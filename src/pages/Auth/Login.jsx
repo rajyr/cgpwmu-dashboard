@@ -26,29 +26,25 @@ const Login = () => {
         setErrorMsg('');
 
         try {
-            // Attempt to sign in via Supabase Auth with a forced timeout to prevent infinite hanging
-            const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Connection to authentication server timed out. Please check your network.')), 15000)
-            );
+            // signIn now uses direct fetch with its own 12s timeout — no extra race needed
+            const result = await signIn(email, password);
 
-            await Promise.race([
-                signIn(email, password),
-                timeoutPromise
-            ]);
-
-            // If successful, route users to their specific hub based on the selected role tab
-            // Note: In a fully production app, we would verify `activeRole` matches `userRole` from context
-            switch (activeRole) {
-                case 'admin':
+            // Route users based on their ACTUAL role from the database, not the selected tab
+            const role = result.resolvedRole || 'DistrictNodal';
+            switch (role) {
+                case 'StateAdmin':
                     navigate('/dashboard');
                     break;
-                case 'pwmu':
+                case 'DistrictNodal':
+                    navigate('/dashboard');
+                    break;
+                case 'PWMUManager':
                     navigate('/dashboard/pwmu');
                     break;
-                case 'village':
+                case 'Sarpanch':
                     navigate('/dashboard/village-hub');
                     break;
-                case 'vendor':
+                case 'Vendor':
                     navigate('/dashboard/vendor-hub');
                     break;
                 default:
@@ -61,6 +57,7 @@ const Login = () => {
             setLoading(false);
         }
     };
+
 
     return (
         <div className="min-h-[calc(100vh-80px)] bg-[#f4f7f6] flex items-center justify-center p-4 lg:p-8 relative overflow-hidden">

@@ -3,8 +3,18 @@ import {
     Settings, Users, Shield, Bell, Save, Sliders, Database, Key, Check, Plus, Search, Filter, MoreVertical
 } from 'lucide-react';
 
+import { useAuth } from '../../context/AuthContext';
+import { Navigate } from 'react-router-dom';
+
 const SettingsDashboard = () => {
+    const { userRole } = useAuth();
     const [activeTab, setActiveTab] = useState('users');
+
+    // Security Lockdown: Double check role inside component
+    const effectiveRole = userRole === 'StateAdmin' ? 'Admin' : userRole;
+    if (effectiveRole !== 'Admin') {
+        return <Navigate to="/dashboard" replace />;
+    }
 
     const tabs = [
         { id: 'users', label: 'User Management', icon: Users },
@@ -14,14 +24,24 @@ const SettingsDashboard = () => {
         { id: 'security', label: 'Security & Access', icon: Shield },
     ];
 
-    // Mock User Data
-    const users = [
+    // Mock User Data with state for Approval demo
+    const [users, setUsers] = useState([
         { id: 1, name: 'Raj Yamgar', email: 'raj@sbm.gov.in', role: 'State Admin', status: 'Active', lastActive: '2 mins ago' },
         { id: 2, name: 'Priya Sharma', email: 'priya@raipur.gov.in', role: 'District Nodal', status: 'Active', lastActive: '1 hr ago' },
         { id: 3, name: 'Amit Kumar', email: 'amit.k@pwmu.in', role: 'PWMU Manager', status: 'Inactive', lastActive: '5 days ago' },
         { id: 4, name: 'Neha Gupta', email: 'neha@sbm.gov.in', role: 'Auditor', status: 'Active', lastActive: '3 hrs ago' },
         { id: 5, name: 'Suresh Patel', email: 'suresh@village.in', role: 'Sarpanch', status: 'Pending', lastActive: 'Never' },
-    ];
+    ]);
+
+    const handleApprove = (userId) => {
+        setUsers(prev => prev.map(u =>
+            u.id === userId ? { ...u, status: 'Active' } : u
+        ));
+    };
+
+    const handleReject = (userId) => {
+        setUsers(prev => prev.filter(u => u.id !== userId));
+    };
 
     const renderContent = () => {
         switch (activeTab) {
@@ -84,8 +104,8 @@ const SettingsDashboard = () => {
                                             </td>
                                             <td className="py-3 px-4">
                                                 <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold ${user.status === 'Active' ? 'bg-green-100 text-green-700' :
-                                                        user.status === 'Pending' ? 'bg-yellow-100 text-yellow-700' :
-                                                            'bg-gray-100 text-gray-600'
+                                                    user.status === 'Pending' ? 'bg-yellow-100 text-yellow-700' :
+                                                        'bg-gray-100 text-gray-600'
                                                     }`}>
                                                     {user.status}
                                                 </span>
@@ -94,9 +114,26 @@ const SettingsDashboard = () => {
                                                 <span className="text-sm text-gray-500">{user.lastActive}</span>
                                             </td>
                                             <td className="py-3 px-4 text-right">
-                                                <button className="p-1 hover:bg-gray-100 rounded text-gray-400 transition-colors">
-                                                    <MoreVertical className="w-4 h-4" />
-                                                </button>
+                                                {user.status === 'Pending' ? (
+                                                    <div className="flex justify-end gap-2">
+                                                        <button
+                                                            onClick={() => handleApprove(user.id)}
+                                                            className="px-2 py-1 bg-green-600 text-white rounded text-xs font-bold hover:bg-green-700"
+                                                        >
+                                                            Approve
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleReject(user.id)}
+                                                            className="px-2 py-1 bg-red-600 text-white rounded text-xs font-bold hover:bg-red-700"
+                                                        >
+                                                            Reject
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <button className="p-1 hover:bg-gray-100 rounded text-gray-400 transition-colors">
+                                                        <MoreVertical className="w-4 h-4" />
+                                                    </button>
+                                                )}
                                             </td>
                                         </tr>
                                     ))}
@@ -317,8 +354,8 @@ const SettingsDashboard = () => {
                                         key={tab.id}
                                         onClick={() => setActiveTab(tab.id)}
                                         className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all ${isActive
-                                                ? 'bg-blue-50 text-blue-700'
-                                                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                                            ? 'bg-blue-50 text-blue-700'
+                                            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                                             }`}
                                     >
                                         <tab.icon className={`w-4 h-4 ${isActive ? 'text-blue-600' : 'text-gray-400'}`} />

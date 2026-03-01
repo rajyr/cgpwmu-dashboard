@@ -27,12 +27,22 @@ import MonitoringAnalytics from './pages/Dashboards/MonitoringAnalytics';
 import SettingsDashboard from './pages/Dashboards/SettingsDashboard';
 import { useAuth } from './context/AuthContext';
 
-// Protected Route Wrapper
-const ProtectedRoute = ({ children }) => {
-    const { user } = useAuth();
+// Protected Route Wrapper with optional Role filtering
+const ProtectedRoute = ({ children, allowedRoles }) => {
+    const { user, userRole } = useAuth();
+
     if (!user) {
         return <Navigate to="/login" replace />;
     }
+
+    if (allowedRoles && !allowedRoles.includes(userRole)) {
+        // Map common role aliases if needed (e.g. StateAdmin -> Admin)
+        const effectiveRole = userRole === 'StateAdmin' ? 'Admin' : userRole;
+        if (!allowedRoles.includes(effectiveRole)) {
+            return <Navigate to="/dashboard" replace />;
+        }
+    }
+
     return children;
 };
 
@@ -72,7 +82,14 @@ function App() {
                     {/* Role-based Hubs (Demoing inside Main Layout) */}
                     <Route path="village-hub" element={<VillageDashboard />} />
                     <Route path="vendor-hub" element={<VendorDashboard />} />
-                    <Route path="settings" element={<SettingsDashboard />} />
+                    <Route
+                        path="settings"
+                        element={
+                            <ProtectedRoute allowedRoles={['Admin']}>
+                                <SettingsDashboard />
+                            </ProtectedRoute>
+                        }
+                    />
 
                     {/* Other protected routes will be added here */}
                 </Route>

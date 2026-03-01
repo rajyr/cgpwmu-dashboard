@@ -11,11 +11,20 @@ import {
     PieChart as RechartsPieChart, Pie, Cell
 } from 'recharts';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const Dashboard = () => {
+    const { userRole } = useAuth();
     const { overview, valueChain } = dashboardData;
     const [date, setDate] = useState(new Date());
     const navigate = useNavigate();
+
+    // Mapping role for display
+    let displayRoleName = userRole || "Admin";
+    if (displayRoleName === 'StateAdmin') displayRoleName = 'Admin';
+    if (displayRoleName === 'DistrictNodal') displayRoleName = 'Nodal Officer';
+    if (displayRoleName === 'PWMUManager') displayRoleName = 'PWMU Manager';
+    if (displayRoleName === 'Sarpanch') displayRoleName = 'Village Admin';
 
     const financialData = [
         { month: 'Apr', revenue: 650000, spending: 580000 },
@@ -66,10 +75,10 @@ const Dashboard = () => {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 animate-fade-in-up">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-800 tracking-tight">
-                        Welcome back, Admin <span className="text-gray-400 font-normal">/</span> <span className="text-2xl font-semibold">आपका स्वागत है, एडमिन</span>
+                        Welcome back, {displayRoleName} <span className="text-gray-400 font-normal">/</span> <span className="text-2xl font-semibold">आपका स्वागत है, {displayRoleName === 'Admin' ? 'एडमिन' : 'अधिकारी'}</span>
                     </h1>
                     <p className="text-sm text-gray-500 mt-2">
-                        Here is what's happening with your PWMU network today. <span className="text-gray-400 mx-1">/</span> आज आपके PWMU नेटवर्क की स्थिति यहां है।
+                        Here is what's happening with the {displayRoleName === 'Admin' ? 'State' : 'Network'} PWMU network today. <span className="text-gray-400 mx-1">/</span> आज नेटवर्क की स्थिति यहां है।
                     </p>
                 </div>
 
@@ -184,10 +193,12 @@ const Dashboard = () => {
                 </div>
             </div>
 
-            {/* Legacy State Overview Elements (Map & Sankey) */}
+            {/* Economic & Spatial Overview */}
             <div className="mt-2 pt-6 border-t border-gray-200 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
                 <div className="mb-6">
-                    <h2 className="text-2xl font-bold text-gray-800">State Economic & Spatial Overview</h2>
+                    <h2 className="text-2xl font-bold text-gray-800">
+                        {displayRoleName === 'Admin' ? 'State' : 'Operational'} Economic & Spatial Overview
+                    </h2>
                     <p className="text-sm text-gray-500 mt-1">Deep dive into geospatial coverage and material flow value chain.</p>
                 </div>
 

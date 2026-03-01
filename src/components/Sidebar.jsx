@@ -61,10 +61,18 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
     // Handle Logout
     const handleLogout = async () => {
         try {
+            // Force redirection even if network is slow/blocked
+            const logoutTimeout = setTimeout(() => {
+                navigate('/login');
+            }, 2000);
+
             await signOut();
+            clearTimeout(logoutTimeout);
             navigate('/login');
         } catch (error) {
             console.error('Error logging out:', error.message);
+            // Always redirect on logout click attempt
+            navigate('/login');
         }
     };
 
