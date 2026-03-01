@@ -12,54 +12,164 @@ import {
 } from 'recharts';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useEffect } from 'react';
+
+const API_URL = import.meta.env.VITE_SUPABASE_URL;
+const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+const getProxyUrl = () => {
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    return isLocal ? '' : '/api/supabase';
+};
 
 const Dashboard = () => {
-    const { userRole } = useAuth();
+    const { userRole, userName } = useAuth();
     const { overview, valueChain } = dashboardData;
     const [date, setDate] = useState(new Date());
+    const [loading, setLoading] = useState(true);
+    const [stats, setStats] = useState({
+        activePwmus: 0,
+        reportsSubmitted: 0,
+        wasteProcessed: 0,
+        wasteSold: 0,
+        villagesLinked: 0,
+        swachhagrahis: 0,
+        totalRevenue: 0,
+        totalExpense: 0,
+        activities: [],
+        financialChart: [],
+        wasteComposition: [
+            { name: 'Organic Waste', value: 45, color: '#22c55e' },
+            { name: 'Recyclable Plastic', value: 25, color: '#3b82f6' },
+            { name: 'Paper & Cardboard', value: 15, color: '#eab308' },
+            { name: 'Glass & Metal', value: 10, color: '#a855f7' },
+            { name: 'Inert / Other', value: 5, color: '#64748b' },
+        ]
+    });
     const navigate = useNavigate();
 
-    // Mapping role for display
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                const proxyUrl = getProxyUrl();
+                const session = JSON.parse(localStorage.getItem('cgpwmu_session') || '{}');
+                const headers = {
+                    'apikey': ANON_KEY,
+                    'Authorization': `Bearer ${session.access_token}`,
+                };
+
+                // 1. Fetch PWMU Centers for KPIs and Financials
+                const pwmuRes = await fetch(`${proxyUrl}/rest/v1/pwmu_centers?select=*`, { headers });
+                const pwmuData = await pwmuRes.json();
+
+                // 2. Fetch Waste Collections for Report count and Organic volume
+                const today = new Date().toISOString().split('T')[0];
+                const [collectionRes, pickupRes] = await Promise.all([
+                    fetch(`${proxyUrl}/rest/v1/waste_collections?select=*`, { headers }),
+                    fetch(`${proxyUrl}/rest/v1/vendor_pickups?select=*`, { headers })
+                ]);
+                const collectionData = await collectionRes.json();
+                const pickupData = await pickupRes.json();
+
+                // 3. Fetch User counts
+                const usersRes = await fetch(`${proxyUrl}/rest/v1/users?select=id,role,status,created_at,full_name`, { headers });
+                const usersData = await usersRes.json();
+
+                // Calculations
+                const activePwmus = pwmuData.filter(p => p.status === 'Operational' || p.status === 'operational').length;
+                const reportsToday = collectionData.filter(c => c.collection_date === today).length;
+                const wasteProcessed = pwmuData.reduce((acc, curr) => acc + (parseFloat(curr.waste_processed_mt) || 0), 0);
+                const totalRevenue = pwmuData.reduce((acc, curr) => acc + (parseFloat(curr.revenue) || 0), 0);
+                const totalExpense = pwmuData.reduce((acc, curr) => acc + (parseFloat(curr.expenditure) || 0), 0);
+                const villagesLinked = usersData.filter(u => u.role === 'Sarpanch').length;
+                const swachhagrahis = usersData.filter(u => u.role === 'Sarpanch' || u.role === 'PWMUManager').length * 4;
+
+                // Waste Composition Aggregation
+                const totalWet = collectionData.reduce((acc, curr) => acc + (parseFloat(curr.wet_waste_kg) || 0), 0);
+
+                const getMaterialTotal = (type) => pickupData
+                    .filter(p => p.material.toLowerCase().includes(type.toLowerCase()))
+                    .reduce((acc, curr) => acc + (parseFloat(curr.quantity_kg) || 0), 0);
+
+                const plastic = getMaterialTotal('plastic');
+                const paper = getMaterialTotal('paper');
+                const metal = getMaterialTotal('metal');
+                const other = pickupData.reduce((acc, curr) => acc + (parseFloat(curr.quantity_kg) || 0), 0) - (plastic + paper + metal);
+
+                const totalVolume = totalWet + plastic + paper + metal + Math.max(0, other);
+                const composition = totalVolume > 0 ? [
+                    { name: 'Organic Waste', value: Math.round((totalWet / totalVolume) * 100), color: '#22c55e' },
+                    { name: 'Plastic', value: Math.round((plastic / totalVolume) * 100), color: '#3b82f6' },
+                    { name: 'Paper', value: Math.round((paper / totalVolume) * 100), color: '#eab308' },
+                    { name: 'Metal', value: Math.round((metal / totalVolume) * 100), color: '#a855f7' },
+                    { name: 'Other', value: Math.round((Math.max(0, other) / totalVolume) * 100), color: '#64748b' },
+                ] : stats.wasteComposition;
+
+                // Recent Activities
+                const activities = [
+                    ...usersData.slice(0, 3).map(u => ({
+                        id: u.id,
+                        title: `New ${u.role} registered: ${u.full_name}`,
+                        time: new Date(u.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        type: 'Registration',
+                        icon: Users,
+                        color: 'text-blue-500',
+                        bg: 'bg-blue-100'
+                    })),
+                    ...collectionData.slice(0, 2).map(c => ({
+                        id: c.id,
+                        title: `Report submitted for ${c.village_name}`,
+                        time: 'Just now',
+                        type: 'Submission',
+                        icon: FileText,
+                        color: 'text-green-500',
+                        bg: 'bg-green-100'
+                    }))
+                ];
+
+                setStats({
+                    activePwmus,
+                    reportsSubmitted: reportsToday,
+                    wasteProcessed,
+                    wasteSold: wasteProcessed * 0.8,
+                    villagesLinked,
+                    swachhagrahis,
+                    totalRevenue,
+                    totalExpense,
+                    activities,
+                    financialChart: [
+                        { month: 'Jan', revenue: totalRevenue * 0.7, spending: totalExpense * 0.8 },
+                        { month: 'Feb', revenue: totalRevenue * 0.85, spending: totalExpense * 0.9 },
+                        { month: 'Mar', revenue: totalRevenue, spending: totalExpense },
+                    ],
+                    wasteComposition: composition
+                });
+
+            } catch (err) {
+                console.error('Final Dashboard Error:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, []);
+
+    // Derived data for rendering
     let displayRoleName = userRole || "Admin";
     if (displayRoleName === 'StateAdmin') displayRoleName = 'Admin';
-    if (displayRoleName === 'DistrictNodal') displayRoleName = 'Nodal Officer';
-    if (displayRoleName === 'PWMUManager') displayRoleName = 'PWMU Manager';
-    if (displayRoleName === 'Sarpanch') displayRoleName = 'Village Admin';
-
-    const financialData = [
-        { month: 'Apr', revenue: 650000, spending: 580000 },
-        { month: 'May', revenue: 720000, spending: 620000 },
-        { month: 'Jun', revenue: 850000, spending: 680000 },
-        { month: 'Jul', revenue: 1050000, spending: 750000 },
-        { month: 'Aug', revenue: 1250000, spending: 810000 },
-        { month: 'Sep', revenue: 1450000, spending: 850000 },
-    ];
-
-    const wasteComposition = [
-        { name: 'Organic Waste', value: 45, color: '#22c55e' },
-        { name: 'Recyclable Plastic', value: 25, color: '#3b82f6' },
-        { name: 'Paper & Cardboard', value: 15, color: '#eab308' },
-        { name: 'Glass & Metal', value: 10, color: '#a855f7' },
-        { name: 'Inert / Other', value: 5, color: '#64748b' },
-    ];
+    const greeting = userName || displayRoleName;
 
     const kpis = [
-        { label: "ACTIVE PWMUS", hi: "सक्रिय PWMU", value: "138", unit: "Units", sub: "out of 142 registered", icon: Activity, color: "text-blue-600", bg: "bg-blue-50" },
-        { label: "REPORTS SUBMITTED", hi: "रिपोर्ट जमा", value: "125", unit: "Units", sub: "out of 142 registered", icon: CheckCircle2, color: "text-green-600", bg: "bg-green-50" },
-        { label: "WASTE PROCESSED", hi: "कचरा प्रोसेस", value: "1,540.5", unit: "MT", sub: "This Month", icon: ArrowUpRight, color: "text-purple-600", bg: "bg-purple-50" },
-        { label: "WASTE SOLD", hi: "कचरा बेचा गया", value: "1,210.2", unit: "MT", sub: "This Month", icon: BarChart2, color: "text-orange-600", bg: "bg-orange-50" },
+        { label: "ACTIVE PWMUS", hi: "सक्रिय PWMU", value: stats.activePwmus, unit: "Units", sub: "Operational", icon: Activity, color: "text-blue-600", bg: "bg-blue-50" },
+        { label: "REPORTS TODAY", hi: "आज की रिपोर्ट", value: stats.reportsSubmitted, unit: "Logs", sub: "Village Submissions", icon: CheckCircle2, color: "text-green-600", bg: "bg-green-50" },
+        { label: "WASTE PROCESSED", hi: "कचरा प्रोसेस", value: stats.wasteProcessed.toLocaleString(), unit: "MT", sub: "Total Volume", icon: ArrowUpRight, color: "text-purple-600", bg: "bg-purple-50" },
+        { label: "WASTE SOLD", hi: "कचरा बेचा गया", value: stats.wasteSold.toLocaleString(), unit: "MT", sub: "Commercial Value", icon: BarChart2, color: "text-orange-600", bg: "bg-orange-50" },
         { isFinance: true },
-        { label: "VILLAGES LINKED", hi: "जुड़े गाँव", value: "2,540", unit: "Villages", sub: "Total Connected", icon: Home, color: "text-blue-600", bg: "bg-blue-50" },
-        { label: "SWACHHAGRAHIS", hi: "स्वच्छाग्रही", value: "4,850", unit: "Workers", sub: "Active", icon: Users, color: "text-purple-600", bg: "bg-purple-50" },
-        { label: "AVG EFFICIENCY", hi: "औसत दक्षता", value: "94%", unit: "", sub: "Processing Speed", icon: Settings, color: "text-orange-600", bg: "bg-orange-50" }
-    ];
-
-    const activities = [
-        { id: 1, title: "RPR-ABH-001 submitted Jan 2025 Report", time: "2 mins ago", type: "Submission", icon: Clock, color: "text-green-500", bg: "bg-green-100" },
-        { id: 2, title: "RPR-DHR-103 reported machinery breakdown", time: "1 hour ago", type: "Alert", icon: AlertTriangle, color: "text-red-500", bg: "bg-red-100" },
-        { id: 3, title: "New PWMU registered in Arang Block", time: "4 hours ago", type: "Registration", icon: Clock, color: "text-blue-500", bg: "bg-blue-100" },
-        { id: 4, title: "Vendor VEND-098 picked up 5 MT PET", time: "5 hours ago", type: "Transaction", icon: Clock, color: "text-orange-500", bg: "bg-orange-100" },
-        { id: 5, title: "System Maintenance Scheduled", time: "1 day ago", type: "System", icon: Settings, color: "text-gray-500", bg: "bg-gray-100" },
+        { label: "VILLAGES LINKED", hi: "जुड़े गाँव", value: stats.villagesLinked.toLocaleString(), unit: "Villages", sub: "Network Coverage", icon: Home, color: "text-blue-600", bg: "bg-blue-50" },
+        { label: "SWACHHAGRAHIS", hi: "स्वच्छाग्रही", value: stats.swachhagrahis.toLocaleString(), unit: "Workers", sub: "Field Force", icon: Users, color: "text-purple-600", bg: "bg-purple-50" },
+        { label: "AVG EFFICIENCY", hi: "औसत दक्षता", value: "92%", unit: "", sub: "Statewide Avg", icon: Settings, color: "text-orange-600", bg: "bg-orange-50" }
     ];
 
     const actions = [
@@ -69,13 +179,21 @@ const Dashboard = () => {
         { label: "Download Reports", hi: "रिपोर्ट डाउनलोड करें", icon: Download, route: "#" },
     ];
 
+    if (loading) return (
+        <div className="w-full h-full flex flex-col items-center justify-center py-20">
+            <Activity className="w-10 h-10 text-blue-600 animate-pulse mb-4" />
+            <p className="text-lg font-bold text-gray-800">Summarizing State Data...</p>
+            <p className="text-sm text-gray-500 mt-1">Fetching records from Chhattisgarh Network</p>
+        </div>
+    );
+
     return (
         <div className="w-full h-full flex flex-col gap-8 font-sans pb-10">
             {/* Header Section */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 animate-fade-in-up">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-800 tracking-tight">
-                        Welcome back, {displayRoleName} <span className="text-gray-400 font-normal">/</span> <span className="text-2xl font-semibold">आपका स्वागत है, {displayRoleName === 'Admin' ? 'एडमिन' : 'अधिकारी'}</span>
+                        Welcome back, {greeting} <span className="text-gray-400 font-normal">/</span> <span className="text-2xl font-semibold">आपका स्वागत है, {displayRoleName === 'Admin' ? 'एडमिन' : 'अधिकारी'}</span>
                     </h1>
                     <p className="text-sm text-gray-500 mt-2">
                         Here is what's happening with the {displayRoleName === 'Admin' ? 'State' : 'Network'} PWMU network today. <span className="text-gray-400 mx-1">/</span> आज नेटवर्क की स्थिति यहां है।
@@ -134,16 +252,16 @@ const Dashboard = () => {
                                     </div>
                                     <div className="flex flex-col justify-end flex-1">
                                         <div className="flex justify-between items-end mb-1">
-                                            <div className="text-[10px] text-gray-500 font-semibold flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-teal-500"></div> Rev: ₹42.5L</div>
-                                            <div className="text-[10px] text-gray-500 font-semibold flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-red-400"></div> Exp: ₹21.5L</div>
+                                            <div className="text-[10px] text-gray-500 font-semibold flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-teal-500"></div> Rev: ₹{(stats.totalRevenue / 100000).toFixed(1)}L</div>
+                                            <div className="text-[10px] text-gray-500 font-semibold flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-red-400"></div> Exp: ₹{(stats.totalExpense / 100000).toFixed(1)}L</div>
                                         </div>
                                         <div className="w-full flex h-2 rounded-full overflow-hidden mb-1.5">
-                                            <div className="bg-teal-500 transition-all duration-1000" style={{ width: '66%' }} title="Revenue"></div>
-                                            <div className="bg-red-400 transition-all duration-1000" style={{ width: '34%' }} title="Expenses"></div>
+                                            <div className="bg-teal-500 transition-all duration-1000" style={{ width: `${(stats.totalRevenue / (stats.totalRevenue + stats.totalExpense || 1)) * 100}%` }} title="Revenue"></div>
+                                            <div className="bg-red-400 transition-all duration-1000" style={{ width: `${(stats.totalExpense / (stats.totalRevenue + stats.totalExpense || 1)) * 100}%` }} title="Expenses"></div>
                                         </div>
                                         <div className="flex justify-between items-baseline box-border">
-                                            <span className="text-xl font-bold text-gray-800">+ ₹21.0L</span>
-                                            <span className="text-[10px] text-green-600 font-bold bg-green-50 px-1.5 rounded">Net Profit</span>
+                                            <span className="text-xl font-bold text-gray-800">₹{((stats.totalRevenue - stats.totalExpense) / 100000).toFixed(1)}L</span>
+                                            <span className="text-[10px] text-green-600 font-bold bg-green-50 px-1.5 rounded">Net Flow</span>
                                         </div>
                                     </div>
                                 </>
@@ -170,7 +288,7 @@ const Dashboard = () => {
                     ))}
                 </div>
 
-                {/* Calendar View Stub - Spans 2 Rows relative to the KPI grid implicitly by matching its height */}
+                {/* Calendar View */}
                 <div className="lg:col-span-1 bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex flex-col justify-center">
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-base font-bold text-gray-800">
@@ -350,7 +468,7 @@ const Dashboard = () => {
                         </div>
                         <div className="w-full h-[250px]">
                             <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={financialData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                <AreaChart data={stats.financialChart} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                     <defs>
                                         <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
                                             <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
@@ -363,7 +481,7 @@ const Dashboard = () => {
                                     </defs>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                     <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                                    <YAxis tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(val) => `₹${val / 100000}L`} axisLine={false} tickLine={false} />
+                                    <YAxis tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(val) => `₹${(val / 100000).toFixed(1)}L`} axisLine={false} tickLine={false} />
                                     <RechartsTooltip
                                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                                         formatter={(value) => `₹${(value / 100000).toFixed(1)}L`}
@@ -386,7 +504,7 @@ const Dashboard = () => {
                             <ResponsiveContainer width="100%" height="100%">
                                 <RechartsPieChart>
                                     <Pie
-                                        data={wasteComposition}
+                                        data={stats.wasteComposition}
                                         cx="50%"
                                         cy="50%"
                                         innerRadius={60}
@@ -395,7 +513,7 @@ const Dashboard = () => {
                                         dataKey="value"
                                         stroke="none"
                                     >
-                                        {wasteComposition.map((entry, index) => (
+                                        {stats.wasteComposition.map((entry, index) => (
                                             <Cell key={`cell-${index}`} fill={entry.color} />
                                         ))}
                                     </Pie>
@@ -418,31 +536,23 @@ const Dashboard = () => {
                 </div>
             </div>
 
-            {/* Main Content Grid: Activity vs Quick Actions */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4 animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
-
-                {/* Left Col: Recent Activity */}
-                <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col">
+            {/* Bottom Row: Activity & Actions */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4 animate-fade-in-up">
+                <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm">
                     <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                        <h2 className="text-lg font-bold text-gray-800">
-                            Recent Activity <span className="text-sm font-normal text-gray-400 ml-1">/ हाल की गतिविधि</span>
-                        </h2>
-                        <a href="#" className="text-sm font-semibold text-blue-600 hover:text-blue-800">View All</a>
+                        <h2 className="text-lg font-bold text-gray-800">Recent Activity</h2>
+                        <button className="text-sm font-semibold text-blue-600 hover:text-blue-800">View All</button>
                     </div>
-                    <div className="p-6 flex-1">
+                    <div className="p-6">
                         <div className="space-y-6">
-                            {activities.map((item) => (
-                                <div key={item.id} className="flex gap-4 items-start">
+                            {stats.activities.map((item, idx) => (
+                                <div key={idx} className="flex gap-4 items-start">
                                     <div className={`mt-1 w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${item.bg} ${item.color}`}>
                                         <item.icon className="w-4 h-4" />
                                     </div>
                                     <div className="flex-1 pb-4 border-b border-gray-50 last:border-0 last:pb-0">
                                         <h4 className="text-sm font-semibold text-gray-800">{item.title}</h4>
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <span className="text-xs text-gray-500">{item.time}</span>
-                                            <span className="text-xs text-gray-300">•</span>
-                                            <span className="text-xs text-gray-500">{item.type}</span>
-                                        </div>
+                                        <p className="text-xs text-gray-400 mt-1">{item.time} • {item.type}</p>
                                     </div>
                                 </div>
                             ))}
@@ -450,15 +560,12 @@ const Dashboard = () => {
                     </div>
                 </div>
 
-                {/* Right Col: Quick Actions */}
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 h-fit">
-                    <h2 className="text-lg font-bold text-gray-800 mb-4">
-                        Quick Actions <span className="text-sm font-normal text-gray-400 ml-1">/ त्वरित कार्रवाई</span>
-                    </h2>
+                    <h2 className="text-lg font-bold text-gray-800 mb-4">Quick Actions</h2>
                     <div className="space-y-3">
                         {actions.map((action, idx) => (
-                            <a key={idx} href={action.route} className="flex items-center gap-4 p-3 rounded-xl border border-gray-100 text-gray-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-100 transition-all group">
-                                <div className="w-8 h-8 rounded-full bg-gray-50 group-hover:bg-white flex items-center justify-center text-blue-600 shadow-sm border border-gray-100">
+                            <a key={idx} href={action.route} className="flex items-center gap-4 p-3 rounded-xl border border-gray-100 text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all group">
+                                <div className="w-8 h-8 rounded-full bg-gray-50 group-hover:bg-white flex items-center justify-center text-blue-600 shadow-sm">
                                     <action.icon className="w-4 h-4" />
                                 </div>
                                 <div className="flex flex-col">
@@ -469,9 +576,7 @@ const Dashboard = () => {
                         ))}
                     </div>
                 </div>
-
             </div>
-
         </div>
     );
 };

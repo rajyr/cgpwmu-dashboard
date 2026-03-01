@@ -21,8 +21,8 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Fetch real userRole and signOut from Supabase session
-    const { userRole, signOut } = useAuth();
+    // Fetch real userRole, userName and signOut from auth session
+    const { userRole, userName, signOut } = useAuth();
     const navigate = useNavigate();
 
     // Default to 'Village' if null (e.g. while loading or logged out edge-case)
@@ -76,8 +76,22 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
         }
     };
 
-    // Helper for display role
+    // Helper for display
     const displayRole = userRole || effectiveRole;
+    const displayName = userName || displayRole;
+    const initials = userName
+        ? userName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase()
+        : displayRole.slice(0, 2).toUpperCase();
+
+    // Friendly role labels for subtitle
+    const roleLabelMap = {
+        'StateAdmin': 'State Admin',
+        'DistrictNodal': 'Nodal Officer',
+        'PWMUManager': 'PWMU Manager',
+        'Sarpanch': 'Village Admin',
+        'Vendor': 'Vendor',
+    };
+    const friendlyRole = roleLabelMap[userRole] || displayRole;
 
     const sidebarContent = (
         <div className="flex flex-col h-full bg-transparent relative">
@@ -146,12 +160,12 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
                 <div onClick={handleLogout} className={`flex items-center cursor-pointer hover:bg-gray-50 rounded-lg transition-colors ${isActuallyCollapsed ? 'justify-center p-1' : 'justify-between p-2'}`}>
                     <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-sm flex-shrink-0 uppercase">
-                            {displayRole.slice(0, 2)}
+                            {initials}
                         </div>
                         {!isActuallyCollapsed && (
                             <div className="overflow-hidden">
-                                <p className="text-sm font-bold text-gray-800 leading-tight truncate capitalize">{displayRole}</p>
-                                <p className="text-[11px] text-gray-400 truncate">Settings & Session</p>
+                                <p className="text-sm font-bold text-gray-800 leading-tight truncate capitalize">{displayName}</p>
+                                <p className="text-[11px] text-gray-400 truncate">{friendlyRole}</p>
                             </div>
                         )}
                     </div>

@@ -1,65 +1,107 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     Activity, ArrowUpRight, CheckCircle2, Factory, Filter,
-    IndianRupee, TrendingUp, AlertCircle, Clock
+    IndianRupee, TrendingUp, AlertCircle, Clock, Loader2
 } from 'lucide-react';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
-    ScatterChart, Scatter, ZAxis
+    ScatterChart, Scatter, ZAxis, Cell
 } from 'recharts';
+import { useAuth } from '../../context/AuthContext';
+
+const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const getProxyUrl = () => (import.meta.env.DEV ? '/supabase' : import.meta.env.VITE_SUPABASE_URL);
 
 const DistrictView = () => {
-    // Top KPIs Data
+    const { userRole } = useAuth();
+    const [selectedDistrict, setSelectedDistrict] = useState('All Districts');
+    const [pwmus, setPwmus] = useState([]);
+    const [collections, setCollections] = useState([]);
+    const [pickups, setPickups] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const session = JSON.parse(localStorage.getItem('cgpwmu_session') || '{}');
+                const token = session.access_token;
+                if (!token) return;
+                const proxyUrl = getProxyUrl();
+
+                const [pwmuRes, collRes, pickRes] = await Promise.all([
+                    fetch(`${proxyUrl}/rest/v1/pwmu_centers?select=*`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } }),
+                    fetch(`${proxyUrl}/rest/v1/waste_collections?select=*`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } }),
+                    fetch(`${proxyUrl}/rest/v1/vendor_pickups?select=*`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } })
+                ]);
+
+                if (pwmuRes.ok) setPwmus(await pwmuRes.json());
+                if (collRes.ok) setCollections(await collRes.json());
+                if (pickRes.ok) setPickups(await pickRes.json());
+
+            } catch (err) {
+                console.error('Error fetching district data:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, []);
+
+    // Filtered data based on location
+    const filteredPwmus = useMemo(() =>
+        selectedDistrict === 'All Districts' ? pwmus : pwmus.filter(p => p.district === selectedDistrict)
+        , [pwmus, selectedDistrict]);
+
+    const filteredCollections = useMemo(() =>
+        selectedDistrict === 'All Districts' ? collections : collections.filter(c => c.district === selectedDistrict)
+        , [collections, selectedDistrict]);
+
+    // KPI Calculations
+    const totalPwmus = filteredPwmus.length;
+    const activePwmus = filteredPwmus.filter(p => p.status === 'operational').length;
+    const totalWasteMT = useMemo(() => {
+        const processed = filteredPwmus.reduce((sum, p) => sum + Number(p.waste_processed_mt || 0), 0);
+        const collectedKg = filteredCollections.reduce((sum, c) => sum + Number(c.wet_waste_kg + c.dry_waste_kg), 0);
+        return (processed + (collectedKg / 1000)).toFixed(1);
+    }, [filteredPwmus, filteredCollections]);
+
+    const totalRevenue = filteredPwmus.reduce((sum, p) => sum + Number(p.revenue || 0), 0);
+    const totalExpenditure = filteredPwmus.reduce((sum, p) => sum + Number(p.expenditure || 0), 0);
+    const netProfit = totalRevenue - totalExpenditure;
+
     const kpis = [
-        { label: "Total PWMUs", value: "45", icon: Factory, color: "text-blue-600", bg: "bg-blue-50" },
-        { label: "Active PWMUs", value: "42", icon: Activity, color: "text-green-600", bg: "bg-green-50" },
-        { label: "Reporting %", value: "88%", icon: CheckCircle2, color: "text-purple-600", bg: "bg-purple-50", trend: "+5%" },
-        { label: "Total Waste", value: "450.5 MT", icon: ArrowUpRight, color: "text-orange-600", bg: "bg-orange-50", trend: "+12%" },
-        { label: "Revenue", value: "₹12.50L", icon: IndianRupee, color: "text-emerald-600", bg: "bg-emerald-50", trend: "+15%" },
-        { label: "Net Profit", value: "₹2.50L", icon: TrendingUp, color: "text-indigo-600", bg: "bg-indigo-50", trend: "+8%" }
+        { label: "Total PWMUs", value: totalPwmus, icon: Factory, color: "text-blue-600", bg: "bg-blue-50" },
+        { label: "Active PWMUs", value: activePwmus, icon: Activity, color: "text-green-600", bg: "bg-green-50" },
+        { label: "Reporting %", value: totalPwmus > 0 ? `${Math.round((activePwmus / totalPwmus) * 100)}%` : '0%', icon: CheckCircle2, color: "text-purple-600", bg: "bg-purple-50" },
+        { label: "Total Waste", value: `${totalWasteMT} MT`, icon: ArrowUpRight, color: "text-orange-600", bg: "bg-orange-50" },
+        { label: "Revenue", value: `₹${(totalRevenue / 100000).toFixed(2)}L`, icon: IndianRupee, color: "text-emerald-600", bg: "bg-emerald-50" },
+        { label: "Net Profit", value: `₹${(netProfit / 100000).toFixed(2)}L`, icon: TrendingUp, color: "text-indigo-600", bg: "bg-indigo-50" }
     ];
 
-    // Processing Comparison Data (Bar Chart)
-    const processingData = [
-        { name: 'PWMU Alpha', percentage: 95, fill: '#3b82f6' },
-        { name: 'PWMU Beta', percentage: 82, fill: '#3b82f6' },
-        { name: 'PWMU Gamma', percentage: 45, fill: '#ef4444' }, // Weak performer
-        { name: 'PWMU Delta', percentage: 88, fill: '#3b82f6' },
-        { name: 'PWMU Epsilon', percentage: 92, fill: '#3b82f6' },
-        { name: 'PWMU Zeta', percentage: 30, fill: '#ef4444' },   // Weak performer
-        { name: 'PWMU Eta', percentage: 75, fill: '#3b82f6' }
-    ];
+    // Chart Data: Processing Efficiency
+    const processingData = filteredPwmus.map(p => ({
+        name: p.name,
+        percentage: p.capacity_mt > 0 ? Math.round((p.waste_processed_mt / p.capacity_mt) * 100) : 0,
+        fill: '#3b82f6'
+    }));
 
-    // Financial Viability Data (Scatter Plot)
-    const financialData = [
-        { name: 'PWMU Alpha', cost: 2.5, revenue: 3.8, fill: '#22c55e' }, // High Rev, Low Cost (Good)
-        { name: 'PWMU Beta', cost: 4.2, revenue: 4.8, fill: '#3b82f6' },  // High Rev, High Cost 
-        { name: 'PWMU Gamma', cost: 5.2, revenue: 1.2, fill: '#ef4444' }, // Low Rev, High Cost (Bad)
-        { name: 'PWMU Delta', cost: 2.2, revenue: 3.5, fill: '#22c55e' },
-        { name: 'PWMU Epsilon', cost: 3.0, revenue: 3.2, fill: '#22c55e' },
-        { name: 'PWMU Zeta', cost: 5.7, revenue: 2.0, fill: '#ef4444' },
-        { name: 'PWMU Eta', cost: 2.8, revenue: 1.5, fill: '#eab308' }    // Low Rev, Low Cost (Warning)
-    ];
+    // Chart Data: Financial Viability (using rates or totals)
+    const financialData = filteredPwmus.map(p => ({
+        name: p.name,
+        cost: p.waste_processed_mt > 0 ? (p.expenditure / (p.waste_processed_mt * 1000)).toFixed(2) : 0,
+        revenue: p.waste_processed_mt > 0 ? (p.revenue / (p.waste_processed_mt * 1000)).toFixed(2) : 0,
+    }));
 
-    // Machine Health Matrix Data
-    const matrixData = [
-        { name: 'PWMU Alpha', machines: ['ok', 'ok', 'ok', 'ok', 'ok', 'ok'] },
-        { name: 'PWMU Beta', machines: ['ok', 'fail', 'ok', 'ok', 'fail', 'ok'] },
-        { name: 'PWMU Gamma', machines: ['fail', 'fail', 'ok', 'fail', 'ok', 'ok'] },
-        { name: 'PWMU Delta', machines: ['ok', 'ok', 'ok', 'ok', 'ok', 'ok'] },
-    ];
     const machineTypes = ['FATKA', 'BALING', 'SHREDDER', 'AGGLOM.', 'MIXER', 'GRANULAR'];
 
-    // Reporting Compliance Data
-    const complianceData = [
-        { name: 'PWMU Alpha', status: 'Submitted', color: 'bg-green-500', bg: 'bg-green-100', text: 'text-green-700', width: '100%' },
-        { name: 'PWMU Beta', status: 'Submitted', color: 'bg-green-500', bg: 'bg-green-100', text: 'text-green-700', width: '100%' },
-        { name: 'PWMU Gamma', status: 'Delayed (12d late)', color: 'bg-red-500', bg: 'bg-red-100', text: 'text-red-700', width: '25%', alert: true },
-        { name: 'PWMU Delta', status: 'Pending (5d late)', color: 'bg-yellow-400', bg: 'bg-yellow-100', text: 'text-yellow-700', width: '70%' },
-        { name: 'PWMU Epsilon', status: 'Submitted', color: 'bg-green-500', bg: 'bg-green-100', text: 'text-green-700', width: '100%' },
-        { name: 'PWMU Zeta', status: 'Delayed (15d late)', color: 'bg-red-500', bg: 'bg-red-100', text: 'text-red-700', width: '25%', alert: true },
-        { name: 'PWMU Eta', status: 'Pending (2d late)', color: 'bg-yellow-400', bg: 'bg-yellow-100', text: 'text-yellow-700', width: '85%' },
-    ];
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64 text-indigo-600">
+                <Loader2 className="w-8 h-8 animate-spin mr-3" />
+                <span className="font-bold">Aggregating district metrics...</span>
+            </div>
+        );
+    }
 
     return (
         <div className="w-full h-full flex flex-col gap-6 font-sans pb-10">
@@ -74,29 +116,25 @@ const DistrictView = () => {
                 <div className="flex items-center gap-4">
                     {/* Filter Dropdowns */}
                     <div className="flex bg-white border border-gray-200 rounded-lg shadow-sm p-1">
-                        <select className="bg-transparent text-sm text-gray-700 px-3 py-1.5 outline-none border-r border-gray-200 cursor-pointer hover:bg-gray-50 rounded-l-md transition-colors">
-                            <option>District Wise</option>
-                            <option>Raipur</option>
-                            <option>Durg</option>
-                        </select>
-                        <select className="bg-transparent text-sm text-gray-700 px-3 py-1.5 outline-none border-r border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors">
-                            <option>Block Wise</option>
-                            <option>Arang</option>
-                            <option>Abhanpur</option>
-                        </select>
-                        <select className="bg-transparent text-sm text-gray-700 px-3 py-1.5 outline-none border-r border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors hidden lg:block">
-                            <option>Gram Panchayat</option>
-                        </select>
-                        <select className="bg-transparent text-sm text-gray-700 px-3 py-1.5 outline-none cursor-pointer hover:bg-gray-50 rounded-r-md transition-colors">
-                            <option>PWMU Wise</option>
+                        <select
+                            className="bg-transparent text-sm text-gray-700 px-3 py-1.5 outline-none cursor-pointer hover:bg-gray-50 rounded-md transition-colors"
+                            value={selectedDistrict}
+                            onChange={(e) => setSelectedDistrict(e.target.value)}
+                        >
+                            <option value="All Districts">All Districts</option>
+                            {[...new Set(pwmus.map(p => p.district))].map(d => (
+                                <option key={d} value={d}>{d}</option>
+                            ))}
                         </select>
                     </div>
 
                     <div className="flex flex-col items-end">
-                        <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Overall Status</span>
+                        <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">State Status</span>
                         <div className="flex items-center gap-1.5">
-                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                            <span className="text-sm font-bold text-green-600">Operational</span>
+                            <div className={`w-2 h-2 ${activePwmus === totalPwmus ? 'bg-green-500' : 'bg-yellow-500'} rounded-full animate-pulse`}></div>
+                            <span className={`text-sm font-bold ${activePwmus === totalPwmus ? 'text-green-600' : 'text-yellow-600'}`}>
+                                {activePwmus === totalPwmus ? 'Fully Operational' : 'Partial Maintenance'}
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -192,16 +230,21 @@ const DistrictView = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {matrixData.map((row, i) => (
+                                {filteredPwmus.map((p, i) => (
                                     <tr key={i} className="border-t border-gray-50 hover:bg-gray-50/50 transition-colors">
-                                        <td className="py-4 text-sm font-semibold text-gray-700">{row.name}</td>
-                                        {row.machines.map((status, j) => (
-                                            <td key={j} className="py-4 text-center">
-                                                <div className="flex justify-center">
-                                                    <div className={`w-3.5 h-3.5 rounded-sm ${status === 'ok' ? 'bg-green-500 shadow-sm shadow-green-200' : 'bg-red-500 shadow-sm shadow-red-200 animate-pulse'}`}></div>
-                                                </div>
-                                            </td>
-                                        ))}
+                                        <td className="py-4 text-sm font-semibold text-gray-700">{p.name}</td>
+                                        {machineTypes.map((_, j) => {
+                                            const isOperational = p.status?.toLowerCase() === 'operational';
+                                            return (
+                                                <td key={j} className="py-4 text-center">
+                                                    <div className="flex justify-center">
+                                                        <div className={`w-3.5 h-3.5 rounded-sm ${isOperational
+                                                            ? 'bg-green-500 shadow-sm shadow-green-200'
+                                                            : 'bg-red-500 shadow-sm shadow-red-200 animate-pulse'}`}></div>
+                                                    </div>
+                                                </td>
+                                            );
+                                        })}
                                     </tr>
                                 ))}
                             </tbody>
@@ -213,25 +256,36 @@ const DistrictView = () => {
                 <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
                     <div className="mb-6">
                         <h2 className="text-lg font-bold text-gray-800">Reporting Compliance</h2>
-                        <p className="text-xs text-gray-500 mt-1">Submission status with auto-flagging for &gt;10 days delay.</p>
+                        <p className="text-xs text-gray-500 mt-1">Submission status based on logs from the last 7 days.</p>
                     </div>
                     <div className="space-y-6">
-                        {complianceData.map((item, i) => (
-                            <div key={i} className="w-full">
-                                <div className="flex justify-between items-center mb-1.5">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm font-semibold text-gray-700">{item.name}</span>
-                                        {item.alert && <AlertCircle className="w-3.5 h-3.5 text-red-500" />}
+                        {filteredPwmus.map((p, i) => {
+                            const lastWeek = new Date();
+                            lastWeek.setDate(lastWeek.getDate() - 7);
+
+                            const hasRecentLogs = collections.some(c =>
+                                c.district === p.district &&
+                                new Date(c.collection_date) >= lastWeek
+                            );
+
+                            const isDelayed = !hasRecentLogs;
+                            return (
+                                <div key={i} className="w-full">
+                                    <div className="flex justify-between items-center mb-1.5">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-semibold text-gray-700">{p.name}</span>
+                                            {isDelayed && <AlertCircle className="w-3.5 h-3.5 text-red-500" />}
+                                        </div>
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isDelayed ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                                            {isDelayed ? 'Reporting Gap' : 'Active'}
+                                        </span>
                                     </div>
-                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${item.bg} ${item.text}`}>
-                                        {item.status}
-                                    </span>
+                                    <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                        <div className={`h-full rounded-full ${isDelayed ? 'bg-red-500' : 'bg-green-500'}`} style={{ width: isDelayed ? '30%' : '100%' }}></div>
+                                    </div>
                                 </div>
-                                <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                    <div className={`h-full rounded-full ${item.color}`} style={{ width: item.width }}></div>
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
 

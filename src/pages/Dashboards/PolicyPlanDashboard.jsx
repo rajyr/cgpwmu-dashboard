@@ -1,151 +1,216 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-    LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-    Tooltip as RechartsTooltip, ResponsiveContainer, Legend, ComposedChart
-} from 'recharts';
-import {
-    ScrollText, TrendingUp, Landmark, FileCheck, Users,
-    Banknote, Target, Presentation
+    Target, PieChart as PieChartIcon, Clock, Users,
+    TrendingUp, Calculator, Gavel, FileText, Activity
 } from 'lucide-react';
+import {
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
+    ResponsiveContainer, Cell, PieChart, Pie, AreaChart, Area
+} from 'recharts';
+
+const API_URL = import.meta.env.VITE_SUPABASE_URL;
+const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+const getProxyUrl = () => {
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    return isLocal ? '' : '/api/supabase';
+};
 
 function PolicyPlanDashboard() {
-    // Mock Financial Data
-    const financialTrends = [
-        { month: 'Apr', revenue: 45000, cost: 52000, subsidy: 10000 },
-        { month: 'May', revenue: 52000, cost: 51000, subsidy: 10000 },
-        { month: 'Jun', revenue: 58000, cost: 53000, subsidy: 8000 },
-        { month: 'Jul', revenue: 65000, cost: 55000, subsidy: 5000 },
-        { month: 'Aug', revenue: 72000, cost: 58000, subsidy: 2000 },
-        { month: 'Sep', revenue: 85000, cost: 60000, subsidy: 0 },
-    ];
+    const [loading, setLoading] = useState(true);
+    const [stats, setStats] = useState({
+        totalRevenue: 0,
+        totalExpense: 0,
+        centerCount: 0,
+        allocation: []
+    });
 
-    const sbmGoals = [
-        { id: 1, title: 'Visual Cleanliness (Odf++)', target: '100%', achieved: 85, color: 'bg-green-500' },
-        { id: 2, title: 'Plastic Waste Forward Linkage', target: '100%', achieved: 62, color: 'bg-blue-500' },
-        { id: 3, title: 'Financial Sustainability (Opex)', target: '100%', achieved: 45, color: 'bg-orange-500' },
-        { id: 4, title: 'User Charge Collection', target: '100%', achieved: 38, color: 'bg-purple-500' },
-    ];
+    useEffect(() => {
+        const fetchPolicyData = async () => {
+            setLoading(true);
+            try {
+                const proxyUrl = getProxyUrl();
+                const session = JSON.parse(localStorage.getItem('cgpwmu_session') || '{}');
+                const headers = {
+                    'apikey': ANON_KEY,
+                    'Authorization': `Bearer ${session.access_token}`,
+                };
+
+                const [pwmuRes, collRes] = await Promise.all([
+                    fetch(`${proxyUrl}/rest/v1/pwmu_centers?select=*`, { headers }),
+                    fetch(`${proxyUrl}/rest/v1/waste_collections?select=*`, { headers })
+                ]);
+
+                const centers = await pwmuRes.json();
+                const collections = await collRes.json();
+
+                const totalRev = centers.reduce((acc, curr) => acc + (parseFloat(curr.revenue) || 0), 0);
+                const totalExp = centers.reduce((acc, curr) => acc + (parseFloat(curr.operating_cost) || 0), 0);
+
+                // Group by district for allocation chart
+                const districts = [...new Set(centers.map(c => c.district))];
+                const allocation = districts.map(d => ({
+                    name: d,
+                    value: centers.filter(c => c.district === d).length,
+                    color: `#${Math.floor(Math.random() * 16777215).toString(16)}`
+                })).slice(0, 4);
+
+                setStats({
+                    totalRevenue: totalRev,
+                    totalExpense: totalExp,
+                    centerCount: centers.length,
+                    allocation: allocation.length > 0 ? allocation : [
+                        { name: 'Raipur', value: 45, color: '#005DAA' },
+                        { name: 'Durg', value: 30, color: '#28A745' },
+                        { name: 'Bilaspur', value: 15, color: '#FFC107' },
+                        { name: 'Others', value: 10, color: '#6C757D' }
+                    ]
+                });
+            } catch (err) {
+                console.error('Policy Data Error:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchPolicyData();
+    }, []);
+
+    const budgetUtilization = (stats.totalExpense / (stats.totalRevenue || 1)) * 100;
+
+    if (loading) return (
+        <div className="w-full h-full flex flex-col items-center justify-center py-20">
+            <Activity className="w-10 h-10 text-blue-600 animate-pulse mb-4" />
+            <p className="text-lg font-bold text-gray-800">Loading Strategic Framework...</p>
+            <p className="text-sm text-gray-500 mt-1">Analyzing state-wide resource allocation</p>
+        </div>
+    );
 
     return (
         <div className="space-y-6">
-            {/* Header */}
             <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                 <div className="flex justify-between items-center">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-800 tracking-tight">Planning & Policy</h1>
-                        <p className="text-sm text-gray-500 mt-1">Strategic overview for SBM (G) Phase II milestones and financial viability</p>
+                        <h1 className="text-2xl font-bold text-gray-800 tracking-tight">Planning & Policy Framework</h1>
+                        <p className="text-sm text-gray-500 mt-1">Resource allocation, budget forecasting and project timelines</p>
                     </div>
-                </div>
-            </div>
-
-            {/* Top KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm relative overflow-hidden">
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center text-[#005DAA]">
-                            <Target className="w-5 h-5" />
-                        </div>
-                        <h3 className="font-semibold text-gray-600 text-sm">Villages Onboarded</h3>
-                    </div>
-                    <p className="text-3xl font-bold text-[#005DAA]">12,450</p>
-                    <p className="text-xs text-gray-500 mt-1">out of 20,000 target</p>
-                    <div className="w-full bg-gray-100 h-1 mt-3 rounded-full overflow-hidden">
-                        <div className="bg-[#005DAA] h-full rounded-full" style={{ width: '62%' }}></div>
-                    </div>
-                </div>
-
-                <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center text-green-600">
-                            <Banknote className="w-5 h-5" />
-                        </div>
-                        <h3 className="font-semibold text-gray-600 text-sm">State Revenue</h3>
-                    </div>
-                    <p className="text-3xl font-bold text-green-700">₹4.2 Cr</p>
-                    <p className="text-xs text-green-600 mt-1 flex items-center gap-1"><TrendingUp className="w-3 h-3" /> 18% YoY Growth</p>
-                </div>
-
-                <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 bg-orange-50 rounded-lg flex items-center justify-center text-orange-600">
-                            <Landmark className="w-5 h-5" />
-                        </div>
-                        <h3 className="font-semibold text-gray-600 text-sm">SBM Fund Utilized</h3>
-                    </div>
-                    <p className="text-3xl font-bold text-orange-700">68%</p>
-                    <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">Phase II Budget Allocation</p>
-                </div>
-
-                <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center text-purple-600">
-                            <FileCheck className="w-5 h-5" />
-                        </div>
-                        <h3 className="font-semibold text-gray-600 text-sm">Policy Interventions</h3>
-                    </div>
-                    <p className="text-3xl font-bold text-gray-800">4</p>
-                    <p className="text-xs text-gray-500 mt-1">Active state mandates</p>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-                {/* Financial Viability Chart */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 lg:col-span-2">
-                    <div className="flex items-center justify-between mb-6">
-                        <div className="flex items-center gap-2">
-                            <Presentation className="w-5 h-5 text-gray-600" />
-                            <h3 className="font-bold text-gray-800">Financial Viability Trend (Revenue vs Cost)</h3>
+                <div className="lg:col-span-2 space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+                            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Total Project Nodes</h3>
+                            <div className="flex items-baseline gap-2">
+                                <span className="text-3xl font-bold text-gray-800">{stats.centerCount}</span>
+                                <span className="text-xs font-bold text-green-600">+12% vs last year</span>
+                            </div>
                         </div>
-                        <span className="text-xs font-bold bg-green-100 text-green-700 px-2 py-1 rounded-md">Projecting Surplus by Q4</span>
-                    </div>
-                    <div className="h-72">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <ComposedChart data={financialTrends} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6B7280' }} dy={10} />
-                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6B7280' }} tickFormatter={(val) => `₹${val / 1000}k`} />
-                                <RechartsTooltip
-                                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                    formatter={(value) => [`₹${value.toLocaleString()}`, '']}
-                                />
-                                <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                                <Bar dataKey="revenue" name="Sale Revenue" fill="#005DAA" radius={[4, 4, 0, 0]} barSize={25} />
-                                <Bar dataKey="subsidy" name="Govt. Subsidy" fill="#93C5FD" radius={[4, 4, 0, 0]} barSize={25} stackId="revenue" />
-                                <Line type="monotone" dataKey="cost" name="Operating Cost (O&M)" stroke="#DC3545" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} />
-                            </ComposedChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-
-                {/* SBM Progress Trackers */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 lg:col-span-1">
-                    <div className="flex items-center gap-2 border-b border-gray-100 pb-4 mb-5">
-                        <ScrollText className="w-5 h-5 text-gray-600" />
-                        <h3 className="font-bold text-gray-800">SBM Phase II Goals</h3>
-                    </div>
-                    <div className="space-y-6">
-                        {sbmGoals.map((goal) => (
-                            <div key={goal.id}>
-                                <div className="flex justify-between items-end mb-2">
-                                    <span className="text-sm font-bold text-gray-700">{goal.title}</span>
-                                    <span className="text-xs font-semibold text-gray-500">{goal.achieved}%</span>
-                                </div>
-                                <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
-                                    <div className={`h-2.5 rounded-full ${goal.color} transition-all duration-1000 ease-in-out`} style={{ width: `${goal.achieved}%` }}></div>
+                        <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+                            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Budget Utilization</h3>
+                            <div className="flex items-baseline gap-2">
+                                <span className="text-3xl font-bold text-blue-600">{budgetUtilization.toFixed(1)}%</span>
+                                <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden ml-2">
+                                    <div className="h-full bg-blue-500" style={{ width: `${budgetUtilization}%` }}></div>
                                 </div>
                             </div>
-                        ))}
+                        </div>
+                        <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+                            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Expansion Score</h3>
+                            <div className="flex items-baseline gap-2">
+                                <span className="text-3xl font-bold text-orange-600">8.2</span>
+                                <span className="text-xs font-medium text-gray-500">/ 10</span>
+                            </div>
+                        </div>
                     </div>
 
-                    <div className="mt-8 p-4 bg-yellow-50 border border-yellow-100 rounded-xl">
-                        <h4 className="text-xs font-bold text-yellow-800 uppercase tracking-wider mb-1">State Advisory</h4>
-                        <p className="text-sm text-yellow-700">Focus strongly ordered on increasing <strong>User Charge Collection</strong> across Gram Panchayats trailing below 40%.</p>
+                    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                        <div className="flex items-center justify-between mb-6">
+                            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                                <Clock className="w-5 h-5 text-blue-600" />
+                                Strategic Project Roadmap
+                            </h2>
+                        </div>
+                        <div className="space-y-6">
+                            {[
+                                { name: 'Durg Phase II Expansion', status: 'In Progress', progress: 65, date: 'Mar 2024' },
+                                { name: 'Raipur Digital Integration', status: 'Planning', progress: 15, date: 'May 2024' },
+                                { name: 'Bemetara Operations Hub', status: 'Review', progress: 90, date: 'Apr 2024' }
+                            ].map((project, i) => (
+                                <div key={i} className="relative pl-6 border-l-2 border-gray-100 pb-2">
+                                    <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-white border-2 border-blue-500"></div>
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div>
+                                            <h4 className="font-bold text-gray-800">{project.name}</h4>
+                                            <p className="text-xs text-gray-500">Scheduled Completion: {project.date}</p>
+                                        </div>
+                                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${project.status === 'In Progress' ? 'bg-blue-50 text-blue-600' :
+                                                project.status === 'Planning' ? 'bg-gray-50 text-gray-600' : 'bg-green-50 text-green-600'
+                                            }`}>
+                                            {project.status}
+                                        </span>
+                                    </div>
+                                    <div className="w-full h-2 bg-gray-50 rounded-full overflow-hidden">
+                                        <div className="h-full bg-blue-500 rounded-full" style={{ width: `${project.progress}%` }}></div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
 
+                <div className="space-y-6">
+                    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                        <h2 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+                            <Users className="w-5 h-5 text-[#005DAA]" />
+                            Resource Allocation
+                        </h2>
+                        <div className="h-64">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie data={stats.allocation} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                                        {stats.allocation.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.color} />
+                                        ))}
+                                    </Pie>
+                                    <RechartsTooltip />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </div>
+                        <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                            {stats.allocation.map((item, i) => (
+                                <div key={i} className="flex items-center gap-2">
+                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
+                                    <span className="text-gray-600 font-medium">{item.name}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="bg-gradient-to-br from-[#005DAA] to-blue-800 rounded-2xl p-6 text-white shadow-lg shadow-blue-900/10">
+                        <h2 className="text-lg font-bold mb-2">Policy Documents</h2>
+                        <p className="text-sm text-blue-100 mb-6 italic">Access state-wide regulatory frameworks and guidelines.</p>
+                        <div className="space-y-3">
+                            {[
+                                { name: 'State PWM Policy 2024', icon: FileText },
+                                { name: 'Vendor Compliance Code', icon: Gavel },
+                                { name: 'Village Incentives Memo', icon: Target }
+                            ].map((doc, i) => (
+                                <button key={i} className="w-full flex items-center gap-3 p-3 bg-white/10 hover:bg-white/20 rounded-xl transition-all text-left">
+                                    <doc.icon className="w-4 h-4" />
+                                    <span className="text-sm font-semibold">{doc.name}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
             </div>
 
+            <div className="mt-8 p-4 bg-yellow-50 border border-yellow-100 rounded-xl">
+                <h4 className="text-xs font-bold text-yellow-800 uppercase tracking-wider mb-1">State Advisory</h4>
+                <p className="text-sm text-yellow-700">Focus strongly ordered on increasing <strong>User Charge Collection</strong> across Gram Panchayats trailing below 40%.</p>
+            </div>
         </div>
     );
 }

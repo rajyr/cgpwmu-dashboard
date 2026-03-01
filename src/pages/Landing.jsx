@@ -202,17 +202,17 @@ const Landing = () => {
 
                         {/* TRUCK ON PATH */}
                         <g id="truck-element">
-                            <rect x="-25" y="-18" width="24" height="18" fill="#1F2937" rx="2"></rect>
-                            <rect x="-22" y="-15" width="8" height="8" fill="#87CEEB" opacity="0.9"></rect>
-                            <rect x="-12" y="-15" width="8" height="8" fill="#87CEEB" opacity="0.7"></rect>
-                            <rect x="-2" y="-16" width="40" height="16" fill="#2563EB" rx="2"></rect>
-                            <rect x="0" y="-13" width="36" height="10" fill="url(#ground-gradient)" opacity="0.5"></rect>
-                            <circle cx="-18" cy="2" r="6" fill="#111827"></circle>
-                            <circle cx="-4" cy="2" r="6" fill="#111827"></circle>
-                            <circle cx="28" cy="2" r="6" fill="#111827"></circle>
-                            <circle cx="34" cy="2" r="6" fill="#111827"></circle>
-                            <circle cx="-25" cy="-8" r="2" fill="#EF4444" opacity="0.8"></circle>
-                            <circle cx="-25" cy="-2" r="2" fill="#EF4444" opacity="0.8"></circle>
+                            <rect x="-38" y="-16" width="40" height="16" fill="#2563EB" rx="2"></rect>
+                            <rect x="-36" y="-13" width="36" height="10" fill="url(#ground-gradient)" opacity="0.5"></rect>
+                            <rect x="2" y="-18" width="24" height="18" fill="#1F2937" rx="2"></rect>
+                            <rect x="5" y="-15" width="8" height="8" fill="#87CEEB" opacity="0.9"></rect>
+                            <rect x="15" y="-15" width="8" height="8" fill="#87CEEB" opacity="0.7"></rect>
+                            <circle cx="-34" cy="2" r="6" fill="#111827"></circle>
+                            <circle cx="-28" cy="2" r="6" fill="#111827"></circle>
+                            <circle cx="4" cy="2" r="6" fill="#111827"></circle>
+                            <circle cx="18" cy="2" r="6" fill="#111827"></circle>
+                            <circle cx="-38" cy="-8" r="2" fill="#EF4444" opacity="0.8"></circle>
+                            <circle cx="-38" cy="-2" r="2" fill="#EF4444" opacity="0.8"></circle>
                         </g>
 
                         {/* PROCESSING FACTORY (Destination) */}

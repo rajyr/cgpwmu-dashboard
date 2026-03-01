@@ -1,34 +1,82 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     Activity, Settings, AlertTriangle, PenTool, Database,
-    TrendingUp, ActivitySquare, CheckCircle2, Clock
+    TrendingUp, ActivitySquare, CheckCircle2, Clock, Loader2
 } from 'lucide-react';
 import {
     PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis,
     CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend
 } from 'recharts';
+import { useAuth } from '../../context/AuthContext';
+
+const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const getProxyUrl = () => (import.meta.env.DEV ? '/supabase' : import.meta.env.VITE_SUPABASE_URL);
 
 function MachineInt() {
-    // Mock Data
+    const { userRole } = useAuth();
+    const [pwmus, setPwmus] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const session = JSON.parse(localStorage.getItem('cgpwmu_session') || '{}');
+                const token = session.access_token;
+                if (!token) return;
+                const proxyUrl = getProxyUrl();
+
+                const res = await fetch(`${proxyUrl}/rest/v1/pwmu_centers?select=*`, {
+                    headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` }
+                });
+
+                if (res.ok) setPwmus(await res.json());
+
+            } catch (err) {
+                console.error('Error fetching asset data:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, []);
+
+    // Derived Metrics
+    const totalUnits = pwmus.length;
+    const functionalCount = pwmus.filter(p => p.status === 'operational').length;
+    const maintenanceCount = pwmus.filter(p => p.status === 'maintenance').length;
+    const breakdownCount = pwmus.filter(p => !p.status || p.status === 'shutdown').length;
+
+    const uptimeRate = totalUnits > 0 ? Math.round((functionalCount / totalUnits) * 100) : 0;
+
     const uptimeData = [
-        { name: 'Functional', value: 75, color: '#28A745' },     // Green
-        { name: 'Maintenance', value: 15, color: '#FF9933' },    // Orange
-        { name: 'Breakdown', value: 10, color: '#DC3545' },      // Red
+        { name: 'Functional', value: functionalCount, color: '#28A745' },
+        { name: 'Maintenance', value: maintenanceCount, color: '#FF9933' },
+        { name: 'Breakdown', value: breakdownCount, color: '#DC3545' },
     ];
 
-    const utilizationData = [
-        { name: 'Shredder 1', hours: 45, max: 60 },
-        { name: 'Baling Mk-II', hours: 38, max: 60 },
-        { name: 'Fatka M/C', hours: 52, max: 60 },
-        { name: 'Agglomerator', hours: 25, max: 60 },
-        { name: 'Granulator', hours: 40, max: 60 },
-    ];
+    const utilizationData = pwmus.slice(0, 5).map(p => ({
+        name: p.name.split(' ')[0],
+        hours: Math.round((p.waste_processed_mt / (p.capacity_mt || 1)) * 100), // Utilization % as proxy
+        max: 100
+    }));
 
-    const alerts = [
-        { id: 1, machine: 'Hydraulic Baling', location: 'Balod PWMU', downtime: '3 Days', reason: 'Hydraulic fluid leak', severity: 'High' },
-        { id: 2, machine: 'Plastic Shredder', location: 'Durg PWMU', downtime: '1 Day', reason: 'Blade replacement', severity: 'Medium' },
-        { id: 3, machine: 'Mixer Machine', location: 'Bastar PWMU', downtime: '5 Hrs', reason: 'Motor Overheat', severity: 'Low' },
-    ];
+    const alerts = pwmus.filter(p => p.status === 'maintenance').map((p, idx) => ({
+        id: idx + 1,
+        machine: 'System/Oversight',
+        location: `${p.district} (${p.name})`,
+        downtime: 'Active',
+        reason: 'Periodic Maintenance / Reporting issue',
+        severity: 'Medium'
+    }));
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64 text-blue-600">
+                <Loader2 className="w-8 h-8 animate-spin mr-3" />
+                <span className="font-bold">Scanning terminal assets...</span>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
@@ -54,10 +102,10 @@ function MachineInt() {
                         <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center text-[#005DAA]">
                             <Settings className="w-5 h-5" />
                         </div>
-                        <h3 className="font-semibold text-gray-600 text-sm">Total Assets</h3>
+                        <h3 className="font-semibold text-gray-600 text-sm">Total PWMU Units</h3>
                     </div>
-                    <p className="text-3xl font-bold text-gray-800">142</p>
-                    <p className="text-xs text-gray-500 mt-1">Installed across 14 PWMUs</p>
+                    <p className="text-3xl font-bold text-gray-800">{totalUnits}</p>
+                    <p className="text-xs text-gray-500 mt-1">Monitored Facilities</p>
                 </div>
 
                 <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
@@ -67,8 +115,8 @@ function MachineInt() {
                         </div>
                         <h3 className="font-semibold text-gray-600 text-sm">Uptime Rate</h3>
                     </div>
-                    <p className="text-3xl font-bold text-green-700">85%</p>
-                    <p className="text-xs text-green-600 mt-1 flex items-center gap-1"><TrendingUp className="w-3 h-3" /> 2% from last month</p>
+                    <p className="text-3xl font-bold text-green-700">{uptimeRate}%</p>
+                    <p className="text-xs text-green-600 mt-1 flex items-center gap-1"><TrendingUp className="w-3 h-3" /> Operational Units</p>
                 </div>
 
                 <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
@@ -76,10 +124,10 @@ function MachineInt() {
                         <div className="w-10 h-10 bg-red-50 rounded-lg flex items-center justify-center text-red-600">
                             <AlertTriangle className="w-5 h-5" />
                         </div>
-                        <h3 className="font-semibold text-gray-600 text-sm">Active Breakdowns</h3>
+                        <h3 className="font-semibold text-gray-600 text-sm">Active Issues</h3>
                     </div>
-                    <p className="text-3xl font-bold text-red-700">18</p>
-                    <p className="text-xs text-red-500 mt-1">Require immediate attention</p>
+                    <p className="text-3xl font-bold text-red-700">{maintenanceCount + breakdownCount}</p>
+                    <p className="text-xs text-red-500 mt-1">In Maintenance/Shutdown</p>
                 </div>
 
                 <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
@@ -87,10 +135,10 @@ function MachineInt() {
                         <div className="w-10 h-10 bg-orange-50 rounded-lg flex items-center justify-center text-orange-600">
                             <Clock className="w-5 h-5" />
                         </div>
-                        <h3 className="font-semibold text-gray-600 text-sm">Avg. Repair Time</h3>
+                        <h3 className="font-semibold text-gray-600 text-sm">Target Uptime</h3>
                     </div>
-                    <p className="text-3xl font-bold text-gray-800">2.4 <span className="text-lg text-gray-500">Days</span></p>
-                    <p className="text-xs text-gray-500 mt-1">Historical average</p>
+                    <p className="text-3xl font-bold text-gray-800">95%</p>
+                    <p className="text-xs text-gray-500 mt-1">State Target Goal</p>
                 </div>
             </div>
 
@@ -127,7 +175,7 @@ function MachineInt() {
                         </ResponsiveContainer>
                         {/* Center Text */}
                         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                            <span className="text-3xl font-bold text-gray-800">142</span>
+                            <span className="text-3xl font-bold text-gray-800">{totalUnits}</span>
                             <span className="text-xs font-semibold uppercase text-gray-400">Total Units</span>
                         </div>
                     </div>
@@ -194,7 +242,11 @@ function MachineInt() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                            {alerts.map((alert) => (
+                            {alerts.length === 0 ? (
+                                <tr>
+                                    <td colSpan="6" className="px-6 py-8 text-center text-gray-400 text-sm">No critical breakdowns reported currently.</td>
+                                </tr>
+                            ) : alerts.map((alert) => (
                                 <tr key={alert.id} className="hover:bg-gray-50/50 transition-colors group">
                                     <td className="px-6 py-4">
                                         <p className="font-bold text-gray-800 text-sm">{alert.machine}</p>
@@ -218,7 +270,7 @@ function MachineInt() {
                                     </td>
                                     <td className="px-6 py-4 text-right">
                                         <button className="text-[#005DAA] bg-blue-50 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors">
-                                            Dispatch Tech
+                                            Assess Issue
                                         </button>
                                     </td>
                                 </tr>

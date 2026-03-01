@@ -1,13 +1,17 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Home, MapPin, Users, Banknote, CheckCircle2, ArrowRight, ArrowLeft, Check, ShieldAlert, Trash2 } from 'lucide-react';
+import { Home, MapPin, Users, Banknote, CheckCircle2, ArrowRight, ArrowLeft, Check, ShieldAlert, Trash2, Loader2 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 const VillageReg = () => {
     const [step, setStep] = useState(1);
+    const [submitting, setSubmitting] = useState(false);
+    const [submitSuccess, setSubmitSuccess] = useState(false);
+    const [submitError, setSubmitError] = useState('');
     const navigate = useNavigate();
+    const { signUp } = useAuth();
 
     const [locationData, setLocationData] = useState({});
-
     React.useEffect(() => {
         fetch('/data/locationData.json')
             .then(res => res.json())
@@ -15,46 +19,23 @@ const VillageReg = () => {
             .catch(err => console.error("Error loading location data:", err));
     }, []);
 
-    // Mock form state
     const [formData, setFormData] = useState({
-        district: '',
-        block: '',
-        gramPanchayat: '',
-        village: '',
-        population: '',
-        households: '',
-        doorToDoorActive: false,
-        swachhgrahiCount: '',
-        sarpanchName: '',
-        phone: '',
-        accountNumber: ''
+        district: '', block: '', gramPanchayat: '', village: '',
+        population: '', households: '', doorToDoorActive: false, swachhgrahiCount: '',
+        sarpanchName: '', phone: '', accountNumber: '', email: '', password: '',
     });
 
     const handleInputChange = (e) => {
         const { name, value, type, checked } = e.target;
         setFormData(prev => {
-            const newData = {
-                ...prev,
-                [name]: type === 'checkbox' ? checked : value
-            };
-
-            // Cascade reset dependent fields when location hierarchy changes
-            if (name === 'district') {
-                newData.block = '';
-                newData.gramPanchayat = '';
-                newData.village = '';
-            } else if (name === 'block') {
-                newData.gramPanchayat = '';
-                newData.village = '';
-            } else if (name === 'gramPanchayat') {
-                newData.village = '';
-            }
-
+            const newData = { ...prev, [name]: type === 'checkbox' ? checked : value };
+            if (name === 'district') { newData.block = ''; newData.gramPanchayat = ''; newData.village = ''; }
+            else if (name === 'block') { newData.gramPanchayat = ''; newData.village = ''; }
+            else if (name === 'gramPanchayat') { newData.village = ''; }
             return newData;
         });
     };
 
-    // Derived Location Options
     const districts = Object.keys(locationData);
     const blocks = formData.district ? Object.keys(locationData[formData.district] || {}) : [];
     const gps = (formData.district && formData.block) ? Object.keys(locationData[formData.district][formData.block] || {}) : [];
@@ -63,10 +44,37 @@ const VillageReg = () => {
     const nextStep = () => setStep(prev => Math.min(prev + 1, 4));
     const prevStep = () => setStep(prev => Math.max(prev - 1, 1));
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        console.log("Submitting Village Data:", formData);
-        navigate('/dashboard');
+        setSubmitting(true);
+        setSubmitError('');
+        try {
+            if (!formData.email || !formData.password) throw new Error('Email and password are required.');
+            if (formData.password.length < 6) throw new Error('Password must be at least 6 characters.');
+            await signUp(formData.email, formData.password, {
+                full_name: formData.sarpanchName,
+                role: 'Sarpanch',
+                district: formData.district,
+                phone_number: formData.phone,
+                registration_data: {
+                    type: 'Village',
+                    village: formData.village,
+                    block: formData.block,
+                    gramPanchayat: formData.gramPanchayat,
+                    district: formData.district,
+                    population: formData.population,
+                    households: formData.households,
+                    doorToDoorActive: formData.doorToDoorActive,
+                    swachhgrahiCount: formData.swachhgrahiCount,
+                    accountNumber: formData.accountNumber,
+                },
+            });
+            setSubmitSuccess(true);
+        } catch (error) {
+            setSubmitError(error.message || 'Registration failed.');
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     const steps = [
@@ -236,28 +244,28 @@ const VillageReg = () => {
 
                     {step === 3 && (
                         <div className="space-y-6 animate-fade-in-up">
-                            <h3 className="text-lg font-bold text-gray-800 border-b pb-2">Sarpanch / Offical Contacts</h3>
+                            <h3 className="text-lg font-bold text-gray-800 border-b pb-2">Sarpanch / Official Contacts & Login</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="md:col-span-2">
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Sarpanch Name</label>
-                                    <input
-                                        type="text" name="sarpanchName" value={formData.sarpanchName} onChange={handleInputChange} placeholder="Full Name"
-                                        className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-600/20 focus:border-green-600"
-                                    />
+                                    <input type="text" name="sarpanchName" value={formData.sarpanchName} onChange={handleInputChange} placeholder="Full Name" className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-600/20 focus:border-green-600" />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Mobile Number (Login ID)</label>
-                                    <input
-                                        type="tel" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="+91"
-                                        className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-600/20 focus:border-green-600"
-                                    />
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Mobile Number</label>
+                                    <input type="tel" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="+91" className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-600/20 focus:border-green-600" />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Gram Panchayat Account No.</label>
-                                    <input
-                                        type="text" name="accountNumber" value={formData.accountNumber} onChange={handleInputChange} placeholder="Bank Account Number"
-                                        className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-600/20 focus:border-green-600"
-                                    />
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Email Address <span className="text-red-500">*</span></label>
+                                    <input type="email" name="email" value={formData.email} onChange={handleInputChange} placeholder="official@email.com" required className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-600/20 focus:border-green-600" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">GP Account No.</label>
+                                    <input type="text" name="accountNumber" value={formData.accountNumber} onChange={handleInputChange} placeholder="Bank Account Number" className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-600/20 focus:border-green-600" />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Set Password <span className="text-red-500">*</span></label>
+                                    <input type="password" name="password" value={formData.password} onChange={handleInputChange} placeholder="Min 6 characters" required className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-600/20 focus:border-green-600" />
+                                    <p className="text-xs text-gray-400 mt-1">This will be your login password. You can log in after admin approval.</p>
                                 </div>
                             </div>
                         </div>
@@ -296,34 +304,32 @@ const VillageReg = () => {
                         </div>
                     )}
 
-                    {/* Navigation Buttons */}
-                    <div className="mt-10 pt-6 border-t border-gray-100 flex items-center justify-between">
-                        <button
-                            onClick={step === 1 ? () => navigate('/register') : prevStep}
-                            className="px-5 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors flex items-center"
-                        >
-                            <ArrowLeft className="w-4 h-4 mr-2" />
-                            {step === 1 ? 'Cancel' : 'Back'}
-                        </button>
+                    {/* Success Screen */}
+                    {submitSuccess && (
+                        <div className="text-center py-12 animate-fade-in-up">
+                            <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-6"><CheckCircle2 className="w-10 h-10 text-green-600" /></div>
+                            <h3 className="text-2xl font-bold text-gray-800 mb-3">Registration Submitted!</h3>
+                            <p className="text-gray-500 max-w-md mx-auto mb-2">Your village registration has been submitted successfully.</p>
+                            <p className="text-amber-600 font-semibold mb-8">⏳ Your account is pending admin approval.</p>
+                            <button onClick={() => navigate('/login')} className="px-8 py-3 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 shadow-sm transition-colors">Go to Login Page</button>
+                        </div>
+                    )}
+                    {submitError && (<div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl text-center"><p className="text-sm text-red-700 font-medium">{submitError}</p></div>)}
 
-                        {step < 4 ? (
-                            <button
-                                onClick={nextStep}
-                                className="px-6 py-2.5 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 shadow-sm transition-colors flex items-center"
-                            >
-                                Continue
-                                <ArrowRight className="w-4 h-4 ml-2" />
+                    {!submitSuccess && (
+                        <div className="mt-10 pt-6 border-t border-gray-100 flex items-center justify-between">
+                            <button onClick={step === 1 ? () => navigate('/register') : prevStep} disabled={submitting} className="px-5 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors flex items-center">
+                                <ArrowLeft className="w-4 h-4 mr-2" /> {step === 1 ? 'Cancel' : 'Back'}
                             </button>
-                        ) : (
-                            <button
-                                onClick={handleSubmit}
-                                className="px-6 py-2.5 rounded-lg text-sm font-medium text-white bg-[#28A745] hover:bg-[#218838] shadow-sm transition-colors flex items-center"
-                            >
-                                Complete Registration
-                                <CheckCircle2 className="w-4 h-4 ml-2" />
-                            </button>
-                        )}
-                    </div>
+                            {step < 4 ? (
+                                <button onClick={nextStep} className="px-6 py-2.5 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 shadow-sm transition-colors flex items-center">Continue <ArrowRight className="w-4 h-4 ml-2" /></button>
+                            ) : (
+                                <button onClick={handleSubmit} disabled={submitting} className="px-6 py-2.5 rounded-lg text-sm font-medium text-white bg-[#28A745] hover:bg-[#218838] disabled:bg-gray-300 shadow-sm transition-colors flex items-center">
+                                    {submitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Submitting...</> : <>Complete Registration <CheckCircle2 className="w-4 h-4 ml-2" /></>}
+                                </button>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

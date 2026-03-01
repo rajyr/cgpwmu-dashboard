@@ -3,17 +3,22 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const Header = ({ setIsMobileOpen }) => {
-    const { user, userRole } = useAuth();
+    const { user, userRole, userName } = useAuth();
 
     // Map database roles to friendly UI strings
     let friendlyRole = userRole || 'Village';
     if (friendlyRole === 'StateAdmin') friendlyRole = 'Admin';
     if (friendlyRole === 'DistrictNodal') friendlyRole = 'Nodal Officer';
     if (friendlyRole === 'PWMUManager') friendlyRole = 'PWMU Manager';
+    if (friendlyRole === 'Sarpanch') friendlyRole = 'Village Admin';
+    if (friendlyRole === 'Vendor') friendlyRole = 'Vendor';
 
     // Fallbacks if not fully loaded or no session
     const displayEmail = user?.email || 'admin@sbm.gov.in';
-    const displayRole = friendlyRole;
+    const displayName = userName || friendlyRole;
+    const initials = userName
+        ? userName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase()
+        : friendlyRole.slice(0, 2).toUpperCase();
     return (
         <header className="bg-white/80 backdrop-blur-md h-[80px] border-b border-gray-100 flex items-center justify-between px-6 sticky top-0 z-50 shadow-sm w-full transition-all duration-300">
             {/* Mobile Menu Toggle */}
@@ -51,11 +56,11 @@ const Header = ({ setIsMobileOpen }) => {
 
                 <div className="flex items-center gap-3">
                     <div className="text-right hidden lg:block">
-                        <p className="text-sm font-bold text-gray-800 leading-tight capitalize">{displayRole}</p>
+                        <p className="text-sm font-bold text-gray-800 leading-tight capitalize">{displayName}</p>
                         <p className="text-[11px] text-gray-400">{displayEmail}</p>
                     </div>
                     <div className="w-10 h-10 rounded-full bg-[#f0ebfb] text-[#6f42c1] flex items-center justify-center font-bold text-sm uppercase">
-                        {displayRole.slice(0, 2)}
+                        {initials}
                     </div>
                 </div>
             </div>
