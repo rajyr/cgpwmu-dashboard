@@ -6,130 +6,313 @@ import {
     Truck, Factory, Home, Building2, Zap, ShieldCheck,
     BarChart3, Users, PlayCircle
 } from 'lucide-react';
+import { useRef } from 'react';
 
 const Landing = () => {
     const [scrolled, setScrolled] = useState(false);
+    const [toggleWord, setToggleWord] = useState('Value');
+    const svgRef = useRef(null);
 
     useEffect(() => {
         const handleScroll = () => {
             setScrolled(window.scrollY > 50);
         };
         window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
+
+        const words = ['Value', 'Wealth'];
+        let wordIndex = 0;
+        const interval = setInterval(() => {
+            wordIndex = (wordIndex + 1) % words.length;
+            setToggleWord(words[wordIndex]);
+        }, 3000);
+
+        // ========== COIN ANIMATION LOGIC ==========
+        const createCoinsAtFactory = () => {
+            const svg = svgRef.current;
+            if (!svg) return;
+
+            // Factory center is roughly 760, 180 in viewBox
+            const point = svg.createSVGPoint();
+            point.x = 760;
+            point.y = 180;
+
+            try {
+                const screenPoint = point.matrixTransform(svg.getScreenCTM());
+                const screenX = screenPoint.x;
+                const screenY = screenPoint.y;
+
+                for (let i = 0; i < 6; i++) {
+                    setTimeout(() => {
+                        const coin = document.createElement('div');
+                        coin.className = 'coin';
+                        coin.textContent = '₹';
+
+                        const angle = (i / 6) * Math.PI * 2;
+                        const distance = 25 + Math.random() * 20;
+                        const spreadX = Math.cos(angle) * distance;
+                        const spreadY = Math.sin(angle) * distance * 0.3;
+
+                        coin.style.position = 'fixed';
+                        coin.style.left = (screenX + spreadX * 0.2) + 'px';
+                        coin.style.top = (screenY + spreadY * 0.2) + 'px';
+                        coin.style.zIndex = '9999';
+                        coin.style.pointerEvents = 'none';
+                        coin.style.setProperty('--tx', (spreadX * 2.5) + 'px');
+                        coin.style.setProperty('--ty', (spreadY * 2.5) + 'px');
+
+                        document.body.appendChild(coin);
+                        setTimeout(() => coin.remove(), 1200);
+                    }, i * 80);
+                }
+            } catch (e) {
+                console.error("Coin animation error:", e);
+            }
+        };
+
+        // ========== WASTE PARTICLE LOGIC ==========
+        const createWasteParticle = () => {
+            const container = document.getElementById('particle-container');
+            if (!container) return;
+
+            const startX = 80 + Math.random() * 200;
+            const startY = 320 + Math.random() * 80;
+            const endX = startX + (600 + Math.random() * 200);
+            const endY = startY - (200 + Math.random() * 100);
+
+            const particle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            particle.setAttribute('cx', startX);
+            particle.setAttribute('cy', startY);
+            particle.setAttribute('r', '4');
+            particle.setAttribute('fill', `hsl(${160 + Math.random() * 40}, 70%, 50%)`);
+            particle.setAttribute('opacity', '0.8');
+            particle.setAttribute('class', 'waste-particle');
+
+            const tx = endX - startX;
+            const ty = endY - startY;
+            particle.style.setProperty('--tx', tx + 'px');
+            particle.style.setProperty('--ty', ty + 'px');
+
+            container.appendChild(particle);
+            setTimeout(() => particle.remove(), 3000);
+        };
+
+        // Truck cycle is 12s, reaches factory at ~11.5s
+        const coinInterval = setInterval(() => {
+            setTimeout(createCoinsAtFactory, 11500);
+        }, 12000);
+
+        const particleInterval = setInterval(createWasteParticle, 400);
+
+        // Initial trigger
+        setTimeout(createCoinsAtFactory, 11500);
+
+        return () => {
+            window.removeEventListener('scroll', handleScroll);
+            clearInterval(interval);
+            clearInterval(coinInterval);
+            clearInterval(particleInterval);
+        };
     }, []);
 
     return (
-        <div className="min-h-screen bg-[#f4f7f6] font-sans selection:bg-[#005DAA] selection:text-white">
+        <div className="min-h-screen bg-[#F0F4F8] font-sans selection:bg-green-600 selection:text-white overflow-x-hidden">
 
-            {/* 1. HERO SECTION */}
-            <header className="relative pt-24 pb-20 lg:pt-32 lg:pb-32 overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-blue-50/50 to-transparent -z-10"></div>
-                {/* Abstract background shapes */}
-                <div className="absolute top-20 right-0 w-[800px] h-[800px] bg-blue-100/40 rounded-full blur-3xl -z-10 opacity-50 translate-x-1/3"></div>
-                <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-green-100/30 rounded-full blur-3xl -z-10 opacity-50 -translate-x-1/4"></div>
+            {/* =========== HERO SECTION =========== */}
+            <section className="hero-container relative pt-20">
+                {/* Background Mesh Animation */}
+                <div className="hero-bg-mesh"></div>
 
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-                    <div className="grid lg:grid-cols-2 gap-12 lg:gap-8 items-center">
+                {/* Main SVG Scene - Background */}
+                <div className="absolute inset-0 z-0 pointer-events-none" style={{ opacity: 0.8, transform: 'translateY(100px)' }}>
+                    <svg ref={svgRef} className="w-full h-full" viewBox="0 0 1000 700" preserveAspectRatio="xMidYMid slice">
+                        <defs>
+                            <linearGradient id="sky-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" style={{ stopColor: '#E8F5E9', stopOpacity: 1 }} />
+                                <stop offset="100%" style={{ stopColor: '#C8E6C9', stopOpacity: 1 }} />
+                            </linearGradient>
+                            <linearGradient id="ground-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" style={{ stopColor: '#A5D6A7', stopOpacity: 1 }} />
+                                <stop offset="100%" style={{ stopColor: '#81C784', stopOpacity: 1 }} />
+                            </linearGradient>
+                            <filter id="soft-shadow">
+                                <feGaussianBlur in="SourceGraphic" stdDeviation="3" />
+                            </filter>
+                        </defs>
 
-                        {/* Left: Text Content */}
-                        <div className="max-w-2xl animate-fade-in-up">
-                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100/80 border border-blue-200 text-blue-800 text-sm font-semibold mb-6 shadow-sm">
-                                <span className="relative flex h-2 w-2">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-500 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600"></span>
-                                </span>
-                                CG-PWMU Digital Monitoring Platform
-                            </div>
-                            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-gray-900 tracking-tight leading-[1.15] mb-6">
-                                छत्तीसगढ़ में प्लास्टिक अपशिष्ट प्रबंधन की <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#005DAA] to-[#00427A]">डिजिटल निगरानी</span>
-                            </h1>
-                            <p className="text-xl text-gray-600 leading-relaxed mb-8 font-medium">
-                                गाँव से रिसाइक्लर तक — वास्तविक समय डेटा, वित्तीय विश्लेषण और कार्यात्मक मशीन मॉनिटरिंग एक ही प्लेटफ़ॉर्म पर।
-                            </p>
+                        {/* Particle Container */}
+                        <g id="particle-container"></g>
 
-                            <div className="flex flex-wrap items-center gap-4">
-                                <Link to="/login" className="px-8 py-3.5 rounded-xl bg-[#005DAA] text-white font-bold text-lg hover:bg-[#00427A] hover:shadow-lg hover:shadow-blue-500/20 transition-all transform hover:-translate-y-0.5 flex items-center gap-2">
-                                    Login <ArrowRight className="w-5 h-5" />
-                                </Link>
-                                <Link to="/register" className="px-8 py-3.5 rounded-xl bg-green-600 text-white font-bold text-lg hover:bg-green-700 hover:shadow-lg hover:shadow-green-500/20 transition-all transform hover:-translate-y-0.5">
-                                    Register Unit
-                                </Link>
-                                <Link to="/dashboard" className="px-8 py-3.5 rounded-xl bg-white text-gray-700 font-bold text-lg border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all transform hover:-translate-y-0.5 flex items-center gap-2">
-                                    <PlayCircle className="w-5 h-5 text-orange-500" /> Explore Dashboard
-                                </Link>
-                            </div>
+                        {/* Sky */}
+                        <rect width="1000" height="350" fill="url(#sky-gradient)"></rect>
+
+                        {/* Sun */}
+                        <circle id="sun-circle" cx="100" cy="100" r="45" fill="#FBBF24" filter="url(#soft-shadow)"></circle>
+
+                        {/* Background Mountains (far) */}
+                        <path d="M0 300 Q 250 200 500 300 T 1000 300 L 1000 350 L 0 350 Z" fill="#B5C99F" opacity="0.4"></path>
+
+                        {/* Mid-ground Hills */}
+                        <path d="M0 350 Q 150 250 300 350 T 600 350 T 1000 320 L 1000 400 L 0 400 Z" fill="#A5D6A7" opacity="0.6"></path>
+
+                        {/* Foreground Ground */}
+                        <rect y="400" width="1000" height="300" fill="url(#ground-gradient)"></rect>
+
+                        {/* VILLAGES ON LEFT (Source) */}
+                        <g id="village-left">
+                            {/* Village Hut 1 */}
+                            <g transform="translate(80, 340)">
+                                <rect x="0" y="0" width="60" height="50" fill="#C46430" rx="3"></rect>
+                                <path d="M-5 0 L 30 -35 L 65 0 Z" fill="#A0522D"></path>
+                                <rect x="15" y="20" width="12" height="12" fill="#87CEEB" opacity="0.8"></rect>
+                                <rect x="38" y="20" width="12" height="12" fill="#87CEEB" opacity="0.8"></rect>
+                                <circle cx="30" cy="45" r="4" fill="#8B4513"></circle>
+                            </g>
+
+                            {/* Village Hut 2 */}
+                            <g transform="translate(160, 350)">
+                                <rect x="0" y="0" width="50" height="40" fill="#CD7F32" rx="3"></rect>
+                                <path d="M-4 0 L 25 -28 L 54 0 Z" fill="#8B4513"></path>
+                                <rect x="12" y="15" width="10" height="10" fill="#87CEEB" opacity="0.8"></rect>
+                                <rect x="32" y="15" width="10" height="10" fill="#87CEEB" opacity="0.8"></rect>
+                                <circle cx="25" cy="38" r="3" fill="#6B4423"></circle>
+                            </g>
+
+                            {/* Village Hut 3 */}
+                            <g transform="translate(240, 345)">
+                                <rect x="0" y="0" width="55" height="45" fill="#D2691E" rx="3"></rect>
+                                <path d="M-4 0 L 27.5 -32 L 59 0 Z" fill="#8B4513"></path>
+                                <rect x="14" y="18" width="11" height="11" fill="#87CEEB" opacity="0.8"></rect>
+                                <rect x="35" y="18" width="11" height="11" fill="#87CEEB" opacity="0.8"></rect>
+                            </g>
+
+                            {/* Trees around village */}
+                            <g className="dust-particle" style={{ animationDelay: '0s' }}>
+                                <rect x="50" y="280" width="8" height="60" fill="#6B4423"></rect>
+                                <path d="M 54 280 Q 35 250 54 220 Q 73 250 54 280" fill="#228B22"></path>
+                            </g>
+                            <g className="dust-particle" style={{ animationDelay: '0.5s' }}>
+                                <rect x="310" y="290" width="8" height="50" fill="#6B4423"></rect>
+                                <path d="M 314 290 Q 300 270 314 245 Q 328 270 314 290" fill="#228B22"></path>
+                            </g>
+                        </g>
+
+                        {/* WASTE COLLECTION PATH (Curved) */}
+                        <path id="waste-path" d="M 80 340 Q 300 200 500 280 T 780 220"
+                            stroke="#10B981" strokeWidth="3" fill="none" strokeDasharray="10 5" opacity="0.3"></path>
+
+                        {/* TRUCK ON PATH */}
+                        <g id="truck-element">
+                            <rect x="-25" y="-18" width="24" height="18" fill="#1F2937" rx="2"></rect>
+                            <rect x="-22" y="-15" width="8" height="8" fill="#87CEEB" opacity="0.9"></rect>
+                            <rect x="-12" y="-15" width="8" height="8" fill="#87CEEB" opacity="0.7"></rect>
+                            <rect x="-2" y="-16" width="40" height="16" fill="#2563EB" rx="2"></rect>
+                            <rect x="0" y="-13" width="36" height="10" fill="url(#ground-gradient)" opacity="0.5"></rect>
+                            <circle cx="-18" cy="2" r="6" fill="#111827"></circle>
+                            <circle cx="-4" cy="2" r="6" fill="#111827"></circle>
+                            <circle cx="28" cy="2" r="6" fill="#111827"></circle>
+                            <circle cx="34" cy="2" r="6" fill="#111827"></circle>
+                            <circle cx="-25" cy="-8" r="2" fill="#EF4444" opacity="0.8"></circle>
+                            <circle cx="-25" cy="-2" r="2" fill="#EF4444" opacity="0.8"></circle>
+                        </g>
+
+                        {/* PROCESSING FACTORY (Destination) */}
+                        <g id="factory" transform="translate(700, 200)">
+                            <rect x="0" y="20" width="120" height="100" fill="#059669" rx="4"></rect>
+                            <rect x="8" y="30" width="15" height="20" fill="#10B981"></rect>
+                            <rect x="28" y="30" width="15" height="20" fill="#10B981"></rect>
+                            <rect x="48" y="30" width="15" height="20" fill="#10B981"></rect>
+                            <rect x="68" y="30" width="15" height="20" fill="#10B981"></rect>
+                            <rect x="88" y="30" width="15" height="20" fill="#10B981"></rect>
+
+                            <rect x="8" y="55" width="15" height="20" fill="#34D399"></rect>
+                            <rect x="28" y="55" width="15" height="20" fill="#34D399"></rect>
+                            <rect x="48" y="55" width="15" height="20" fill="#34D399"></rect>
+                            <rect x="68" y="55" width="15" height="20" fill="#34D399"></rect>
+                            <rect x="88" y="55" width="15" height="20" fill="#34D399"></rect>
+
+                            <rect x="20" y="-20" width="12" height="40" fill="#1F2937" rx="2"></rect>
+                            <circle className="chimney-smoke" cx="26" cy="-25" r="8" fill="#D1D5DB" opacity="0.7" style={{ animationDelay: '0s' }}></circle>
+                            <circle className="chimney-smoke" cx="28" cy="-25" r="10" fill="#E5E7EB" opacity="0.5" style={{ animationDelay: '0.3s' }}></circle>
+                            <circle className="chimney-smoke" cx="24" cy="-25" r="9" fill="#F3F4F6" opacity="0.4" style={{ animationDelay: '0.6s' }}></circle>
+
+                            <rect x="85" y="-20" width="12" height="40" fill="#1F2937" rx="2"></rect>
+                            <circle className="chimney-smoke" cx="91" cy="-25" r="8" fill="#D1D5DB" opacity="0.7" style={{ animationDelay: '0.5s' }}></circle>
+                            <circle className="chimney-smoke" cx="93" cy="-25" r="10" fill="#E5E7EB" opacity="0.5" style={{ animationDelay: '0.8s' }}></circle>
+                            <circle className="chimney-smoke" cx="89" cy="-25" r="9" fill="#F3F4F6" opacity="0.4" style={{ animationDelay: '1.1s' }}></circle>
+
+                            <g transform="translate(60, 70)">
+                                <circle cx="0" cy="0" r="15" fill="#FBBF24" opacity="0.8"></circle>
+                                <path d="M -3,-8 L 4,-3 L 2,6 L -7,3 Z" fill="#059669" stroke="#059669" strokeWidth="1.5"></path>
+                            </g>
+                        </g>
+
+                        {/* OUTPUT/PROCESSED GOODS */}
+                        <g transform="translate(850, 320)">
+                            <rect x="0" y="0" width="40" height="15" fill="#10B981" rx="2"></rect>
+                            <rect x="0" y="18" width="40" height="15" fill="#34D399" rx="2"></rect>
+                            <rect x="0" y="36" width="40" height="15" fill="#6EE7B7" rx="2"></rect>
+                            <path d="M 50 20 L 65 20 M 60 15 L 65 20 L 60 25" stroke="#FBBF24" strokeWidth="2.5" fill="none" strokeLinecap="round"></path>
+                            <circle cx="75" cy="20" r="10" fill="#FBBF24"></circle>
+                            <text x="75" y="24" fontSize="12" fill="#1F2937" textAnchor="middle" fontWeight="bold">₹</text>
+                        </g>
+                    </svg>
+                </div>
+
+                {/* FULL WIDTH TITLE SECTION */}
+                <div className="relative z-10 w-full pt-20 pb-12">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center animate-fade-in-up">
+                        <h1 className="text-5xl md:text-7xl font-extrabold text-slate-900 leading-tight mb-4">
+                            Transforming Waste into <span className="text-green-600 transition-opacity duration-300">{toggleWord}</span>
+                        </h1>
+                        <p className="text-xl md:text-2xl text-slate-600 mb-2 font-medium">
+                            छत्तीसगढ़ के लिए एक एकीकृत प्लास्टिक अपशिष्ट प्रबंधन मंच
+                        </p>
+                        <p className="text-lg md:text-xl text-slate-500 mb-12">
+                            An Integrated Plastic Waste Management Platform for Chhattisgarh
+                        </p>
+
+                        <div className="flex flex-wrap justify-center items-center gap-6">
+                            <Link to="/login" className="btn-primary-new flex items-center gap-2">
+                                Get Started <ArrowRight className="w-5 h-5" />
+                            </Link>
+                            <button className="btn-secondary-new flex items-center gap-2">
+                                <PlayCircle className="w-6 h-6 text-orange-500" /> Watch Demo
+                            </button>
                         </div>
+                    </div>
+                </div>
 
-                        {/* Right: Animated Visual Concept */}
-                        <div className="relative h-[400px] lg:h-[500px] flex items-center justify-center animate-fade-in-up" style={{ animationDelay: '200ms' }}>
-                            <div className="absolute inset-0 bg-gradient-to-tr from-blue-100 to-green-50 rounded-[3rem] transform rotate-3 scale-105 -z-10 shadow-inner border border-white/50"></div>
-                            <div className="bg-white/80 backdrop-blur-md border border-white p-8 rounded-[2.5rem] shadow-2xl w-full h-full relative overflow-hidden group">
-                                <div className="absolute top-4 left-4 right-4 flex justify-between items-center opacity-50">
-                                    <div className="flex gap-2"><div className="w-3 h-3 rounded-full bg-red-400"></div><div className="w-3 h-3 rounded-full bg-yellow-400"></div><div className="w-3 h-3 rounded-full bg-green-400"></div></div>
-                                    <div className="text-xs font-mono text-gray-400">STATE_MONITORING_VS1</div>
+                {/* KPI SECTION */}
+                <div className="relative z-10 w-full pt-72 pb-32">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 animate-fade-in-up" style={{ animationDelay: '200ms' }}>
+                            <div className="stat-card" style={{ animationDelay: '0s' }}>
+                                <div className="stat-icon bg-gradient-to-br from-blue-400 to-blue-600">
+                                    <Recycle className="w-8 h-8" />
                                 </div>
+                                <div className="stat-number">1250</div>
+                                <div className="stat-label uppercase tracking-wider font-bold text-xs">Tons Processed</div>
+                            </div>
 
-                                {/* Simulated Interactive Flow SVG */}
-                                <div className="absolute inset-0 flex items-center justify-center mt-4">
-                                    <svg className="w-full h-full max-w-[400px]" viewBox="0 0 400 300" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        {/* Paths */}
-                                        <path d="M50 150 C 150 150, 150 50, 200 50" stroke="#CBD5E1" strokeWidth="3" strokeDasharray="6 6" className="animate-pulse" />
-                                        <path d="M50 150 C 150 150, 150 250, 200 250" stroke="#CBD5E1" strokeWidth="3" strokeDasharray="6 6" className="animate-pulse" />
-                                        <path d="M200 50 C 300 50, 300 150, 350 150" stroke="#005DAA" strokeWidth="4" strokeLinecap="round" />
-                                        <path d="M200 250 C 300 250, 300 150, 350 150" stroke="#005DAA" strokeWidth="4" strokeLinecap="round" />
-
-                                        {/* Animated Particles */}
-                                        <circle cx="50" cy="150" r="4" fill="#10B981"><animateMotion dur="3s" repeatCount="indefinite" path="M0 0 C 100 0, 100 -100, 150 -100" /></circle>
-                                        <circle cx="50" cy="150" r="4" fill="#3B82F6"><animateMotion dur="3.5s" repeatCount="indefinite" path="M0 0 C 100 0, 100 100, 150 100" /></circle>
-
-                                        {/* Nodes */}
-                                        <g className="transform hover:scale-110 transition-transform cursor-pointer group/node">
-                                            <circle cx="50" cy="150" r="25" fill="white" stroke="#94A3B8" strokeWidth="2" />
-                                            <path d="M42 153l8-8 8 8M46 153v6h8v-6" stroke="#475569" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                            {/* Tooltip */}
-                                            <g className="opacity-0 group-hover/node:opacity-100 transition-opacity">
-                                                <rect x="15" y="90" width="70" height="24" rx="4" fill="#1E293B" />
-                                                <text x="50" y="106" fill="white" fontSize="10" textAnchor="middle" fontWeight="bold">Villages</text>
-                                            </g>
-                                        </g>
-
-                                        <g className="transform hover:scale-110 transition-transform cursor-pointer group/node2">
-                                            <circle cx="200" cy="50" r="30" fill="white" stroke="#005DAA" strokeWidth="3" />
-                                            <rect x="188" y="40" width="24" height="20" rx="2" stroke="#005DAA" strokeWidth="2" />
-                                            <path d="M194 40v-6h12v6" stroke="#005DAA" strokeWidth="2" />
-                                            <g className="opacity-0 group-hover/node2:opacity-100 transition-opacity">
-                                                <rect x="160" y="0" width="80" height="24" rx="4" fill="#1E293B" />
-                                                <text x="200" y="16" fill="white" fontSize="10" textAnchor="middle" fontWeight="bold">+450 MT Processed</text>
-                                            </g>
-                                        </g>
-
-                                        <g className="transform hover:scale-110 transition-transform cursor-pointer group/node3">
-                                            <circle cx="200" cy="250" r="30" fill="white" stroke="#F59E0B" strokeWidth="3" />
-                                            <circle cx="194" cy="256" r="4" stroke="#F59E0B" strokeWidth="2" />
-                                            <circle cx="206" cy="256" r="4" stroke="#F59E0B" strokeWidth="2" />
-                                            <path d="M188 252h24v-6l-4-4h-16l-4 4v6z" stroke="#F59E0B" strokeWidth="2" fill="none" />
-                                            <g className="opacity-0 group-hover/node3:opacity-100 transition-opacity">
-                                                <rect x="160" y="280" width="80" height="24" rx="4" fill="#1E293B" />
-                                                <text x="200" y="296" fill="white" fontSize="10" textAnchor="middle" fontWeight="bold">Active Vendors</text>
-                                            </g>
-                                        </g>
-
-                                        <g className="transform hover:scale-110 transition-transform cursor-pointer group/node4">
-                                            <circle cx="350" cy="150" r="35" fill="white" stroke="#10B981" strokeWidth="4" />
-                                            <path d="M340 160l10-10 10 10M345 155v10h10v-10" fill="none" stroke="#10B981" strokeWidth="2" />
-                                            <circle cx="350" cy="150" r="10" fill="none" stroke="#10B981" strokeWidth="2" strokeDasharray="4 2" className="animate-spin-slow" />
-                                            <g className="opacity-0 group-hover/node4:opacity-100 transition-opacity">
-                                                <rect x="310" y="90" width="80" height="24" rx="4" fill="#1E293B" />
-                                                <text x="350" y="106" fill="white" fontSize="10" textAnchor="middle" fontWeight="bold">92% Recovery</text>
-                                            </g>
-                                        </g>
-                                    </svg>
+                            <div className="stat-card" style={{ animationDelay: '0.2s' }}>
+                                <div className="stat-icon bg-gradient-to-br from-green-400 to-green-600">
+                                    <Map className="w-8 h-8" />
                                 </div>
+                                <div className="stat-number">100+</div>
+                                <div className="stat-label uppercase tracking-wider font-bold text-xs">PWMUs Online</div>
+                            </div>
+
+                            <div className="stat-card" style={{ animationDelay: '0.4s' }}>
+                                <div className="stat-icon bg-gradient-to-br from-amber-400 to-amber-600">
+                                    <IndianRupee className="w-8 h-8" />
+                                </div>
+                                <div className="stat-number">120</div>
+                                <div className="stat-label uppercase tracking-wider font-bold text-xs">Cr Revenue Generated</div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </header>
+            </section>
 
             {/* 2. LIVE STATE SNAPSHOT */}
             <section className="py-12 bg-white border-y border-gray-100 relative z-20 shadow-sm">
