@@ -118,12 +118,12 @@ const Landing = () => {
         <div className="min-h-screen bg-[#F0F4F8] font-sans selection:bg-green-600 selection:text-white overflow-x-hidden">
 
             {/* =========== HERO SECTION =========== */}
-            <section className="hero-container relative pt-20">
+            <section className="hero-container relative">
                 {/* Background Mesh Animation */}
                 <div className="hero-bg-mesh"></div>
 
                 {/* Main SVG Scene - Background */}
-                <div className="absolute inset-0 z-0 pointer-events-none" style={{ opacity: 0.8, transform: 'translateY(100px)' }}>
+                <div className="absolute inset-0 z-0 pointer-events-none" style={{ opacity: 0.8 }}>
                     <svg ref={svgRef} className="w-full h-full" viewBox="0 0 1000 700" preserveAspectRatio="xMidYMid slice">
                         <defs>
                             <linearGradient id="sky-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -259,7 +259,7 @@ const Landing = () => {
                 </div>
 
                 {/* FULL WIDTH TITLE SECTION */}
-                <div className="relative z-10 w-full pt-20 pb-12">
+                <div className="relative z-10 w-full pt-10 pb-12">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center animate-fade-in-up">
                         <h1 className="text-5xl md:text-7xl font-extrabold text-slate-900 leading-tight mb-4">
                             Transforming Waste into <span className="text-green-600 transition-opacity duration-300">{toggleWord}</span>
