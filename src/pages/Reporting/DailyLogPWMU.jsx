@@ -1,12 +1,64 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Calendar, Truck, Save, CheckCircle2, TrendingUp, Search } from 'lucide-react';
+import { useLanguage } from '../../context/LanguageContext';
 
 const DailyLogPWMU = () => {
     const navigate = useNavigate();
     const location = useLocation();
 
     // Get date from query params or default to today
+    const { t, language } = useLanguage();
+
+    const dailyLogTranslations = {
+        en: {
+            title: "Daily Waste Intake Log",
+            subtitle: "Record daily plastic waste collection from linked Gram Panchayats and Villages.",
+            totalIntake: "Total Intake Today",
+            reportingVillages: "Reporting Villages",
+            saving: "Saving...",
+            saveBtn: "Save Daily Log",
+            saved: "Saved Successfully",
+            linkedVillages: "Linked Villages & GPs",
+            searchPlaceholder: "Search village...",
+            colLocation: "Location Name",
+            colType: "Type",
+            colStatus: "Status/Source",
+            colIntake: "Intake kg",
+            autoFilled: "Auto-filled",
+            manualEntry: "Manual Entry",
+            noMatch: "No linked villages matching \"{term}\" found.",
+            dailyTotal: "Daily Total:",
+            kg: "kg",
+            gp: "Gram Panchayat",
+            village: "Village",
+            block: "Block"
+        },
+        hi: {
+            title: "दैनिक अपशिष्ट अंतर्ग्रहण लॉग",
+            subtitle: "लिंक की गई ग्राम पंचायतों और गांवों से दैनिक प्लास्टिक कचरा संग्रह रिकॉर्ड करें।",
+            totalIntake: "आज का कुल अंतर्ग्रहण",
+            reportingVillages: "रिपोर्टिंग गांव",
+            saving: "सहेज रहा है...",
+            saveBtn: "दैनिक लॉग सहेजें",
+            saved: "सफलतापूर्वक सहेजा गया",
+            linkedVillages: "लिंक किए गए गांव और ग्राम पंचायतें",
+            searchPlaceholder: "गांव खोजें...",
+            colLocation: "स्थान का नाम",
+            colType: "प्रकार",
+            colStatus: "स्थिति/स्रोत",
+            colIntake: "मात्रा (किलो)",
+            autoFilled: "ऑटो-भरा हुआ",
+            manualEntry: "मैनुअल प्रविष्टि",
+            noMatch: "\"{term}\" से मेल खाने वाला कोई गांव नहीं मिला।",
+            dailyTotal: "दैनिक कुल:",
+            kg: "किलो",
+            gp: "ग्राम पंचायत",
+            village: "गांव",
+            block: "ब्लॉक"
+        }
+    };
+
     const queryParams = new URLSearchParams(location.search);
     const dateParam = queryParams.get('date');
     const today = new Date().toISOString().split('T')[0];
@@ -66,10 +118,10 @@ const DailyLogPWMU = () => {
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
                         <Truck className="w-7 h-7 text-[#005DAA]" />
-                        Daily Waste Intake Log
+                        {t('title', dailyLogTranslations)}
                     </h1>
                     <p className="text-sm text-gray-500 mt-1">
-                        Record daily plastic waste collection from linked Gram Panchayats and Villages.
+                        {t('subtitle', dailyLogTranslations)}
                     </p>
                 </div>
 
@@ -94,15 +146,15 @@ const DailyLogPWMU = () => {
                     <div className="absolute top-0 right-0 p-4 opacity-5">
                         <TrendingUp className="w-20 h-20" />
                     </div>
-                    <span className="text-sm font-medium text-gray-500 mb-2 z-10">Total Intake Today</span>
+                    <span className="text-sm font-medium text-gray-500 mb-2 z-10">{t('totalIntake', dailyLogTranslations)}</span>
                     <div className="flex items-baseline gap-2 z-10 transition-all duration-300">
                         <span className="text-4xl font-bold text-gray-900">{totalIntake}</span>
-                        <span className="text-sm font-medium text-gray-500">kg</span>
+                        <span className="text-sm font-medium text-gray-500">{t('kg', dailyLogTranslations)}</span>
                     </div>
                 </div>
 
                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col relative overflow-hidden">
-                    <span className="text-sm font-medium text-gray-500 mb-2 z-10">Reporting Villages</span>
+                    <span className="text-sm font-medium text-gray-500 mb-2 z-10">{t('reportingVillages', dailyLogTranslations)}</span>
                     <div className="flex items-baseline gap-2 z-10">
                         <span className="text-4xl font-bold text-gray-900">
                             {villages.filter(v => v.value !== '').length}
@@ -121,19 +173,19 @@ const DailyLogPWMU = () => {
                             {isSaving ? (
                                 <div className="flex items-center gap-2">
                                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    Saving...
+                                    {t('saving', dailyLogTranslations)}
                                 </div>
                             ) : (
                                 <div className="flex items-center gap-2">
                                     <Save className="w-5 h-5" />
-                                    Save Daily Log
+                                    {t('saveBtn', dailyLogTranslations)}
                                 </div>
                             )}
                         </button>
                     ) : (
                         <div className="w-full py-3 px-4 rounded-lg font-medium text-white bg-[#28A745] shadow-sm flex items-center justify-center animate-fade-in-up">
                             <CheckCircle2 className="w-5 h-5 mr-2" />
-                            Saved Successfully
+                            {t('saved', dailyLogTranslations)}
                         </div>
                     )}
                 </div>
@@ -142,14 +194,14 @@ const DailyLogPWMU = () => {
             {/* Data Entry Table */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <h2 className="font-semibold text-gray-800">Linked Villages & GPs</h2>
+                    <h2 className="font-semibold text-gray-800">{t('linkedVillages', dailyLogTranslations)}</h2>
                     <div className="relative">
                         <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                             <Search className="w-4 h-4 text-gray-400" />
                         </div>
                         <input
                             type="text"
-                            placeholder="Search village..."
+                            placeholder={t('searchPlaceholder', dailyLogTranslations)}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="bg-white border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-[#005DAA] focus:border-[#005DAA] block w-full sm:w-64 pl-9 p-2"
@@ -160,10 +212,10 @@ const DailyLogPWMU = () => {
                     <table className="w-full text-sm text-left text-gray-600 min-w-[600px]">
                         <thead className="text-xs text-gray-500 uppercase bg-gray-50/80 border-b border-gray-100">
                             <tr>
-                                <th scope="col" className="px-4 md:px-6 py-4 font-semibold">Location Name (स्थान का नाम)</th>
-                                <th scope="col" className="px-4 md:px-6 py-4 font-semibold">Type (प्रकार)</th>
-                                <th scope="col" className="px-4 md:px-6 py-4 font-semibold">Status/Source (स्थिति/स्रोत)</th>
-                                <th scope="col" className="px-4 md:px-6 py-4 font-semibold text-right">Intake kg (मात्रा किलो में)</th>
+                                <th scope="col" className="px-4 md:px-6 py-4 font-semibold">{t('colLocation', dailyLogTranslations)}</th>
+                                <th scope="col" className="px-4 md:px-6 py-4 font-semibold">{t('colType', dailyLogTranslations)}</th>
+                                <th scope="col" className="px-4 md:px-6 py-4 font-semibold">{t('colStatus', dailyLogTranslations)}</th>
+                                <th scope="col" className="px-4 md:px-6 py-4 font-semibold text-right">{t('colIntake', dailyLogTranslations)}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
@@ -173,17 +225,17 @@ const DailyLogPWMU = () => {
                                         {village.name}
                                     </td>
                                     <td className="px-4 md:px-6 py-4 text-gray-500 whitespace-nowrap">
-                                        {village.type}
+                                        {t(village.type.toLowerCase().includes('panchayat') ? 'gp' : village.type.toLowerCase().includes('block') ? 'block' : 'village', dailyLogTranslations)}
                                     </td>
                                     <td className="px-4 md:px-6 py-4 whitespace-nowrap">
                                         {village.autoFilled ? (
                                             <span className="inline-flex items-center gap-1.5 py-1 px-2.5 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">
                                                 <CheckCircle2 className="w-3.5 h-3.5" />
-                                                Auto-filled
+                                                {t('autoFilled', dailyLogTranslations)}
                                             </span>
                                         ) : (
                                             <span className="inline-flex items-center gap-1.5 py-1 px-2.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
-                                                Manual Entry
+                                                {t('manualEntry', dailyLogTranslations)}
                                             </span>
                                         )}
                                     </td>
@@ -203,7 +255,7 @@ const DailyLogPWMU = () => {
                                                         : 'bg-white border-gray-300 text-gray-900 font-medium'
                                                     }`}
                                             />
-                                            <span className="ml-2 text-gray-400 font-medium w-4">kg</span>
+                                            <span className="ml-2 text-gray-400 font-medium w-4">{t('kg', dailyLogTranslations)}</span>
                                         </div>
                                     </td>
                                 </tr>
@@ -211,16 +263,16 @@ const DailyLogPWMU = () => {
                             {filteredVillages.length === 0 && (
                                 <tr>
                                     <td colSpan="4" className="px-6 py-8 text-center text-gray-500">
-                                        No linked villages matching "{searchTerm}" found.
+                                        {t('noMatch', dailyLogTranslations).replace('{term}', searchTerm)}
                                     </td>
                                 </tr>
                             )}
                         </tbody>
                         <tfoot className="bg-blue-50/50 border-t border-blue-100 font-semibold text-gray-900">
                             <tr>
-                                <td colSpan="3" className="px-4 md:px-6 py-4 text-right">Daily Total:</td>
+                                <td colSpan="3" className="px-4 md:px-6 py-4 text-right">{t('dailyTotal', dailyLogTranslations)}</td>
                                 <td className="px-4 md:px-6 py-4 text-right text-lg text-[#005DAA]">
-                                    {totalIntake.toFixed(1)} <span className="text-sm font-medium text-gray-500">kg</span>
+                                    {totalIntake.toFixed(1)} <span className="text-sm font-medium text-gray-500">{t('kg', dailyLogTranslations)}</span>
                                 </td>
                             </tr>
                         </tfoot>

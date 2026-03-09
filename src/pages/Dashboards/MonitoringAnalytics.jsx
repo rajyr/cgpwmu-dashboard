@@ -4,13 +4,88 @@ import {
     LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell
 } from 'recharts';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const getProxyUrl = () => (import.meta.env.DEV ? '/supabase' : import.meta.env.VITE_SUPABASE_URL);
 
 const MonitoringAnalytics = () => {
     const { userRole } = useAuth();
+    const { t, language } = useLanguage();
     const [selectedDistrict, setSelectedDistrict] = useState('All Districts');
+
+    const monTrans = {
+        en: {
+            title: "Monitoring & Compliance Hub",
+            subtitle: "Real-time tracking of operational compliance, audits, and facility health.",
+            allDistricts: "All Districts",
+            totalAudits: "Total Audits",
+            loggedCol: "Logged Collections",
+            overallCompliance: "Overall Compliance",
+            operationalCenters: "Operational Centers",
+            openIssues: "Open Issues",
+            inMaintenance: "In Maintenance",
+            criticalFlags: "Critical Flags",
+            overCapacity: "Over Capacity",
+            complianceTrend: "Compliance Trend",
+            actualVsTarget: "Actual vs Target compliance rate over time.",
+            target: "Target (%)",
+            actual: "Actual Compliance (%)",
+            openIssuesByCat: "Open Issues by Category",
+            distribution: "Distribution of current non-compliance flags.",
+            complianceMatrix: "PWMU Compliance Matrix",
+            facilityHealth: "Facility Health across key reporting and operational standards.",
+            exportReport: "Export Report",
+            colPwmuUnit: "PWMU Unit",
+            colDailyLogs: "Daily Logs",
+            colMonthlyReport: "Monthly Report",
+            colSafetyCerts: "Safety Certs",
+            colRecyclerQuality: "Recycler Quality",
+            colScore: "Score",
+            fetching: "Syncing compliance oversight...",
+            issueCat: {
+                maintenance: "Maintenance",
+                logDelay: "Log Delay",
+                overCapacity: "Over Capacity",
+                dataMismatch: "Data Mismatch"
+            }
+        },
+        hi: {
+            title: "निगरानी और अनुपालन हब",
+            subtitle: "परिचालन अनुपालन, ऑडिट और सुविधा स्वास्थ्य की रीयल-टाइम ट्रैकिंग।",
+            allDistricts: "सभी जिले",
+            totalAudits: "कुल ऑडिट",
+            loggedCol: "ड्रग संग्रह",
+            overallCompliance: "कुल अनुपालन",
+            operationalCenters: "परिचालन केंद्र",
+            openIssues: "खुले मुद्दे",
+            inMaintenance: "रखरखाव में",
+            criticalFlags: "महत्वपूर्ण झंडे",
+            overCapacity: "क्षमता से अधिक",
+            complianceTrend: "अनुपालन रुझान",
+            actualVsTarget: "समय के साथ वास्तविक बनाम लक्ष्य अनुपालन दर।",
+            target: "लक्ष्य (%)",
+            actual: "वास्तविक अनुपालन (%)",
+            openIssuesByCat: "श्रेणी के अनुसार खुले मुद्दे",
+            distribution: "वर्तमान गैर-अनुपालन फ्लैग का वितरण।",
+            complianceMatrix: "PWMU अनुपालन मैट्रिक्स",
+            facilityHealth: "प्रमुख रिपोर्टिंग और परिचालन मानकों में सुविधा स्वास्थ्य।",
+            exportReport: "रिपोर्ट निर्यात करें",
+            colPwmuUnit: "PWMU इकाई",
+            colDailyLogs: "दैनिक लॉग",
+            colMonthlyReport: "मासिक रिपोर्ट",
+            colSafetyCerts: "सुरक्षा प्रमाण पत्र",
+            colRecyclerQuality: "रीसायकल गुणवत्ता",
+            colScore: "स्कोर",
+            fetching: "अनुपालन निरीक्षण सिंक किया जा रहा है...",
+            issueCat: {
+                maintenance: "रखरखाव",
+                logDelay: "लॉग विलंब",
+                overCapacity: "क्षमता से अधिक",
+                dataMismatch: "डेटा बेमेल"
+            }
+        }
+    };
     const [pwmus, setPwmus] = useState([]);
     const [collections, setCollections] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -58,10 +133,10 @@ const MonitoringAnalytics = () => {
     const criticalFlags = filteredPwmus.filter(p => p.capacity_mt > 0 && (p.waste_processed_mt / p.capacity_mt) > 1.2).length;
 
     const kpis = [
-        { label: "Total Audits", value: totalAudits, icon: FileText, color: "text-blue-600", bg: "bg-blue-50", text: "Logged Collections" },
-        { label: "Overall Compliance", value: `${overallCompliance}%`, icon: ShieldCheck, color: "text-green-600", bg: "bg-green-50", text: "Operational Centers" },
-        { label: "Open Issues", value: openIssues, icon: Clock, color: "text-orange-600", bg: "bg-orange-50", text: "In Maintenance" },
-        { label: "Critical Flags", value: criticalFlags, icon: AlertTriangle, color: "text-red-600", bg: "bg-red-50", text: "Over Capacity" },
+        { label: t('totalAudits', monTrans), value: totalAudits, icon: FileText, color: "text-blue-600", bg: "bg-blue-50", text: t('loggedCol', monTrans) },
+        { label: t('overallCompliance', monTrans), value: `${overallCompliance}%`, icon: ShieldCheck, color: "text-green-600", bg: "bg-green-50", text: t('operationalCenters', monTrans) },
+        { label: t('openIssues', monTrans), value: openIssues, icon: Clock, color: "text-orange-600", bg: "bg-orange-50", text: t('inMaintenance', monTrans) },
+        { label: t('criticalFlags', monTrans), value: criticalFlags, icon: AlertTriangle, color: "text-red-600", bg: "bg-red-50", text: t('overCapacity', monTrans) },
     ];
 
     // Compliance Trend Data (Line Chart) - Mocking for now based on actual data
@@ -72,10 +147,10 @@ const MonitoringAnalytics = () => {
 
     // Issue Categories Data (Bar Chart)
     const issueData = [
-        { category: 'Maintenance', count: openIssues },
-        { category: 'Log Delay', count: filteredPwmus.filter(p => p.status === 'maintenance').length * 2 },
-        { category: 'Over Capacity', count: criticalFlags },
-        { category: 'Data Mismatch', count: 0 },
+        { category: t('issueCat', monTrans).maintenance, count: openIssues },
+        { category: t('issueCat', monTrans).logDelay, count: filteredPwmus.filter(p => p.status === 'maintenance').length * 2 },
+        { category: t('issueCat', monTrans).overCapacity, count: criticalFlags },
+        { category: t('issueCat', monTrans).dataMismatch, count: 0 },
     ];
 
     const getStatusIcon = (status) => {
@@ -88,7 +163,7 @@ const MonitoringAnalytics = () => {
         return (
             <div className="flex items-center justify-center h-64 text-indigo-600">
                 <Loader2 className="w-8 h-8 animate-spin mr-3" />
-                <span className="font-bold">Syncing compliance oversight...</span>
+                <span className="font-bold">{t('fetching', monTrans)}</span>
             </div>
         );
     }
@@ -101,9 +176,9 @@ const MonitoringAnalytics = () => {
                 <div>
                     <div className="flex items-center gap-3">
                         <Activity className="w-8 h-8 text-indigo-600" />
-                        <h1 className="text-2xl font-bold text-gray-800 tracking-tight">Monitoring & Compliance Hub</h1>
+                        <h1 className="text-2xl font-bold text-gray-800 tracking-tight">{t('title', monTrans)}</h1>
                     </div>
-                    <p className="text-sm text-gray-500 mt-1">Real-time tracking of operational compliance, audits, and facility health.</p>
+                    <p className="text-sm text-gray-500 mt-1">{t('subtitle', monTrans)}</p>
                 </div>
 
                 {/* Hierarchical Location Filters */}
@@ -113,7 +188,7 @@ const MonitoringAnalytics = () => {
                         value={selectedDistrict}
                         onChange={(e) => setSelectedDistrict(e.target.value)}
                     >
-                        <option value="All Districts">All Districts</option>
+                        <option value="All Districts">{t('allDistricts', monTrans)}</option>
                         {[...new Set(pwmus.map(p => p.district))].map(d => (
                             <option key={d} value={d}>{d}</option>
                         ))}
@@ -147,8 +222,8 @@ const MonitoringAnalytics = () => {
                     <div className="mb-6 flex items-center gap-2">
                         <LineChart className="w-5 h-5 text-indigo-500" />
                         <div>
-                            <h2 className="text-lg font-bold text-gray-800">Compliance Trend</h2>
-                            <p className="text-xs text-gray-500 mt-0.5">Actual vs Target compliance rate over time.</p>
+                            <h2 className="text-lg font-bold text-gray-800">{t('complianceTrend', monTrans)}</h2>
+                            <p className="text-xs text-gray-500 mt-0.5">{t('actualVsTarget', monTrans)}</p>
                         </div>
                     </div>
                     <div className="w-full h-[250px]">
@@ -162,8 +237,8 @@ const MonitoringAnalytics = () => {
                                     formatter={(value) => `${value}%`}
                                 />
                                 <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '20px' }} iconType="circle" iconSize={8} />
-                                <Line type="monotone" dataKey="target" name="Target (%)" stroke="#94a3b8" strokeWidth={2} strokeDasharray="5 5" dot={false} />
-                                <Line type="monotone" dataKey="actual" name="Actual Compliance (%)" stroke="#6366f1" strokeWidth={3} dot={{ r: 4, fill: 'white', strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                                <Line type="monotone" dataKey="target" name={t('target', monTrans)} stroke="#94a3b8" strokeWidth={2} strokeDasharray="5 5" dot={false} />
+                                <Line type="monotone" dataKey="actual" name={t('actual', monTrans)} stroke="#6366f1" strokeWidth={3} dot={{ r: 4, fill: 'white', strokeWidth: 2 }} activeDot={{ r: 6 }} />
                             </LineChart>
                         </ResponsiveContainer>
                     </div>
@@ -174,8 +249,8 @@ const MonitoringAnalytics = () => {
                     <div className="mb-6 flex items-center gap-2">
                         <AlertTriangle className="w-5 h-5 text-orange-500" />
                         <div>
-                            <h2 className="text-lg font-bold text-gray-800">Open Issues by Category</h2>
-                            <p className="text-xs text-gray-500 mt-0.5">Distribution of current non-compliance flags.</p>
+                            <h2 className="text-lg font-bold text-gray-800">{t('openIssuesByCat', monTrans)}</h2>
+                            <p className="text-xs text-gray-500 mt-0.5">{t('distribution', monTrans)}</p>
                         </div>
                     </div>
                     <div className="w-full h-[250px]">
@@ -203,12 +278,12 @@ const MonitoringAnalytics = () => {
                     <div className="flex items-center gap-2">
                         <ShieldCheck className="w-5 h-5 text-green-600" />
                         <div>
-                            <h2 className="text-lg font-bold text-gray-800">PWMU Compliance Matrix</h2>
-                            <p className="text-xs text-gray-500 mt-0.5">Facility health across key reporting and operational standards.</p>
+                            <h2 className="text-lg font-bold text-gray-800">{t('complianceMatrix', monTrans)}</h2>
+                            <p className="text-xs text-gray-500 mt-0.5">{t('facilityHealth', monTrans)}</p>
                         </div>
                     </div>
                     <button className="text-sm font-semibold text-indigo-600 bg-indigo-50 px-4 py-2 rounded-lg hover:bg-indigo-100 transition-colors">
-                        Export Report
+                        {t('exportReport', monTrans)}
                     </button>
                 </div>
 
@@ -216,12 +291,12 @@ const MonitoringAnalytics = () => {
                     <table className="w-full text-left border-collapse min-w-[700px]">
                         <thead className="bg-white">
                             <tr>
-                                <th className="py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">PWMU Unit</th>
-                                <th className="py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider text-center border-b border-gray-100">Daily Logs</th>
-                                <th className="py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider text-center border-b border-gray-100">Monthly Report</th>
-                                <th className="py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider text-center border-b border-gray-100">Safety Certs</th>
-                                <th className="py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider text-center border-b border-gray-100">Recycler Quality</th>
-                                <th className="py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider text-center border-b border-gray-100">Score</th>
+                                <th className="py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">{t('colPwmuUnit', monTrans)}</th>
+                                <th className="py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider text-center border-b border-gray-100">{t('colDailyLogs', monTrans)}</th>
+                                <th className="py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider text-center border-b border-gray-100">{t('colMonthlyReport', monTrans)}</th>
+                                <th className="py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider text-center border-b border-gray-100">{t('colSafetyCerts', monTrans)}</th>
+                                <th className="py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider text-center border-b border-gray-100">{t('colRecyclerQuality', monTrans)}</th>
+                                <th className="py-4 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider text-center border-b border-gray-100">{t('colScore', monTrans)}</th>
                             </tr>
                         </thead>
                         <tbody className="bg-white">

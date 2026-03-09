@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
     Activity, CheckCircle2, ArrowUpRight, BarChart2, IndianRupee,
     Home, Users, Settings, PlusCircle, FileText, PieChart, Download,
-    Calendar as CalendarIcon, Clock, AlertTriangle, Truck, Factory, Info
+    Calendar as CalendarIcon, Clock, AlertTriangle, Truck, Factory, Info, Globe
 } from 'lucide-react';
 import ChhattisgarhMap from '../components/ChhattisgarhMap';
 import { dashboardData } from '../data/mockDashboardData';
@@ -12,6 +12,7 @@ import {
 } from 'recharts';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { useEffect } from 'react';
 
 const API_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -24,6 +25,173 @@ const getProxyUrl = () => {
 
 const Dashboard = () => {
     const { userRole, userName } = useAuth();
+    const { language, t, toggleLanguage } = useLanguage();
+
+    const dashTranslations = {
+        en: {
+            welcome: "Welcome back,",
+            state: "State",
+            network: "Network",
+            happening: "Here is what's happening with the",
+            pwmuNetwork: "PWMU network today.",
+            systemStatus: "System Status",
+            operational: "Operational",
+            activePwmus: "ACTIVE PWMUS",
+            reportsToday: "REPORTS TODAY",
+            wasteProcessed: "WASTE PROCESSED",
+            wasteSold: "WASTE SOLD",
+            villagesLinked: "VILLAGES LINKED",
+            swachhagrahis: "SWACHHAGRAHIS",
+            avgEfficiency: "AVG EFFICIENCY",
+            netBalance: "NET BALANCE",
+            revenue: "Rev",
+            expense: "Exp",
+            netFlow: "Net Flow",
+            calendar: "Calendar",
+            upcomingEvents: "Upcoming Events",
+            monthlyReview: "Monthly Review (2:00 PM)",
+            stateMap: "State Map",
+            districtCoverage: "District wise coverage metrics",
+            economicOverview: "Economic & Spatial Overview",
+            valueChainTitle: "Value Chain Economic Analysis",
+            valueChainSubtitle: "Tracking value generation and costs from Village Collection to Final Disposal",
+            recentActivity: "Recent Activity",
+            viewAll: "View All",
+            quickActions: "Quick Actions",
+            registerNew: "Register New PWMU",
+            submitReport: "Submit Report",
+            viewAnalytics: "View Analytics",
+            downloadReports: "Download Reports",
+            operationalStatus: "Operational",
+            summarizing: "Summarizing State Data...",
+            fetching: "Fetching records from Chhattisgarh Network",
+            units: "Units",
+            logs: "Logs",
+            mt: "MT",
+            workers: "Workers",
+            villages: "Villages",
+            networkCoverage: "Network Coverage",
+            fieldForce: "Field Force",
+            statewideAvg: "Statewide Avg",
+            totalVolume: "Total Volume",
+            commercialValue: "Commercial Value",
+            villageSubmissions: "Village Submissions",
+            districtWise: "District Wise",
+            blockWise: "Block Wise",
+            gramPanchayat: "Gram Panchayat",
+            village: "Village",
+            pwmuWise: "PWMU Wise",
+            operationalEconomic: "Economic & Spatial Overview",
+            deepDive: "Deep dive into geospatial coverage and material flow value chain.",
+            villagesNode: "Villages",
+            pwmuNode: "PWMU Center",
+            centralHub: "Central Hub",
+            financialPerf: "Financial Performance",
+            revVsExp: "Revenue Generation vs Operational Spending",
+            wasteComp: "Statewide Waste Composition",
+            breakdown: "Breakdown of processed material types by volume",
+            totalRevenueLabel: "Total Revenue",
+            totalSpendingLabel: "Total Spending",
+            operationalEconomicState: "State Economic & Spatial Overview",
+            dryWaste: "Dry Waste",
+            wetWaste: "Wet Waste",
+            processingLoss: "Processing Loss",
+            recovered: "Recovered",
+            recyclers: "Recyclers",
+            cementKiln: "Cement Kiln",
+            roadConst: "Road Construction",
+            organicWaste: "Organic Waste",
+            plastic: "Plastic",
+            paper: "Paper",
+            metal: "Metal",
+            other: "Other",
+            newReg: "New {role} registered: {name}",
+            reportSub: "Report submitted for {village}",
+            justNow: "Just now"
+        },
+        hi: {
+            welcome: "स्वागत है,",
+            state: "राज्य",
+            network: "नेटवर्क",
+            happening: "आज आपके",
+            pwmuNetwork: "PWMU नेटवर्क में क्या हो रहा है, यहाँ देखें।",
+            systemStatus: "सिस्टम की स्थिति",
+            operational: "संचालित",
+            activePwmus: "सक्रिय PWMU",
+            reportsToday: "आज की रिपोर्ट",
+            wasteProcessed: "कचरा प्रोसेस",
+            wasteSold: "कचरा बेचा गया",
+            villagesLinked: "जुड़े गाँव",
+            swachhagrahis: "स्वच्छाग्रही",
+            avgEfficiency: "औसत दक्षता",
+            netBalance: "कुल शेष",
+            revenue: "आय",
+            expense: "व्यय",
+            netFlow: "कुल प्रवाह",
+            calendar: "कैलेंडर",
+            upcomingEvents: "आगामी कार्यक्रम",
+            monthlyReview: "मासिक समीक्षा (दोपहर 2:00 बजे)",
+            stateMap: "राज्य का नक्शा",
+            districtCoverage: "जिला वार कवरेज मेट्रिक्स",
+            economicOverview: "आर्थिक और स्थानिक अवलोकन",
+            valueChainTitle: "मूल्य श्रृंखला आर्थिक विश्लेषण",
+            valueChainSubtitle: "गांव संग्रह से अंतिम निपटान तक मूल्य सृजन और लागत की ट्रैकिंग",
+            recentActivity: "हाल की गतिविधि",
+            viewAll: "सभी देखें",
+            quickActions: "त्वरित कार्रवाई",
+            registerNew: "नया PWMU पंजीकृत करें",
+            submitReport: "रिपोर्ट जमा करें",
+            viewAnalytics: "एनालिटिक्स देखें",
+            downloadReports: "रिपोर्ट डाउनलोड करें",
+            operationalStatus: "परिचालित",
+            summarizing: "राज्य डेटा का सारांश...",
+            fetching: "छत्तीसगढ़ नेटवर्क से रिकॉर्ड प्राप्त किए जा रहे हैं",
+            units: "इकाइयां",
+            logs: "लॉग",
+            mt: "मीट्रिक टन",
+            workers: "श्रमिक",
+            villages: "गाँव",
+            networkCoverage: "नेटवर्क कवरेज",
+            fieldForce: "फील्ड फोर्स",
+            statewideAvg: "राज्यव्यापी औसत",
+            totalVolume: "कुल मात्रा",
+            commercialValue: "व्यावसायिक मूल्य",
+            villageSubmissions: "गांव सबमिशन",
+            districtWise: "जिला वार",
+            blockWise: "ब्लॉक वार",
+            gramPanchayat: "ग्राम पंचायत",
+            village: "गाँव",
+            pwmuWise: "PWMU वार",
+            operationalEconomic: "आर्थिक और स्थानिक अवलोकन",
+            deepDive: "भू-स्थानिक कवरेज और सामग्री प्रवाह मूल्य श्रृंखला में गहराई से जानकारी लें।",
+            villagesNode: "गाँव",
+            pwmuNode: "PWMU केंद्र",
+            centralHub: "मुख्य हब",
+            financialPerf: "वित्तीय प्रदर्शन",
+            revVsExp: "राजस्व सृजन बनाम परिचालन व्यय",
+            wasteComp: "राज्यव्यापी कचरा संरचना",
+            breakdown: "मात्रा के अनुसार प्रसंस्कृत सामग्री के प्रकारों का विवरण",
+            totalRevenueLabel: "कुल राजस्व",
+            totalSpendingLabel: "कुल व्यय",
+            operationalEconomicState: "राज्य आर्थिक और स्थानिक अवलोकन",
+            dryWaste: "सूखा कचरा",
+            wetWaste: "गीला कचरा",
+            processingLoss: "प्रसंस्करण हानि",
+            recovered: "रिकवर किया गया",
+            recyclers: "रीसायकलर्स",
+            cementKiln: "सीमेंट भट्ठा",
+            roadConst: "सड़क निर्माण",
+            organicWaste: "जैविक कचरा",
+            plastic: "प्लास्टिक",
+            paper: "कागज",
+            metal: "धातु",
+            other: "अन्य",
+            newReg: "नया {role} पंजीकृत: {name}",
+            reportSub: "{village} के लिए रिपोर्ट सबमिट की गई",
+            justNow: "अभी-अभी"
+        }
+    };
+
     const { overview, valueChain } = dashboardData;
     const [date, setDate] = useState(new Date());
     const [loading, setLoading] = useState(true);
@@ -40,10 +208,10 @@ const Dashboard = () => {
         financialChart: [],
         wasteComposition: [
             { name: 'Organic Waste', value: 45, color: '#22c55e' },
-            { name: 'Recyclable Plastic', value: 25, color: '#3b82f6' },
-            { name: 'Paper & Cardboard', value: 15, color: '#eab308' },
-            { name: 'Glass & Metal', value: 10, color: '#a855f7' },
-            { name: 'Inert / Other', value: 5, color: '#64748b' },
+            { name: 'Plastic', value: 25, color: '#3b82f6' },
+            { name: 'Paper', value: 15, color: '#eab308' },
+            { name: 'Metal', value: 10, color: '#a855f7' },
+            { name: 'Other', value: 5, color: '#64748b' },
         ]
     });
     const navigate = useNavigate();
@@ -99,18 +267,18 @@ const Dashboard = () => {
 
                 const totalVolume = totalWet + plastic + paper + metal + Math.max(0, other);
                 const composition = totalVolume > 0 ? [
-                    { name: 'Organic Waste', value: Math.round((totalWet / totalVolume) * 100), color: '#22c55e' },
-                    { name: 'Plastic', value: Math.round((plastic / totalVolume) * 100), color: '#3b82f6' },
-                    { name: 'Paper', value: Math.round((paper / totalVolume) * 100), color: '#eab308' },
-                    { name: 'Metal', value: Math.round((metal / totalVolume) * 100), color: '#a855f7' },
-                    { name: 'Other', value: Math.round((Math.max(0, other) / totalVolume) * 100), color: '#64748b' },
+                    { name: t('organicWaste', dashTranslations), value: Math.round((totalWet / totalVolume) * 100), color: '#22c55e' },
+                    { name: t('plastic', dashTranslations), value: Math.round((plastic / totalVolume) * 100), color: '#3b82f6' },
+                    { name: t('paper', dashTranslations), value: Math.round((paper / totalVolume) * 100), color: '#eab308' },
+                    { name: t('metal', dashTranslations), value: Math.round((metal / totalVolume) * 100), color: '#a855f7' },
+                    { name: t('other', dashTranslations), value: Math.round((Math.max(0, other) / totalVolume) * 100), color: '#64748b' },
                 ] : stats.wasteComposition;
 
                 // Recent Activities
                 const activities = [
                     ...usersData.slice(0, 3).map(u => ({
                         id: u.id,
-                        title: `New ${u.role} registered: ${u.full_name}`,
+                        title: t('newReg', dashTranslations).replace('{role}', u.role).replace('{name}', u.full_name),
                         time: new Date(u.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                         type: 'Registration',
                         icon: Users,
@@ -119,8 +287,8 @@ const Dashboard = () => {
                     })),
                     ...collectionData.slice(0, 2).map(c => ({
                         id: c.id,
-                        title: `Report submitted for ${c.village_name}`,
-                        time: 'Just now',
+                        title: t('reportSub', dashTranslations).replace('{village}', c.village_name),
+                        time: t('justNow', dashTranslations),
                         type: 'Submission',
                         icon: FileText,
                         color: 'text-green-500',
@@ -156,34 +324,121 @@ const Dashboard = () => {
         fetchData();
     }, []);
 
+    const dashTranslations2 = {
+        en: {
+            village: "Village",
+        },
+        hi: {
+            welcome: "स्वागत है,",
+            state: "राज्य",
+            network: "नेटवर्क",
+            happening: "आज आपके",
+            pwmuNetwork: "PWMU नेटवर्क में क्या हो रहा है, यहाँ देखें।",
+            systemStatus: "सिस्टम की स्थिति",
+            operational: "संचालित",
+            activePwmus: "सक्रिय PWMU",
+            reportsToday: "आज की रिपोर्ट",
+            wasteProcessed: "कचरा प्रोसेस",
+            wasteSold: "कचरा बेचा गया",
+            villagesLinked: "जुड़े गाँव",
+            swachhagrahis: "स्वच्छाग्रही",
+            avgEfficiency: "औसत दक्षता",
+            netBalance: "कुल शेष",
+            revenue: "आय",
+            expense: "व्यय",
+            netFlow: "कुल प्रवाह",
+            calendar: "कैलेंडर",
+            upcomingEvents: "आगामी कार्यक्रम",
+            monthlyReview: "मासिक समीक्षा (दोपहर 2:00 बजे)",
+            stateMap: "राज्य का नक्शा",
+            districtCoverage: "जिला वार कवरेज मेट्रिक्स",
+            economicOverview: "आर्थिक और स्थानिक अवलोकन",
+            valueChainTitle: "मूल्य श्रृंखला आर्थिक विश्लेषण",
+            valueChainSubtitle: "गांव संग्रह से अंतिम निपटान तक मूल्य सृजन और लागत की ट्रैकिंग",
+            recentActivity: "हाल की गतिविधि",
+            viewAll: "सभी देखें",
+            quickActions: "त्वरित कार्रवाई",
+            registerNew: "नया PWMU पंजीकृत करें",
+            submitReport: "रिपोर्ट जमा करें",
+            viewAnalytics: "एनालिटिक्स देखें",
+            downloadReports: "रिपोर्ट डाउनलोड करें",
+            operationalStatus: "परिचालित",
+            summarizing: "राज्य डेटा का सारांश...",
+            fetching: "छत्तीसगढ़ नेटवर्क से रिकॉर्ड प्राप्त किए जा रहे हैं",
+            units: "इकाइयां",
+            logs: "लॉग",
+            mt: "मीट्रिक टन",
+            workers: "श्रमिक",
+            villages: "गाँव",
+            networkCoverage: "नेटवर्क कवरेज",
+            fieldForce: "फील्ड फोर्स",
+            statewideAvg: "राज्यव्यापी औसत",
+            totalVolume: "कुल मात्रा",
+            commercialValue: "व्यावसायिक मूल्य",
+            villageSubmissions: "गांव सबमिशन",
+            districtWise: "जिला वार",
+            blockWise: "ब्लॉक वार",
+            gramPanchayat: "ग्राम पंचायत",
+            village: "गाँव",
+            pwmuWise: "PWMU वार",
+            operationalEconomic: "आर्थिक और स्थानिक अवलोकन",
+            deepDive: "भू-स्थानिक कवरेज और सामग्री प्रवाह मूल्य श्रृंखला में गहराई से जानकारी लें।",
+            villagesNode: "गाँव",
+            pwmuNode: "PWMU केंद्र",
+            centralHub: "मुख्य हब",
+            financialPerf: "वित्तीय प्रदर्शन",
+            revVsExp: "राजस्व सृजन बनाम परिचालन व्यय",
+            wasteComp: "राज्यव्यापी कचरा संरचना",
+            breakdown: "मात्रा के अनुसार प्रसंस्कृत सामग्री के प्रकारों का विवरण",
+            totalRevenueLabel: "कुल राजस्व",
+            totalSpendingLabel: "कुल व्यय",
+            operationalEconomicState: "राज्य आर्थिक और स्थानिक अवलोकन",
+            dryWaste: "सूखा कचरा",
+            wetWaste: "गीला कचरा",
+            processingLoss: "प्रसंस्करण हानि",
+            recovered: "रिकवर किया गया",
+            recyclers: "रीसायकलर्स",
+            cementKiln: "सीमेंट भट्ठा",
+            roadConst: "सड़क निर्माण",
+            organicWaste: "जैविक कचरा",
+            plastic: "प्लास्टिक",
+            paper: "कागज",
+            metal: "धातु",
+            other: "अन्य",
+            newReg: "नया {role} पंजीकृत: {name}",
+            reportSub: "{village} के लिए रिपोर्ट सबमिट की गई",
+            justNow: "अभी-अभी"
+        }
+    };
+
     // Derived data for rendering
     let displayRoleName = userRole || "Admin";
     if (displayRoleName === 'StateAdmin') displayRoleName = 'Admin';
     const greeting = userName || displayRoleName;
 
     const kpis = [
-        { label: "ACTIVE PWMUS", hi: "सक्रिय PWMU", value: stats.activePwmus, unit: "Units", sub: "Operational", icon: Activity, color: "text-blue-600", bg: "bg-blue-50" },
-        { label: "REPORTS TODAY", hi: "आज की रिपोर्ट", value: stats.reportsSubmitted, unit: "Logs", sub: "Village Submissions", icon: CheckCircle2, color: "text-green-600", bg: "bg-green-50" },
-        { label: "WASTE PROCESSED", hi: "कचरा प्रोसेस", value: stats.wasteProcessed.toLocaleString(), unit: "MT", sub: "Total Volume", icon: ArrowUpRight, color: "text-purple-600", bg: "bg-purple-50" },
-        { label: "WASTE SOLD", hi: "कचरा बेचा गया", value: stats.wasteSold.toLocaleString(), unit: "MT", sub: "Commercial Value", icon: BarChart2, color: "text-orange-600", bg: "bg-orange-50" },
+        { label: t('activePwmus', dashTranslations), value: stats.activePwmus, unit: t('units', dashTranslations), sub: t('operationalStatus', dashTranslations), icon: Activity, color: "text-blue-600", bg: "bg-blue-50" },
+        { label: t('reportsToday', dashTranslations), value: stats.reportsSubmitted, unit: t('logs', dashTranslations), sub: t('villageSubmissions', dashTranslations), icon: CheckCircle2, color: "text-green-600", bg: "bg-green-50" },
+        { label: t('wasteProcessed', dashTranslations), value: stats.wasteProcessed.toLocaleString(), unit: t('mt', dashTranslations), sub: t('totalVolume', dashTranslations), icon: ArrowUpRight, color: "text-purple-600", bg: "bg-purple-50" },
+        { label: t('wasteSold', dashTranslations), value: stats.wasteSold.toLocaleString(), unit: t('mt', dashTranslations), sub: t('commercialValue', dashTranslations), icon: BarChart2, color: "text-orange-600", bg: "bg-orange-50" },
         { isFinance: true },
-        { label: "VILLAGES LINKED", hi: "जुड़े गाँव", value: stats.villagesLinked.toLocaleString(), unit: "Villages", sub: "Network Coverage", icon: Home, color: "text-blue-600", bg: "bg-blue-50" },
-        { label: "SWACHHAGRAHIS", hi: "स्वच्छाग्रही", value: stats.swachhagrahis.toLocaleString(), unit: "Workers", sub: "Field Force", icon: Users, color: "text-purple-600", bg: "bg-purple-50" },
-        { label: "AVG EFFICIENCY", hi: "औसत दक्षता", value: "92%", unit: "", sub: "Statewide Avg", icon: Settings, color: "text-orange-600", bg: "bg-orange-50" }
+        { label: t('villagesLinked', dashTranslations), value: stats.villagesLinked.toLocaleString(), unit: t('villages', dashTranslations), sub: t('networkCoverage', dashTranslations), icon: Home, color: "text-blue-600", bg: "bg-blue-50" },
+        { label: t('swachhagrahis', dashTranslations), value: stats.swachhagrahis.toLocaleString(), unit: t('workers', dashTranslations), sub: t('fieldForce', dashTranslations), icon: Users, color: "text-purple-600", bg: "bg-purple-50" },
+        { label: t('avgEfficiency', dashTranslations), value: "92%", unit: "", sub: t('statewideAvg', dashTranslations), icon: Settings, color: "text-orange-600", bg: "bg-orange-50" }
     ];
 
     const actions = [
-        { label: "Register New PWMU", hi: "नया PWMU पंजीकृत करें", icon: PlusCircle, route: "/register/pwmu" },
-        { label: "Submit Report", hi: "रिपोर्ट जमा करें", icon: FileText, route: "/dashboard/pwmu" },
-        { label: "View Analytics", hi: "एनालिटिक्स देखें", icon: PieChart, route: "/dashboard/monitoring" },
-        { label: "Download Reports", hi: "रिपोर्ट डाउनलोड करें", icon: Download, route: "#" },
+        { label: t('registerNew', dashTranslations), icon: PlusCircle, route: "/register/pwmu" },
+        { label: t('submitReport', dashTranslations), icon: FileText, route: "/dashboard/pwmu" },
+        { label: t('viewAnalytics', dashTranslations), icon: PieChart, route: "/dashboard/monitoring" },
+        { label: t('downloadReports', dashTranslations), icon: Download, route: "#" },
     ];
 
     if (loading) return (
         <div className="w-full h-full flex flex-col items-center justify-center py-20">
             <Activity className="w-10 h-10 text-blue-600 animate-pulse mb-4" />
-            <p className="text-lg font-bold text-gray-800">Summarizing State Data...</p>
-            <p className="text-sm text-gray-500 mt-1">Fetching records from Chhattisgarh Network</p>
+            <p className="text-lg font-bold text-gray-800">{t('summarizing', dashTranslations)}</p>
+            <p className="text-sm text-gray-500 mt-1">{t('fetching', dashTranslations)}</p>
         </div>
     );
 
@@ -193,42 +448,51 @@ const Dashboard = () => {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 animate-fade-in-up">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-800 tracking-tight">
-                        Welcome back, {greeting} <span className="text-gray-400 font-normal">/</span> <span className="text-2xl font-semibold">आपका स्वागत है, {displayRoleName === 'Admin' ? 'एडमिन' : 'अधिकारी'}</span>
+                        {t('welcome', dashTranslations)} {greeting}
                     </h1>
                     <p className="text-sm text-gray-500 mt-2">
-                        Here is what's happening with the {displayRoleName === 'Admin' ? 'State' : 'Network'} PWMU network today. <span className="text-gray-400 mx-1">/</span> आज नेटवर्क की स्थिति यहां है।
+                        {t('happening', dashTranslations)} {displayRoleName === 'Admin' ? t('state', dashTranslations) : t('network', dashTranslations)} {t('pwmuNetwork', dashTranslations)}
                     </p>
                 </div>
 
                 <div className="flex flex-col md:flex-row items-end md:items-center gap-4">
+                    {/* Language Toggle */}
+                    <button
+                        onClick={toggleLanguage}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all text-xs font-bold text-gray-700 bg-white shadow-sm"
+                    >
+                        <Globe className="w-3.5 h-3.5 text-blue-500" />
+                        {language === 'en' ? 'हिन्दी' : 'English'}
+                    </button>
+
                     {/* Hierarchical Location Filters */}
                     <div className="flex bg-white border border-gray-200 rounded-lg shadow-sm p-1 overflow-x-auto max-w-[full] md:max-w-none hide-scrollbar">
                         <select className="bg-transparent text-xs font-semibold text-gray-700 px-3 py-1.5 outline-none border-r border-gray-200 cursor-pointer hover:bg-gray-50 rounded-l-md transition-colors min-w-[100px]">
-                            <option>District Wise</option>
+                            <option>{t('districtWise', dashTranslations)}</option>
                             <option>Raipur</option>
                             <option>Durg</option>
                         </select>
                         <select className="bg-transparent text-xs font-semibold text-gray-700 px-3 py-1.5 outline-none border-r border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors min-w-[100px]">
-                            <option>Block Wise</option>
+                            <option>{t('blockWise', dashTranslations)}</option>
                             <option>Arang</option>
                             <option>Abhanpur</option>
                         </select>
                         <select className="bg-transparent text-xs font-semibold text-gray-700 px-3 py-1.5 outline-none border-r border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors hidden lg:block min-w-[120px]">
-                            <option>Gram Panchayat</option>
+                            <option>{t('gramPanchayat', dashTranslations)}</option>
                         </select>
                         <select className="bg-transparent text-xs font-semibold text-gray-700 px-3 py-1.5 outline-none border-r border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors hidden lg:block min-w-[100px]">
-                            <option>Village</option>
+                            <option>{t('village', dashTranslations)}</option>
                         </select>
                         <select className="bg-transparent text-xs font-semibold text-gray-700 px-3 py-1.5 outline-none cursor-pointer hover:bg-gray-50 rounded-r-md transition-colors min-w-[100px]">
-                            <option>PWMU Wise</option>
+                            <option>{t('pwmuWise', dashTranslations)}</option>
                         </select>
                     </div>
 
                     {/* System Status Bubble */}
                     <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-full px-4 py-1.5 shadow-sm shrink-0">
                         <div className="flex flex-col text-right mr-2">
-                            <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">System Status</span>
-                            <span className="text-sm font-bold text-green-600">Operational <span className="text-xs font-normal">(संचालित)</span></span>
+                            <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider font-sans">{t('systemStatus', dashTranslations)}</span>
+                            <span className="text-sm font-bold text-green-600 font-sans">{t('operational', dashTranslations)}</span>
                         </div>
                         <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
                     </div>
@@ -244,7 +508,7 @@ const Dashboard = () => {
                                 <>
                                     <div className="flex justify-between items-start mb-1">
                                         <div>
-                                            <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">NET BALANCE <span className="font-normal">(शुद्ध शेष)</span></h3>
+                                            <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">{t('netBalance', dashTranslations)}</h3>
                                         </div>
                                         <div className="p-1.5 rounded-lg bg-teal-50 text-teal-600">
                                             <IndianRupee className="w-4 h-4" />
@@ -252,8 +516,8 @@ const Dashboard = () => {
                                     </div>
                                     <div className="flex flex-col justify-end flex-1">
                                         <div className="flex justify-between items-end mb-1">
-                                            <div className="text-[10px] text-gray-500 font-semibold flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-teal-500"></div> Rev: ₹{(stats.totalRevenue / 100000).toFixed(1)}L</div>
-                                            <div className="text-[10px] text-gray-500 font-semibold flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-red-400"></div> Exp: ₹{(stats.totalExpense / 100000).toFixed(1)}L</div>
+                                            <div className="text-[10px] text-gray-500 font-semibold flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-teal-500"></div> {t('revenue', dashTranslations)}: ₹{(stats.totalRevenue / 100000).toFixed(1)}L</div>
+                                            <div className="text-[10px] text-gray-500 font-semibold flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-red-400"></div> {t('expense', dashTranslations)}: ₹{(stats.totalExpense / 100000).toFixed(1)}L</div>
                                         </div>
                                         <div className="w-full flex h-2 rounded-full overflow-hidden mb-1.5">
                                             <div className="bg-teal-500 transition-all duration-1000" style={{ width: `${(stats.totalRevenue / (stats.totalRevenue + stats.totalExpense || 1)) * 100}%` }} title="Revenue"></div>
@@ -261,7 +525,7 @@ const Dashboard = () => {
                                         </div>
                                         <div className="flex justify-between items-baseline box-border">
                                             <span className="text-xl font-bold text-gray-800">₹{((stats.totalRevenue - stats.totalExpense) / 100000).toFixed(1)}L</span>
-                                            <span className="text-[10px] text-green-600 font-bold bg-green-50 px-1.5 rounded">Net Flow</span>
+                                            <span className="text-[10px] text-green-600 font-bold bg-green-50 px-1.5 rounded">{t('netFlow', dashTranslations)}</span>
                                         </div>
                                     </div>
                                 </>
@@ -269,7 +533,7 @@ const Dashboard = () => {
                                 <>
                                     <div className="flex justify-between items-start mb-2">
                                         <div>
-                                            <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">{kpi.label} <span className="font-normal">({kpi.hi})</span></h3>
+                                            <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">{kpi.label}</h3>
                                         </div>
                                         <div className={`p-1.5 rounded-lg ${kpi.bg} ${kpi.color}`}>
                                             <kpi.icon className="w-4 h-4" />
@@ -292,19 +556,19 @@ const Dashboard = () => {
                 <div className="lg:col-span-1 bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex flex-col justify-center">
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-base font-bold text-gray-800">
-                            Calendar <span className="text-xs font-normal text-gray-400">/ कैलेंडर</span>
+                            {t('calendar', dashTranslations)}
                         </h2>
                         <CalendarIcon className="w-4 h-4 text-gray-400" />
                     </div>
                     <div className="bg-gray-50 rounded-xl p-4 flex flex-col items-center justify-center border border-gray-100 flex-1">
-                        <p className="text-2xl font-bold text-gray-800">{date.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-                        <p className="text-xs text-gray-500 mt-1 text-center">{date.toLocaleDateString('hi-IN', { weekday: 'long' })} / {date.toLocaleDateString('en-US', { weekday: 'long' })}</p>
+                        <p className="text-2xl font-bold text-gray-800">{date.toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                        <p className="text-xs text-gray-500 mt-1 text-center">{date.toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-US', { weekday: 'long' })}</p>
 
                         <div className="w-full mt-4 pt-4 border-t border-gray-200">
-                            <p className="text-[10px] uppercase tracking-wider font-bold text-gray-500 mb-2">Upcoming Events</p>
+                            <p className="text-[10px] uppercase tracking-wider font-bold text-gray-500 mb-2">{t('upcomingEvents', dashTranslations)}</p>
                             <div className="flex items-start gap-2 text-xs text-gray-700 font-medium">
                                 <div className="w-1.5 h-1.5 mt-1 bg-orange-500 rounded-full shrink-0"></div>
-                                <span>Monthly Review (2:00 PM)</span>
+                                <span>{t('monthlyReview', dashTranslations)}</span>
                             </div>
                         </div>
                     </div>
@@ -315,17 +579,17 @@ const Dashboard = () => {
             <div className="mt-2 pt-6 border-t border-gray-200 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
                 <div className="mb-6">
                     <h2 className="text-2xl font-bold text-gray-800">
-                        {displayRoleName === 'Admin' ? 'State' : 'Operational'} Economic & Spatial Overview
+                        {displayRoleName === 'Admin' ? t('operationalEconomicState', dashTranslations) : t('operationalEconomic', dashTranslations)}
                     </h2>
-                    <p className="text-sm text-gray-500 mt-1">Deep dive into geospatial coverage and material flow value chain.</p>
+                    <p className="text-sm text-gray-500 mt-1">{t('deepDive', dashTranslations)}</p>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* State Map Coverage */}
                     <div className="lg:col-span-1 bg-white rounded-xl border border-gray-100 shadow-sm flex flex-col">
                         <div className="p-6 border-b border-gray-100">
-                            <h2 className="text-lg font-bold text-gray-800">State Map</h2>
-                            <p className="text-sm text-gray-500 mt-1">District wise coverage metrics</p>
+                            <h2 className="text-lg font-bold text-gray-800">{t('stateMap', dashTranslations)}</h2>
+                            <p className="text-sm text-gray-500 mt-1">{t('districtCoverage', dashTranslations)}</p>
                         </div>
                         <div className="p-4 flex-1 min-h-[400px]">
                             <ChhattisgarhMap />
@@ -336,8 +600,8 @@ const Dashboard = () => {
                     <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm flex flex-col">
                         <div className="p-6 border-b border-gray-100 flex justify-between items-center">
                             <div>
-                                <h2 className="text-lg font-bold text-gray-800">Value Chain Economic Analysis</h2>
-                                <p className="text-sm text-gray-500 mt-1">Tracking value generation and costs from Village Collection to Final Disposal</p>
+                                <h2 className="text-lg font-bold text-gray-800">{t('valueChainTitle', dashTranslations)}</h2>
+                                <p className="text-sm text-gray-500 mt-1">{t('valueChainSubtitle', dashTranslations)}</p>
                             </div>
                             <Info className="w-5 h-5 text-gray-400 cursor-pointer hover:text-blue-600 transition-colors" />
                         </div>
@@ -387,7 +651,7 @@ const Dashboard = () => {
                                             <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center mb-3">
                                                 <Truck className="text-blue-600 w-6 h-6" />
                                             </div>
-                                            <h3 className="font-bold text-gray-800 text-base">Villages</h3>
+                                            <h3 className="font-bold text-gray-800 text-base">{t('villagesNode', dashTranslations)}</h3>
                                             <p className="text-sm font-semibold text-gray-600 mt-1">{valueChain.villages.volume}</p>
                                             <p className="text-xs font-bold text-red-500 mt-1">{valueChain.villages.financial}</p>
                                         </div>
@@ -398,7 +662,7 @@ const Dashboard = () => {
                                             <div className="space-y-2 border-t border-gray-700 pt-3">
                                                 {valueChain.villages.details.map((d, i) => (
                                                     <div key={i} className="flex justify-between text-sm">
-                                                        <span className="text-gray-400">{d.label}</span>
+                                                        <span className="text-gray-400">{t(d.label === 'Dry Waste' ? 'dryWaste' : 'wetWaste', dashTranslations)}</span>
                                                         <span className="font-semibold">{d.value}</span>
                                                     </div>
                                                 ))}
@@ -409,12 +673,12 @@ const Dashboard = () => {
 
                                     {/* 2. PWMU Center Node */}
                                     <div className="group relative w-48 bg-white border-2 border-[#005DAA] rounded-xl p-4 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer z-20 scale-110">
-                                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#005DAA] text-white text-[10px] uppercase font-bold px-3 py-1 rounded-full border border-blue-400 shadow-sm whitespace-nowrap">Central Hub</div>
+                                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#005DAA] text-white text-[10px] uppercase font-bold px-3 py-1 rounded-full border border-blue-400 shadow-sm whitespace-nowrap">{t('centralHub', dashTranslations)}</div>
                                         <div className="flex flex-col items-center text-center mt-2">
                                             <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-3">
                                                 <Factory className="text-[#005DAA] w-6 h-6" />
                                             </div>
-                                            <h3 className="font-bold text-gray-800 text-base">PWMU Center</h3>
+                                            <h3 className="font-bold text-gray-800 text-base">{t('pwmuNode', dashTranslations)}</h3>
                                             <p className="text-sm font-semibold text-gray-600 mt-1">{valueChain.pwmuCenter.volume}</p>
                                             <p className="text-xs font-bold text-red-500 mt-1">{valueChain.pwmuCenter.financial}</p>
                                         </div>
@@ -424,7 +688,7 @@ const Dashboard = () => {
                                             <div className="space-y-2 border-t border-gray-700 pt-3">
                                                 {valueChain.pwmuCenter.details.map((d, i) => (
                                                     <div key={i} className="flex justify-between text-sm">
-                                                        <span className="text-gray-400">{d.label}</span>
+                                                        <span className="text-gray-400">{t(d.label === 'Processing Loss' ? 'processingLoss' : 'recovered', dashTranslations)}</span>
                                                         <span className="font-semibold">{d.value}</span>
                                                     </div>
                                                 ))}
@@ -439,7 +703,9 @@ const Dashboard = () => {
                                             <div key={sink.id} className={`group relative bg-white border-2 border-${sink.color}-200 rounded-xl p-3 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer`}>
                                                 <div className="flex justify-between items-center">
                                                     <div>
-                                                        <h3 className="font-bold text-gray-800 text-sm">{sink.name}</h3>
+                                                        <h3 className="font-bold text-gray-800 text-sm">
+                                                            {t(sink.id === 'recyclers' ? 'recyclers' : sink.id === 'cementKiln' ? 'cementKiln' : 'roadConst', dashTranslations)}
+                                                        </h3>
                                                         <p className={`text-xs font-bold ${sink.financial.startsWith('+') ? 'text-green-600' : 'text-red-500'} mt-1`}>{sink.financial}</p>
                                                     </div>
                                                     <span className={`text-xs font-semibold px-2 py-1 rounded bg-${sink.color}-50 text-${sink.color}-700 border border-${sink.color}-100`}>{sink.volume}</span>
@@ -463,8 +729,8 @@ const Dashboard = () => {
                     {/* Financial Performance */}
                     <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 flex flex-col">
                         <div className="mb-6">
-                            <h2 className="text-lg font-bold text-gray-800">Financial Performance</h2>
-                            <p className="text-sm text-gray-500 mt-1">Revenue Generation vs Operational Spending</p>
+                            <h2 className="text-lg font-bold text-gray-800">{t('financialPerf', dashTranslations)}</h2>
+                            <p className="text-sm text-gray-500 mt-1">{t('revVsExp', dashTranslations)}</p>
                         </div>
                         <div className="w-full h-[250px]">
                             <ResponsiveContainer width="100%" height="100%">
@@ -487,8 +753,8 @@ const Dashboard = () => {
                                         formatter={(value) => `₹${(value / 100000).toFixed(1)}L`}
                                     />
                                     <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} iconType="circle" iconSize={8} />
-                                    <Area type="monotone" dataKey="revenue" name="Total Revenue" stroke="#22c55e" fillOpacity={1} fill="url(#colorRevenue)" strokeWidth={2} />
-                                    <Area type="monotone" dataKey="spending" name="Total Spending" stroke="#ef4444" fillOpacity={1} fill="url(#colorSpending)" strokeWidth={2} />
+                                    <Area type="monotone" dataKey="revenue" name={t('totalRevenueLabel', dashTranslations)} stroke="#22c55e" fillOpacity={1} fill="url(#colorRevenue)" strokeWidth={2} />
+                                    <Area type="monotone" dataKey="spending" name={t('totalSpendingLabel', dashTranslations)} stroke="#ef4444" fillOpacity={1} fill="url(#colorSpending)" strokeWidth={2} />
                                 </AreaChart>
                             </ResponsiveContainer>
                         </div>
@@ -497,8 +763,8 @@ const Dashboard = () => {
                     {/* Waste Composition */}
                     <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 flex flex-col">
                         <div className="mb-6">
-                            <h2 className="text-lg font-bold text-gray-800">Statewide Waste Composition</h2>
-                            <p className="text-sm text-gray-500 mt-1">Breakdown of processed material types by volume</p>
+                            <h2 className="text-lg font-bold text-gray-800">{t('wasteComp', dashTranslations)}</h2>
+                            <p className="text-sm text-gray-500 mt-1">{t('breakdown', dashTranslations)}</p>
                         </div>
                         <div className="w-full h-[250px] flex items-center justify-center">
                             <ResponsiveContainer width="100%" height="100%">
@@ -540,8 +806,8 @@ const Dashboard = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4 animate-fade-in-up">
                 <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm">
                     <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                        <h2 className="text-lg font-bold text-gray-800">Recent Activity</h2>
-                        <button className="text-sm font-semibold text-blue-600 hover:text-blue-800">View All</button>
+                        <h2 className="text-lg font-bold text-gray-800">{t('recentActivity', dashTranslations)}</h2>
+                        <button className="text-sm font-semibold text-blue-600 hover:text-blue-800">{t('viewAll', dashTranslations)}</button>
                     </div>
                     <div className="p-6">
                         <div className="space-y-6">
@@ -561,7 +827,7 @@ const Dashboard = () => {
                 </div>
 
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 h-fit">
-                    <h2 className="text-lg font-bold text-gray-800 mb-4">Quick Actions</h2>
+                    <h2 className="text-lg font-bold text-gray-800 mb-4">{t('quickActions', dashTranslations)}</h2>
                     <div className="space-y-3">
                         {actions.map((action, idx) => (
                             <a key={idx} href={action.route} className="flex items-center gap-4 p-3 rounded-xl border border-gray-100 text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all group">

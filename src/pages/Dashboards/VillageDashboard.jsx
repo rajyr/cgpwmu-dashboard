@@ -8,13 +8,84 @@ import {
     Tooltip as RechartsTooltip, ResponsiveContainer, Cell
 } from 'recharts';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const getProxyUrl = () => (import.meta.env.DEV ? '/supabase' : import.meta.env.VITE_SUPABASE_URL);
 
 function VillageDashboard() {
     const { userRole: authRole, userName } = useAuth();
+    const { t, language } = useLanguage();
     const userRole = authRole || 'Admin';
+
+    const vTrans = {
+        en: {
+            stateDir: "State Village Directory",
+            overview: "Overview of all {count} registered villages and their collection metrics.",
+            gpInfo: "Gram Panchayat: {gp} • Block: {block} • District: {district}",
+            totalVillages: "Total Registered Villages",
+            stateAvg: "State Avg. Daily Waste",
+            totalUserCharge: "Total User Charge",
+            perfDir: "Village Performance Directory",
+            colVillage: "Village Name",
+            colDistrict: "District",
+            colDailyAvg: "Daily Avg (kg)",
+            colUserCharge: "User Charge",
+            colStatus: "Status",
+            colAction: "Action",
+            noVillages: "No villages registered yet.",
+            kg: "kg",
+            loggedToday: "Logged Today",
+            noLogToday: "No Log Today",
+            viewDashboard: "View Dashboard",
+            todaySummary: "Today's Collection Summary",
+            submitted: "Submitted",
+            wetWaste: "Wet Waste",
+            dryWaste: "Dry Waste",
+            targetProgress: "Daily Target Progress",
+            weeklyTrend: "7-Day Collection Trend",
+            userChargeTitle: "User Charge Collected",
+            totalLogged: "Total Collections Logged",
+            target: "Target",
+            achievement: "Target Achievement",
+            workers: "Swachhata Workers",
+            present: "Present",
+            noWorkers: "No workers registered.",
+        },
+        hi: {
+            stateDir: "राज्य ग्राम निर्देशिका",
+            overview: "सभी {count} पंजीकृत गांवों और उनके संग्रह मेट्रिक्स का विवरण।",
+            gpInfo: "ग्राम पंचायत: {gp} • ब्लॉक: {block} • जिला: {district}",
+            totalVillages: "कुल पंजीकृत गाँव",
+            stateAvg: "राज्य औसत दैनिक कचरा",
+            totalUserCharge: "कुल उपयोगकर्ता शुल्क",
+            perfDir: "गाँव प्रदर्शन निर्देशिका",
+            colVillage: "गाँव का नाम",
+            colDistrict: "ज़िला",
+            colDailyAvg: "दैनिक औसत (किलो)",
+            colUserCharge: "उपयोगकर्ता शुल्क",
+            colStatus: "स्थिति",
+            colAction: "कार्रवाई",
+            noVillages: "अभी तक कोई गाँव पंजीकृत नहीं है।",
+            kg: "किलो",
+            loggedToday: "आज दर्ज किया गया",
+            noLogToday: "आज दर्ज नहीं हुआ",
+            viewDashboard: "डैशबोर्ड देखें",
+            todaySummary: "आज का संग्रह सारांश",
+            submitted: "सबमिट किया गया",
+            wetWaste: "गीला कचरा",
+            dryWaste: "सूखा कचरा",
+            targetProgress: "दैनिक लक्ष्य प्रगति",
+            weeklyTrend: "7-दिवसीय संग्रह रुझान",
+            userChargeTitle: "संग्रहित उपयोगकर्ता शुल्क",
+            totalLogged: "कुल दर्ज संग्रह",
+            target: "लक्ष्य",
+            achievement: "लक्ष्य उपलब्धि",
+            workers: "स्वच्छता कार्यकर्ता",
+            present: "उपस्थित",
+            noWorkers: "कोई कार्यकर्ता पंजीकृत नहीं है।",
+        }
+    };
 
     const [selectedVillage, setSelectedVillage] = useState(userRole === 'Sarpanch' ? 'self' : 'All Villages');
     const [villageProfile, setVillageProfile] = useState(null);
@@ -143,7 +214,7 @@ function VillageDashboard() {
         return (
             <div className="flex items-center justify-center h-64 text-blue-600">
                 <Loader2 className="w-8 h-8 animate-spin mr-3" />
-                <span className="font-bold">Fetching village metrics...</span>
+                <span className="font-bold">{language === 'hi' ? 'गाँव के आँकड़े प्राप्त किए जा रहे हैं...' : 'Fetching village metrics...'}</span>
             </div>
         );
     }
@@ -158,12 +229,12 @@ function VillageDashboard() {
                     </div>
                     <div>
                         <h1 className="text-2xl font-bold text-gray-800 tracking-tight">
-                            {selectedVillage === 'All Villages' ? 'State Village Directory' : activeVillageName}
+                            {selectedVillage === 'All Villages' ? t('stateDir', vTrans) : activeVillageName}
                         </h1>
                         <p className="text-sm font-medium text-gray-500 mt-1">
                             {selectedVillage === 'All Villages'
-                                ? `Overview of all ${allVillages.length} registered villages and their collection metrics.`
-                                : `Gram Panchayat: ${activeVillageName} • Block: ${villageProfile?.block || '—'} • District: ${villageProfile?.district || '—'}`}
+                                ? t('overview', vTrans).replace('{count}', allVillages.length)
+                                : t('gpInfo', vTrans).replace('{gp}', activeVillageName).replace('{block}', villageProfile?.block || '—').replace('{district}', villageProfile?.district || '—')}
                         </p>
                     </div>
                 </div>
@@ -176,7 +247,7 @@ function VillageDashboard() {
                             value={selectedVillage}
                             onChange={(e) => setSelectedVillage(e.target.value)}
                         >
-                            <option value="All Villages">All Villages</option>
+                            <option value="All Villages">{t('allVillages', vTrans) || (language === 'hi' ? 'सभी गाँव' : 'All Villages')}</option>
                             {allVillages.map(v => (
                                 <option key={v.id} value={v.id}>{v.full_name}</option>
                             ))}
@@ -195,7 +266,7 @@ function VillageDashboard() {
                                 <Home className="w-6 h-6" />
                             </div>
                             <div>
-                                <p className="text-sm text-gray-500 font-medium">Total Registered Villages</p>
+                                <p className="text-sm text-gray-500 font-medium">{t('totalVillages', vTrans)}</p>
                                 <p className="text-2xl font-bold text-gray-800">{allVillages.length}</p>
                             </div>
                         </div>
@@ -204,8 +275,8 @@ function VillageDashboard() {
                                 <Droplets className="w-6 h-6" />
                             </div>
                             <div>
-                                <p className="text-sm text-gray-500 font-medium">State Avg. Daily Waste</p>
-                                <p className="text-2xl font-bold text-gray-800">{avgDailyWaste} <span className="text-sm">kg</span></p>
+                                <p className="text-sm text-gray-500 font-medium">{t('stateAvg', vTrans)}</p>
+                                <p className="text-2xl font-bold text-gray-800">{avgDailyWaste} <span className="text-sm">{t('kg', vTrans)}</span></p>
                             </div>
                         </div>
                         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
@@ -213,7 +284,7 @@ function VillageDashboard() {
                                 <Banknote className="w-6 h-6" />
                             </div>
                             <div>
-                                <p className="text-sm text-gray-500 font-medium">Total User Charge</p>
+                                <p className="text-sm text-gray-500 font-medium">{t('totalUserCharge', vTrans)}</p>
                                 <p className="text-2xl font-bold text-gray-800">₹{totalUserCharge.toLocaleString()}</p>
                             </div>
                         </div>
@@ -222,18 +293,18 @@ function VillageDashboard() {
                     {/* Directory Table */}
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                         <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
-                            <h3 className="font-bold text-gray-800">Village Performance Directory</h3>
+                            <h3 className="font-bold text-gray-800">{t('perfDir', vTrans)}</h3>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="bg-white text-gray-500 text-xs uppercase tracking-wider border-b border-gray-100">
-                                        <th className="p-4 font-medium">Village Name</th>
-                                        <th className="p-4 font-medium">District</th>
-                                        <th className="p-4 font-medium">Daily Avg (kg)</th>
-                                        <th className="p-4 font-medium">User Charge</th>
-                                        <th className="p-4 font-medium">Status</th>
-                                        <th className="p-4 font-medium text-right">Action</th>
+                                        <th className="p-4 font-medium">{t('colVillage', vTrans)}</th>
+                                        <th className="p-4 font-medium">{t('colDistrict', vTrans)}</th>
+                                        <th className="p-4 font-medium">{t('colDailyAvg', vTrans)}</th>
+                                        <th className="p-4 font-medium">{t('colUserCharge', vTrans)}</th>
+                                        <th className="p-4 font-medium">{t('colStatus', vTrans)}</th>
+                                        <th className="p-4 font-medium text-right">{t('colAction', vTrans)}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="text-sm text-gray-700">
@@ -251,17 +322,17 @@ function VillageDashboard() {
                                             <tr key={v.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                                                 <td className="p-4 font-bold text-gray-900">{v.full_name}</td>
                                                 <td className="p-4">{v.district || '—'}</td>
-                                                <td className="p-4 font-medium text-blue-600">{vAvg} kg</td>
+                                                <td className="p-4 font-medium text-blue-600">{vAvg} {t('kg', vTrans)}</td>
                                                 <td className="p-4 text-green-600 font-bold">₹{vCharge.toLocaleString()}</td>
                                                 <td className="p-4">
                                                     {hasToday ? (
-                                                        <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-bold">Logged Today</span>
+                                                        <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-bold">{t('loggedToday', vTrans)}</span>
                                                     ) : (
-                                                        <span className="bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full text-xs font-bold font-medium opacity-70">No Log Today</span>
+                                                        <span className="bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full text-xs font-bold font-medium opacity-70">{t('noLogToday', vTrans)}</span>
                                                     )}
                                                 </td>
                                                 <td className="p-4 text-right">
-                                                    <button onClick={() => setSelectedVillage(v.id)} className="text-[#005DAA] font-medium hover:underline text-xs">View Dashboard</button>
+                                                    <button onClick={() => setSelectedVillage(v.id)} className="text-[#005DAA] font-medium hover:underline text-xs">{t('viewDashboard', vTrans)}</button>
                                                 </td>
                                             </tr>
                                         );
@@ -282,10 +353,10 @@ function VillageDashboard() {
                             <div className="flex justify-between items-start mb-6">
                                 <div className="flex items-center gap-2">
                                     <Target className="w-5 h-5 text-[#005DAA]" />
-                                    <h3 className="font-bold text-gray-800">Today's Collection Summary</h3>
+                                    <h3 className="font-bold text-gray-800">{t('todaySummary', vTrans)}</h3>
                                 </div>
                                 <span className="bg-green-100 text-green-700 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
-                                    <CheckCircle2 className="w-3 h-3" /> Submitted
+                                    <CheckCircle2 className="w-3 h-3" /> {t('submitted', vTrans)}
                                 </span>
                             </div>
 
@@ -295,8 +366,8 @@ function VillageDashboard() {
                                         <Droplets className="w-6 h-6" />
                                     </div>
                                     <div>
-                                        <p className="text-sm font-medium text-gray-500">Wet Waste</p>
-                                        <h4 className="text-2xl font-bold text-green-700">{wetWasteToday} <span className="text-sm text-green-600 font-medium">kg</span></h4>
+                                        <p className="text-sm font-medium text-gray-500">{t('wetWaste', vTrans)}</p>
+                                        <h4 className="text-2xl font-bold text-green-700">{wetWasteToday} <span className="text-sm text-green-600 font-medium">{t('kg', vTrans)}</span></h4>
                                     </div>
                                 </div>
                                 <div className="flex-1 bg-blue-50/50 border border-blue-100 rounded-xl p-4 flex items-center gap-4">
@@ -304,8 +375,8 @@ function VillageDashboard() {
                                         <Trash2 className="w-6 h-6" />
                                     </div>
                                     <div>
-                                        <p className="text-sm font-medium text-gray-500">Dry Waste</p>
-                                        <h4 className="text-2xl font-bold text-[#005DAA]">{dryWasteToday} <span className="text-sm text-blue-600 font-medium">kg</span></h4>
+                                        <p className="text-sm font-medium text-gray-500">{t('dryWaste', vTrans)}</p>
+                                        <h4 className="text-2xl font-bold text-[#005DAA]">{dryWasteToday} <span className="text-sm text-blue-600 font-medium">{t('kg', vTrans)}</span></h4>
                                     </div>
                                 </div>
                             </div>
@@ -313,8 +384,8 @@ function VillageDashboard() {
                             {/* Progress Bar */}
                             <div>
                                 <div className="flex justify-between items-end mb-2">
-                                    <span className="text-sm font-bold text-gray-700">Daily Target Progress</span>
-                                    <span className="text-sm font-bold text-[#005DAA]">{currentKg} / {targetKg} kg</span>
+                                    <span className="text-sm font-bold text-gray-700">{t('targetProgress', vTrans)}</span>
+                                    <span className="text-sm font-bold text-[#005DAA]">{currentKg} / {targetKg} {t('kg', vTrans)}</span>
                                 </div>
                                 <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
                                     <div className="bg-[#005DAA] h-3 rounded-full transition-all duration-1000 ease-out relative" style={{ width: `${progressPercent}%` }}>
@@ -328,7 +399,7 @@ function VillageDashboard() {
                         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                             <div className="flex items-center gap-2 mb-6">
                                 <Activity className="w-5 h-5 text-gray-600" />
-                                <h3 className="font-bold text-gray-800">7-Day Collection Trend</h3>
+                                <h3 className="font-bold text-gray-800">{t('weeklyTrend', vTrans)}</h3>
                             </div>
                             <div className="h-64">
                                 <ResponsiveContainer width="100%" height="100%">
@@ -341,8 +412,8 @@ function VillageDashboard() {
                                             contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                                             formatter={(value, name) => [`${value} kg`, name]}
                                         />
-                                        <Bar dataKey="wet" name="Wet Waste" stackId="a" fill="#28A745" radius={[0, 0, 4, 4]} barSize={30} />
-                                        <Bar dataKey="dry" name="Dry Waste" stackId="a" fill="#005DAA" radius={[4, 4, 0, 0]} barSize={30} />
+                                        <Bar dataKey="wet" name={t('wetWaste', vTrans)} stackId="a" fill="#28A745" radius={[0, 0, 4, 4]} barSize={30} />
+                                        <Bar dataKey="dry" name={t('dryWaste', vTrans)} stackId="a" fill="#005DAA" radius={[4, 4, 0, 0]} barSize={30} />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
@@ -360,18 +431,18 @@ function VillageDashboard() {
                                 <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
                                     <Banknote className="w-5 h-5 text-white" />
                                 </div>
-                                <h3 className="font-semibold text-blue-50">User Charge Collected</h3>
+                                <h3 className="font-semibold text-blue-50">{t('userChargeTitle', vTrans)}</h3>
                             </div>
                             <p className="text-4xl font-bold mb-2">₹{totalUserCharge.toLocaleString()}</p>
-                            <p className="text-sm text-blue-100/80">Total Collections Logged</p>
+                            <p className="text-sm text-blue-100/80">{t('totalLogged', vTrans)}</p>
 
                             <div className="mt-6 pt-4 border-t border-white/20 flex justify-between items-center">
                                 <div>
-                                    <p className="text-xs text-blue-100/70 mb-1">Target</p>
+                                    <p className="text-xs text-blue-100/70 mb-1">{t('target', vTrans)}</p>
                                     <p className="font-semibold text-sm">₹15,000</p>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-xs text-blue-100/70 mb-1">Target Achievement</p>
+                                    <p className="text-xs text-blue-100/70 mb-1">{t('achievement', vTrans)}</p>
                                     <p className="font-semibold text-sm">{progressPercent}%</p>
                                 </div>
                             </div>
@@ -382,13 +453,13 @@ function VillageDashboard() {
                             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
                                 <div className="flex items-center gap-2">
                                     <Users className="w-5 h-5 text-gray-600" />
-                                    <h3 className="font-bold text-gray-800">Swachhata Workers</h3>
+                                    <h3 className="font-bold text-gray-800">{t('workers', vTrans)}</h3>
                                 </div>
-                                <span className="text-xs font-bold bg-green-100 text-green-700 px-2 py-1 rounded-md">{getPresentCount()}/{filteredWorkers.length} Present</span>
+                                <span className="text-xs font-bold bg-green-100 text-green-700 px-2 py-1 rounded-md">{getPresentCount()}/{filteredWorkers.length} {t('present', vTrans)}</span>
                             </div>
                             <div className="p-2">
                                 {filteredWorkers.length === 0 ? (
-                                    <p className="text-center py-4 text-gray-400 text-sm">No workers registered.</p>
+                                    <p className="text-center py-4 text-gray-400 text-sm">{t('noWorkers', vTrans)}</p>
                                 ) : filteredWorkers.map((worker) => (
                                     <div key={worker.id} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-xl transition-colors">
                                         <div className="flex items-center gap-3">

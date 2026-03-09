@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import {
     LayoutDashboard, Map, DollarSign, Activity,
     ShieldAlert, ScrollText, LineChart, PieChart, Settings, LogOut,
@@ -34,24 +35,53 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
     if (effectiveRole === 'PWMUManager') effectiveRole = 'PWMU';
     if (effectiveRole === 'Sarpanch') effectiveRole = 'Village';
 
+    const sidebarTranslations = {
+        en: {
+            overview: "State Overview",
+            directory: "District Directory",
+            financial: "Financial Analytics",
+            machine: "Machine Intelligence",
+            compliance: "Compliance & Logs",
+            monitoring: "Monitoring Hub",
+            policy: "Policy & Plan",
+            villageHub: "Village Hub",
+            vendorHub: "Vendor Hub",
+            settings: "Settings"
+        },
+        hi: {
+            overview: "राज्य अवलोकन",
+            directory: "जिला निर्देशिका",
+            financial: "वित्तीय विश्लेषण",
+            machine: "मशीन इंटेलिजेंस",
+            compliance: "अनुपालन और लॉग",
+            monitoring: "निगरानी हब",
+            policy: "नीति और योजना",
+            villageHub: "गांव हब",
+            vendorHub: "विक्रेता हब",
+            settings: "सेटिंग्स"
+        }
+    };
+
+    const { language, t } = useLanguage();
+
     const allNavItems = [
         // Main
-        { name: 'State Overview', icon: LayoutDashboard, path: '/dashboard', roles: ['Admin', 'Nodal', 'PWMU', 'Village'] },
+        { name: t('overview', sidebarTranslations), icon: LayoutDashboard, path: '/dashboard', roles: ['Admin', 'Nodal', 'PWMU', 'Village'] },
 
         // Advanced Analytics
-        { name: 'District Directory', icon: Map, path: '/dashboard/district', roles: ['Admin', 'Nodal', 'PWMU'] },
-        { name: 'Financial Analytics', icon: DollarSign, path: '/dashboard/financial', roles: ['Admin', 'Nodal', 'PWMU'] },
-        { name: 'Machine Intelligence', icon: Activity, path: '/dashboard/machine', roles: ['Admin', 'Nodal', 'PWMU'] },
-        { name: 'Compliance & Logs', icon: ShieldAlert, path: '/dashboard/compliance', roles: ['Admin', 'Nodal', 'PWMU'] },
-        { name: 'Monitoring Hub', icon: LineChart, path: '/dashboard/monitoring', roles: ['Admin', 'Nodal', 'PWMU'] },
-        { name: 'Policy & Plan', icon: ScrollText, path: '/dashboard/policy', roles: ['Admin', 'Nodal'] },
+        { name: t('directory', sidebarTranslations), icon: Map, path: '/dashboard/district', roles: ['Admin', 'Nodal', 'PWMU'] },
+        { name: t('financial', sidebarTranslations), icon: DollarSign, path: '/dashboard/financial', roles: ['Admin', 'Nodal', 'PWMU'] },
+        { name: t('machine', sidebarTranslations), icon: Activity, path: '/dashboard/machine', roles: ['Admin', 'Nodal', 'PWMU'] },
+        { name: t('compliance', sidebarTranslations), icon: ShieldAlert, path: '/dashboard/compliance', roles: ['Admin', 'Nodal', 'PWMU'] },
+        { name: t('monitoring', sidebarTranslations), icon: LineChart, path: '/dashboard/monitoring', roles: ['Admin', 'Nodal', 'PWMU'] },
+        { name: t('policy', sidebarTranslations), icon: ScrollText, path: '/dashboard/policy', roles: ['Admin', 'Nodal'] },
 
         // Stakeholders
-        { name: 'Village Hub', icon: Home, path: '/dashboard/village-hub', roles: ['Admin', 'Nodal', 'PWMU', 'Village'] },
-        { name: 'Vendor Hub', icon: Store, path: '/dashboard/vendor-hub', roles: ['Admin', 'Nodal', 'PWMU', 'Vendor'] },
+        { name: t('villageHub', sidebarTranslations), icon: Home, path: '/dashboard/village-hub', roles: ['Admin', 'Nodal', 'PWMU', 'Village'] },
+        { name: t('vendorHub', sidebarTranslations), icon: Store, path: '/dashboard/vendor-hub', roles: ['Admin', 'Nodal', 'PWMU', 'Vendor'] },
 
         // System
-        { name: 'Settings', icon: Settings, path: '/dashboard/settings', roles: ['Admin'] },
+        { name: t('settings', sidebarTranslations), icon: Settings, path: '/dashboard/settings', roles: ['Admin'] },
     ];
 
     const navItems = allNavItems.filter(item => item.roles.includes(effectiveRole));

@@ -1,70 +1,149 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { FileBarChart, Settings, IndianRupee, Factory, Plus, Trash2, Calendar, CheckCircle2, AlertTriangle, AlertCircle, Wrench } from 'lucide-react';
+import { useLanguage } from '../../context/LanguageContext';
 
 const PWMUMonthlyReport = () => {
     const navigate = useNavigate();
-    const [isSaving, setIsSaving] = useState(false);
-    const [showSuccess, setShowSuccess] = useState(false);
+    const { t, language } = useLanguage();
 
-    // Form State
-    const [basicInfo, setBasicInfo] = useState({
-        pwmuName: 'Balod Central PWMU', // Simulated auto-selection based on login
-        year: new Date().getFullYear().toString(),
-        month: (new Date().getMonth() + 1).toString().padStart(2, '0') // 01 to 12
-    });
-
-    const [machineStatus, setMachineStatus] = useState({
-        fatka: { selected: false, functional: true, dateBroke: '', reason: '' },
-        baling: { selected: false, functional: true, dateBroke: '', reason: '' },
-        shredder: { selected: false, functional: true, dateBroke: '', reason: '' },
-        agglomerator: { selected: false, functional: true, dateBroke: '', reason: '' },
-        mixer: { selected: false, functional: true, dateBroke: '', reason: '' },
-        granular: { selected: false, functional: true, dateBroke: '', reason: '' },
-    });
-
-    const [sales, setSales] = useState([
-        { id: Date.now(), vendor: '', wasteType: '', quantity: '', revenue: '' }
-    ]);
-
-    const [expenses, setExpenses] = useState({
-        electricity: '',
-        honorarium: '',
-        other: ''
-    });
-
-    // Option Definitions
-    const months = [
-        { val: '01', label: 'January' }, { val: '02', label: 'February' }, { val: '03', label: 'March' },
-        { val: '04', label: 'April' }, { val: '05', label: 'May' }, { val: '06', label: 'June' },
-        { val: '07', label: 'July' }, { val: '08', label: 'August' }, { val: '09', label: 'September' },
-        { val: '10', label: 'October' }, { val: '11', label: 'November' }, { val: '12', label: 'December' }
-    ];
-
-    const years = ['2024', '2025', '2026'];
-
-    const machineOptions = {
-        fatka: 'Fatka / Dust Cleaning Machine',
-        baling: 'Hydraulic Baling Machine',
-        shredder: 'Plastic Shredder Machine',
-        agglomerator: 'Agglomerator Machine',
-        mixer: 'Mixer Machine',
-        granular: 'Granule Making Machine'
+    const monthlyTranslations = {
+        en: {
+            title: "PWMU Monthly Report",
+            subtitle: "Submit operational, financial, and asset status data for the selected month.",
+            facilityInfo: "Facility Information",
+            pwmuCenter: "PWMU Center (Auto-Selected)",
+            nodalOfficer: "Logged in as Nodal Officer",
+            assetStatus: "Asset & Machinery Status",
+            selectMachines: "Select installed machines",
+            operationalChecklist: "Operational Condition Checklist",
+            functional: "Functional",
+            nonFunctional: "Non-Functional",
+            dateBreakdown: "Date Breakdown Occurred",
+            primaryReason: "Primary Reason",
+            selectReason: "-- Select Reason --",
+            salesRevenue: "Sales & Diversion (Revenue)",
+            addRecord: "Add Record",
+            noSales: "No sales recorded for this month.",
+            vendorCol: "Purchasing Vendor",
+            materialCol: "Material Type",
+            qtyCol: "Qty (Kg)",
+            revenueCol: "Revenue (₹)",
+            actionCol: "Action",
+            selectVendor: "Select Vendor...",
+            selectMaterial: "Select Material...",
+            totalRev: "Total Revenue:",
+            opExpenses: "Operating Expenses (O&M)",
+            electricity: "Electricity Bill (₹)",
+            honorarium: "Swachhata Samuh Honorarium (₹)",
+            otherExp: "Other Gen. Expenses (₹)",
+            reportingMonthDesc: "For the reporting month",
+            distWorkersDesc: "Total distributed to workers",
+            repairsDesc: "Repairs, transport, consumables",
+            totalExp: "Total Expenses:",
+            netBalance: "Net Monthly Balance:",
+            cancel: "Cancel",
+            saveReport: "Save Report",
+            saving: "Saving...",
+            submitted: "Report Submitted!",
+            submittedDesc: "The monthly performance report for {month} {year} has been successfully recorded.",
+            jan: "January", feb: "February", mar: "March", apr: "April", may: "May", jun: "June",
+            jul: "July", aug: "August", sep: "September", oct: "October", nov: "November", dec: "December",
+            kg: "kg",
+            reasons: [
+                'Electricity/Power supply issue',
+                'Operator (Swachhgrahi) unavailable',
+                'Unsuitable plastic quality',
+                'Technical machine failure',
+                'Part replacement required',
+                'Other'
+            ],
+            wasteTypes: [
+                'PET (Water Bottles)', 'HDPE (Milk Jugs)', 'LDPE (Plastic Bags)',
+                'PP (Tupperware)', 'MLP (Multi-Layer Packages)', 'Processed RDF', 'Shredded Mixed Plastic'
+            ],
+            machines: {
+                fatka: 'Fatka / Dust Cleaning Machine',
+                baling: 'Hydraulic Baling Machine',
+                shredder: 'Plastic Shredder Machine',
+                agglomerator: 'Agglomerator Machine',
+                mixer: 'Mixer Machine',
+                granular: 'Granule Making Machine'
+            }
+        },
+        hi: {
+            title: "PWMU मासिक रिपोर्ट",
+            subtitle: "चयनित महीने के लिए परिचालन, वित्तीय और संपत्ति की स्थिति का डेटा सबमिट करें।",
+            facilityInfo: "सुविधा की जानकारी",
+            pwmuCenter: "PWMU केंद्र (स्वत: चयनित)",
+            nodalOfficer: "नोडल अधिकारी के रूप में लॉग इन किया गया",
+            assetStatus: "संपत्ति और मशीनरी की स्थिति",
+            selectMachines: "स्थापित मशीनों का चयन करें",
+            operationalChecklist: "परिचालन स्थिति चेकलिस्ट",
+            functional: "चालू",
+            nonFunctional: "बंद",
+            dateBreakdown: "खराबी होने की तिथि",
+            primaryReason: "मुख्य कारण",
+            selectReason: "-- कारण चुनें --",
+            salesRevenue: "बिक्री और डाइवर्जन (राजस्व)",
+            addRecord: "रिकॉर्ड जोड़ें",
+            noSales: "इस महीने के लिए कोई बिक्री दर्ज नहीं की गई।",
+            vendorCol: "खरीदार विक्रेता",
+            materialCol: "सामग्री का प्रकार",
+            qtyCol: "मात्रा (किलो)",
+            revenueCol: "राजस्व (₹)",
+            actionCol: "कार्रवाई",
+            selectVendor: "विक्रेता चुनें...",
+            selectMaterial: "सामग्री चुनें...",
+            totalRev: "कुल राजस्व:",
+            opExpenses: "परिचालन व्यय (O&M)",
+            electricity: "बिजली बिल (₹)",
+            honorarium: "स्वच्छता समूह मानदेय (₹)",
+            otherExp: "अन्य सामान्य खर्च (₹)",
+            reportingMonthDesc: "रिपोर्टिंग महीने के लिए",
+            distWorkersDesc: "श्रमिकों को कुल वितरण",
+            repairsDesc: "मरम्मत, परिवहन, उपभोग्य वस्तुएं",
+            totalExp: "कुल खर्च:",
+            netBalance: "शुद्ध मासिक शेष:",
+            cancel: "रद्द करें",
+            saveReport: "रिपोर्ट सहेजें",
+            saving: "सहेज रहा है...",
+            submitted: "रिपोर्ट सबमिट की गई!",
+            submittedDesc: "{month} {year} के लिए मासिक प्रदर्शन रिपोर्ट सफलतापूर्वक दर्ज की गई है।",
+            jan: "जनवरी", feb: "फरवरी", mar: "मार्च", apr: "अप्रैल", may: "मई", jun: "जून",
+            jul: "जुलाई", aug: "अगस्त", sep: "सितंबर", oct: "अक्टूबर", nov: "नवंबर", dec: "दिसंबर",
+            kg: "किलो",
+            reasons: [
+                'बिजली/बिजली आपूर्ति समस्या',
+                'ऑपरेटर (स्वच्छाग्राही) अनुपलब्ध',
+                'अनुपयुक्त प्लास्टिक गुणवत्ता',
+                'तकनीकी मशीन विफलता',
+                'पुर्जे बदलने की आवश्यकता',
+                'अन्य'
+            ],
+            wasteTypes: [
+                'PET (पानी की बोतलें)', 'HDPE (दूध के जग)', 'LDPE (प्लास्टिक बैग)',
+                'PP (टपरवेयर)', 'MLP (मल्टी-लेयर पैकेज)', 'प्रसंस्कृत RDF', 'कटा हुआ मिश्रित प्लास्टिक'
+            ],
+            machines: {
+                fatka: 'फटका / धूल सफाई मशीन',
+                baling: 'हाइड्रोलिक बेलिंग मशीन',
+                shredder: 'प्लास्टिक श्रेडर मशीन',
+                agglomerator: 'एग्लोमेरेटर मशीन',
+                mixer: 'मिक्सर मशीन',
+                granular: 'ग्रेन्यूल बनाने की मशीन'
+            }
+        }
     };
 
-    const breakdownReasons = [
-        'Electricity/Power supply issue',
-        'Operator (Swachhgrahi) unavailable',
-        'Unsuitable plastic quality',
-        'Technical machine failure',
-        'Part replacement required',
-        'Other'
+    const months = [
+        { val: '01', label: t('jan', monthlyTranslations) }, { val: '02', label: t('feb', monthlyTranslations) }, { val: '03', label: t('mar', monthlyTranslations) },
+        { val: '04', label: t('apr', monthlyTranslations) }, { val: '05', label: t('may', monthlyTranslations) }, { val: '06', label: t('jun', monthlyTranslations) },
+        { val: '07', label: t('jul', monthlyTranslations) }, { val: '08', label: t('aug', monthlyTranslations) }, { val: '09', label: t('sep', monthlyTranslations) },
+        { val: '10', label: t('oct', monthlyTranslations) }, { val: '11', label: t('nov', monthlyTranslations) }, { val: '12', label: t('dec', monthlyTranslations) }
     ];
 
-    const wasteTypes = [
-        'PET (Water Bottles)', 'HDPE (Milk Jugs)', 'LDPE (Plastic Bags)',
-        'PP (Tupperware)', 'MLP (Multi-Layer Packages)', 'Processed RDF', 'Shredded Mixed Plastic'
-    ];
+    const machineOptions = t('machines', monthlyTranslations);
+    const breakdownReasons = t('reasons', monthlyTranslations);
+    const wasteTypes = t('wasteTypes', monthlyTranslations);
 
     // Handlers
     const handleBasicInfoChange = (e) => setBasicInfo(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -121,8 +200,8 @@ const PWMUMonthlyReport = () => {
                     <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-6">
                         <CheckCircle2 className="w-10 h-10 text-green-600" />
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-800 mb-2">Report Submitted!</h2>
-                    <p className="text-gray-500 mb-6">The monthly performance report for {months.find(m => m.val === basicInfo.month)?.label} {basicInfo.year} has been successfully recorded.</p>
+                    <h2 className="text-2xl font-bold text-gray-800 mb-2">{t('submitted', monthlyTranslations)}</h2>
+                    <p className="text-gray-500 mb-6">{t('submittedDesc', monthlyTranslations).replace('{month}', months.find(m => m.val === basicInfo.month)?.label).replace('{year}', basicInfo.year)}</p>
                     <div className="flex gap-2">
                         <div className="w-2 h-2 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
                         <div className="w-2 h-2 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
@@ -144,9 +223,9 @@ const PWMUMonthlyReport = () => {
                             <div className="p-2 bg-blue-100 text-[#005DAA] rounded-lg">
                                 <FileBarChart className="w-6 h-6" />
                             </div>
-                            <h1 className="text-2xl font-bold text-gray-800 uppercase tracking-tight">PWMU Monthly Report</h1>
+                            <h1 className="text-2xl font-bold text-gray-800 uppercase tracking-tight">{t('title', monthlyTranslations)}</h1>
                         </div>
-                        <p className="text-gray-500 text-sm pl-12">Submit operational, financial, and asset status data for the selected month.</p>
+                        <p className="text-gray-500 text-sm pl-12">{t('subtitle', monthlyTranslations)}</p>
                     </div>
 
                     <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-200">
@@ -172,19 +251,19 @@ const PWMUMonthlyReport = () => {
                     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                         <div className="bg-gray-50/50 px-6 py-4 border-b border-gray-100 flex items-center gap-2">
                             <Factory className="w-5 h-5 text-gray-500" />
-                            <h2 className="font-semibold text-gray-800 tracking-wide uppercase text-sm">Facility Information</h2>
+                            <h2 className="font-semibold text-gray-800 tracking-wide uppercase text-sm">{t('facilityInfo', monthlyTranslations)}</h2>
                         </div>
                         <div className="p-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-500 mb-1">PWMU Center (Auto-Selected)</label>
+                                    <label className="block text-sm font-medium text-gray-500 mb-1">{t('pwmuCenter', monthlyTranslations)}</label>
                                     <div className="flex items-center gap-3 p-3 bg-blue-50/50 border border-blue-100 rounded-xl">
                                         <div className="p-2 bg-blue-100 rounded-lg text-[#005DAA]">
                                             <Factory className="w-5 h-5" />
                                         </div>
                                         <div>
                                             <div className="font-bold text-[#005DAA] text-lg">{basicInfo.pwmuName}</div>
-                                            <div className="text-xs text-gray-500">Logged in as Nodal Officer</div>
+                                            <div className="text-xs text-gray-500">{t('nodalOfficer', monthlyTranslations)}</div>
                                         </div>
                                     </div>
                                 </div>
@@ -197,9 +276,9 @@ const PWMUMonthlyReport = () => {
                         <div className="bg-gray-50/50 px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <Settings className="w-5 h-5 text-gray-500" />
-                                <h2 className="font-semibold text-gray-800 tracking-wide uppercase text-sm">Asset & Machinery Status</h2>
+                                <h2 className="font-semibold text-gray-800 tracking-wide uppercase text-sm">{t('assetStatus', monthlyTranslations)}</h2>
                             </div>
-                            <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded-md border border-gray-200 shadow-sm">Select installed machines</span>
+                            <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded-md border border-gray-200 shadow-sm">{t('selectMachines', monthlyTranslations)}</span>
                         </div>
                         <div className="p-6 space-y-6">
                             {/* Machine Selection Grid */}
@@ -227,7 +306,7 @@ const PWMUMonthlyReport = () => {
                             {Object.values(machineStatus).some(m => m.selected) && (
                                 <div className="mt-8 space-y-4">
                                     <h3 className="text-sm font-semibold text-gray-700 border-b pb-2 mb-4 flex items-center gap-2">
-                                        <Wrench className="w-4 h-4" /> Operational Condition Checklist
+                                        <Wrench className="w-4 h-4" /> {t('operationalChecklist', monthlyTranslations)}
                                     </h3>
                                     {Object.entries(machineOptions).map(([key, label]) => {
                                         const machine = machineStatus[key];
@@ -249,7 +328,7 @@ const PWMUMonthlyReport = () => {
                                                             className={`px-4 py-1.5 text-xs font-bold uppercase rounded-md transition-colors ${machine.functional ? 'bg-green-500 text-white' : 'text-gray-500 hover:bg-gray-100'
                                                                 }`}
                                                         >
-                                                            Functional
+                                                            {t('functional', monthlyTranslations)}
                                                         </button>
                                                         <button
                                                             type="button"
@@ -257,7 +336,7 @@ const PWMUMonthlyReport = () => {
                                                             className={`px-4 py-1.5 text-xs font-bold uppercase rounded-md transition-colors ${!machine.functional ? 'bg-red-500 text-white' : 'text-gray-500 hover:bg-gray-100'
                                                                 }`}
                                                         >
-                                                            Non-Functional
+                                                            {t('nonFunctional', monthlyTranslations)}
                                                         </button>
                                                     </div>
                                                 </div>
@@ -266,7 +345,7 @@ const PWMUMonthlyReport = () => {
                                                 {!machine.functional && (
                                                     <div className="mt-4 pt-4 border-t border-red-100 grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-up">
                                                         <div>
-                                                            <label className="block text-xs font-medium text-red-800 mb-1">Date Breakdown Occurred</label>
+                                                            <label className="block text-xs font-medium text-red-800 mb-1">{t('dateBreakdown', monthlyTranslations)}</label>
                                                             <input
                                                                 type="date"
                                                                 value={machine.dateBroke}
@@ -276,14 +355,14 @@ const PWMUMonthlyReport = () => {
                                                             />
                                                         </div>
                                                         <div>
-                                                            <label className="block text-xs font-medium text-red-800 mb-1">Primary Reason</label>
+                                                            <label className="block text-xs font-medium text-red-800 mb-1">{t('primaryReason', monthlyTranslations)}</label>
                                                             <select
                                                                 value={machine.reason}
                                                                 onChange={(e) => updateMachineIssue(key, 'reason', e.target.value)}
                                                                 required={!machine.functional}
                                                                 className="w-full p-2 bg-white border border-red-200 rounded-lg text-sm focus:ring-2 focus:ring-red-500/20 focus:border-red-500 text-red-900"
                                                             >
-                                                                <option value="">-- Select Reason --</option>
+                                                                <option value="">{t('selectReason', monthlyTranslations)}</option>
                                                                 {breakdownReasons.map(r => <option key={r} value={r}>{r}</option>)}
                                                             </select>
                                                         </div>
@@ -302,31 +381,31 @@ const PWMUMonthlyReport = () => {
                         <div className="bg-gray-50/50 px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <IndianRupee className="w-5 h-5 text-gray-500" />
-                                <h2 className="font-semibold text-gray-800 tracking-wide uppercase text-sm">Sales & Diversion (Revenue)</h2>
+                                <h2 className="font-semibold text-gray-800 tracking-wide uppercase text-sm">{t('salesRevenue', monthlyTranslations)}</h2>
                             </div>
                             <button
                                 type="button"
                                 onClick={addSaleRow}
                                 className="flex items-center gap-1 text-sm font-semibold text-[#005DAA] hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors border border-transparent hover:border-blue-100"
                             >
-                                <Plus className="w-4 h-4" /> Add Record
+                                <Plus className="w-4 h-4" /> {t('addRecord', monthlyTranslations)}
                             </button>
                         </div>
                         <div className="p-6">
                             {sales.length === 0 ? (
                                 <div className="text-center py-6 text-gray-400 bg-gray-50 rounded-xl border border-dashed border-gray-200">
                                     <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                                    <p className="text-sm">No sales recorded for this month.</p>
+                                    <p className="text-sm">{t('noSales', monthlyTranslations)}</p>
                                 </div>
                             ) : (
                                 <div className="space-y-4">
                                     {/* Desktop Header */}
                                     <div className="hidden md:grid grid-cols-12 gap-4 px-2 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                                        <div className="col-span-4">Purchasing Vendor</div>
-                                        <div className="col-span-3">Material Type</div>
-                                        <div className="col-span-2 text-right">Qty (Kg)</div>
-                                        <div className="col-span-2 text-right">Revenue (₹)</div>
-                                        <div className="col-span-1 text-center">Action</div>
+                                        <div className="col-span-4">{t('vendorCol', monthlyTranslations)}</div>
+                                        <div className="col-span-3">{t('materialCol', monthlyTranslations)}</div>
+                                        <div className="col-span-2 text-right">{t('qtyCol', monthlyTranslations)}</div>
+                                        <div className="col-span-2 text-right">{t('revenueCol', monthlyTranslations)}</div>
+                                        <div className="col-span-1 text-center">{t('actionCol', monthlyTranslations)}</div>
                                     </div>
 
                                     {/* Rows */}
@@ -334,12 +413,12 @@ const PWMUMonthlyReport = () => {
                                         <div key={sale.id} className="relative bg-white border border-gray-200 rounded-xl p-4 md:p-2 md:bg-transparent md:border-none md:rounded-none grid grid-cols-1 md:grid-cols-12 gap-4 items-end md:items-center animate-fade-in-up">
                                             {/* Mobile Labels */}
                                             <div className="col-span-1 md:col-span-4">
-                                                <label className="md:hidden block text-xs font-semibold text-gray-500 mb-1">Purchasing Vendor</label>
+                                                <label className="md:hidden block text-xs font-semibold text-gray-500 mb-1">{t('vendorCol', monthlyTranslations)}</label>
                                                 <select
                                                     value={sale.vendor} onChange={(e) => updateSaleRow(sale.id, 'vendor', e.target.value)} required
                                                     className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#005DAA]/20"
                                                 >
-                                                    <option value="">Select Vendor...</option>
+                                                    <option value="">{t('selectVendor', monthlyTranslations)}</option>
                                                     <option value="EcoPlast Recyclers Pvt Ltd">EcoPlast Recyclers Pvt Ltd</option>
                                                     <option value="Ambuja Cement Facility">Ambuja Cement Facility</option>
                                                     <option value="Local PWD Contractor">Local PWD Contractor</option>
@@ -347,27 +426,27 @@ const PWMUMonthlyReport = () => {
                                                 </select>
                                             </div>
                                             <div className="col-span-1 md:col-span-3">
-                                                <label className="md:hidden block text-xs font-semibold text-gray-500 mb-1">Material Type</label>
+                                                <label className="md:hidden block text-xs font-semibold text-gray-500 mb-1">{t('materialCol', monthlyTranslations)}</label>
                                                 <select
                                                     value={sale.wasteType} onChange={(e) => updateSaleRow(sale.id, 'wasteType', e.target.value)} required
                                                     className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#005DAA]/20"
                                                 >
-                                                    <option value="">Select Material...</option>
+                                                    <option value="">{t('selectMaterial', monthlyTranslations)}</option>
                                                     {wasteTypes.map(w => <option key={w} value={w}>{w}</option>)}
                                                 </select>
                                             </div>
                                             <div className="col-span-1 md:col-span-2">
-                                                <label className="md:hidden block text-xs font-semibold text-gray-500 mb-1">Quantity (Kg)</label>
+                                                <label className="md:hidden block text-xs font-semibold text-gray-500 mb-1">{t('qtyCol', monthlyTranslations)}</label>
                                                 <div className="relative">
                                                     <input
                                                         type="number" value={sale.quantity} onChange={(e) => updateSaleRow(sale.id, 'quantity', e.target.value)} required min="0" placeholder="0"
                                                         className="w-full p-2 pl-3 pr-8 bg-gray-50 border border-gray-200 rounded-lg text-sm text-right focus:ring-2 focus:ring-[#005DAA]/20 font-mono"
                                                     />
-                                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-bold">kg</span>
+                                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-bold">{t('kg', monthlyTranslations)}</span>
                                                 </div>
                                             </div>
                                             <div className="col-span-1 md:col-span-2">
-                                                <label className="md:hidden block text-xs font-semibold text-gray-500 mb-1">Revenue Earned (₹)</label>
+                                                <label className="md:hidden block text-xs font-semibold text-gray-500 mb-1">{t('revenueCol', monthlyTranslations)}</label>
                                                 <div className="relative">
                                                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">₹</span>
                                                     <input
@@ -391,7 +470,7 @@ const PWMUMonthlyReport = () => {
                                     {/* Subtotal */}
                                     <div className="pt-4 border-t border-gray-100 flex justify-end">
                                         <div className="bg-green-50 px-4 py-2 rounded-lg border border-green-100 flex items-center gap-3">
-                                            <span className="text-sm font-semibold text-green-800">Total Revenue:</span>
+                                            <span className="text-sm font-semibold text-green-800">{t('totalRev', monthlyTranslations)}</span>
                                             <span className="text-lg font-bold text-green-700 font-mono">₹{totalRevenue.toLocaleString()}</span>
                                         </div>
                                     </div>
@@ -404,43 +483,43 @@ const PWMUMonthlyReport = () => {
                     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                         <div className="bg-gray-50/50 px-6 py-4 border-b border-gray-100 flex items-center gap-2">
                             <IndianRupee className="w-5 h-5 text-gray-500" />
-                            <h2 className="font-semibold text-gray-800 tracking-wide uppercase text-sm">Operating Expenses (O&M)</h2>
+                            <h2 className="font-semibold text-gray-800 tracking-wide uppercase text-sm">{t('opExpenses', monthlyTranslations)}</h2>
                         </div>
                         <div className="p-6">
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Electricity Bill (₹)</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('electricity', monthlyTranslations)}</label>
                                     <input
                                         type="number" name="electricity" value={expenses.electricity} onChange={handleExpenseChange} min="0" placeholder="0"
                                         className="w-full p-2.5 pl-8 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#005DAA]/20 focus:border-[#005DAA] font-mono text-gray-800 relative"
                                         style={{ backgroundImage: 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%239CA3AF\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><line x1=\'12\' y1=\'1\' x2=\'12\' y2=\'23\'></line><path d=\'M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6\'></path></svg>")', backgroundPosition: '10px center', backgroundRepeat: 'no-repeat' }}
                                     />
-                                    <p className="text-xs text-gray-500 mt-1">For the reporting month</p>
+                                    <p className="text-xs text-gray-500 mt-1">{t('reportingMonthDesc', monthlyTranslations)}</p>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Swachhata Samuh Honorarium (₹)</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('honorarium', monthlyTranslations)}</label>
                                     <input
                                         type="number" name="honorarium" value={expenses.honorarium} onChange={handleExpenseChange} min="0" placeholder="0"
                                         className="w-full p-2.5 pl-8 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#005DAA]/20 focus:border-[#005DAA] font-mono text-gray-800 relative"
                                         style={{ backgroundImage: 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%239CA3AF\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><line x1=\'12\' y1=\'1\' x2=\'12\' y2=\'23\'></line><path d=\'M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6\'></path></svg>")', backgroundPosition: '10px center', backgroundRepeat: 'no-repeat' }}
                                     />
-                                    <p className="text-xs text-gray-500 mt-1">Total distributed to workers</p>
+                                    <p className="text-xs text-gray-500 mt-1">{t('distWorkersDesc', monthlyTranslations)}</p>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Other Gen. Expenses (₹)</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('otherExp', monthlyTranslations)}</label>
                                     <input
                                         type="number" name="other" value={expenses.other} onChange={handleExpenseChange} min="0" placeholder="0"
                                         className="w-full p-2.5 pl-8 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#005DAA]/20 focus:border-[#005DAA] font-mono text-gray-800 relative"
                                         style={{ backgroundImage: 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%239CA3AF\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><line x1=\'12\' y1=\'1\' x2=\'12\' y2=\'23\'></line><path d=\'M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6\'></path></svg>")', backgroundPosition: '10px center', backgroundRepeat: 'no-repeat' }}
                                     />
-                                    <p className="text-xs text-gray-500 mt-1">Repairs, transport, consumables</p>
+                                    <p className="text-xs text-gray-500 mt-1">{t('repairsDesc', monthlyTranslations)}</p>
                                 </div>
                             </div>
 
                             {/* Expense Subtotal */}
                             <div className="pt-4 mt-6 border-t border-gray-100 flex justify-end">
                                 <div className="bg-red-50 px-4 py-2 rounded-lg border border-red-100 flex items-center gap-3">
-                                    <span className="text-sm font-semibold text-red-800">Total Expenses:</span>
+                                    <span className="text-sm font-semibold text-red-800">{t('totalExp', monthlyTranslations)}</span>
                                     <span className="text-lg font-bold text-red-700 font-mono">₹{totalExpenses.toLocaleString()}</span>
                                 </div>
                             </div>
@@ -452,7 +531,7 @@ const PWMUMonthlyReport = () => {
 
                         {/* Summary Pill */}
                         <div className={`px-4 py-2 rounded-xl flex items-center gap-4 text-sm font-bold border ${netBalance >= 0 ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
-                            <span>Net Monthly Balance:</span>
+                            <span>{t('netBalance', monthlyTranslations)}</span>
                             <span className="text-xl font-mono tracking-tight">
                                 {netBalance >= 0 ? '+' : ''}₹{netBalance.toLocaleString()}
                             </span>
@@ -460,7 +539,7 @@ const PWMUMonthlyReport = () => {
 
                         <div className="flex gap-3 w-full sm:w-auto">
                             <button type="button" onClick={() => navigate('/dashboard/pwmu')} className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 transition-colors">
-                                Cancel
+                                {t('cancel', monthlyTranslations)}
                             </button>
                             <button
                                 type="submit"
@@ -468,11 +547,14 @@ const PWMUMonthlyReport = () => {
                                 className="flex-1 sm:flex-none px-8 py-2.5 rounded-xl bg-[#005DAA] text-white font-bold hover:bg-[#00427A] shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-w-[160px]"
                             >
                                 {isSaving ? (
-                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                        <span>{t('saving', monthlyTranslations)}</span>
+                                    </div>
                                 ) : (
                                     <>
                                         <CheckCircle2 className="w-5 h-5 mr-2" />
-                                        Save Report
+                                        {t('saveReport', monthlyTranslations)}
                                     </>
                                 )}
                             </button>

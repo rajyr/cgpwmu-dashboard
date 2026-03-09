@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Building2, MapPin, Factory, User, CheckCircle2, ArrowRight, ArrowLeft, Check, ShieldAlert, Zap, Cpu, Loader2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 const PWMUReg = () => {
     const [step, setStep] = useState(1);
@@ -10,6 +11,114 @@ const PWMUReg = () => {
     const [submitError, setSubmitError] = useState('');
     const navigate = useNavigate();
     const { signUp } = useAuth();
+    const { t } = useLanguage();
+
+    const pwmuTranslations = {
+        en: {
+            title: "PWMU Center Registration",
+            subtitle: "Onboard a new Plastic Waste Management Unit into the state network.",
+            step1: "Location",
+            step2: "Infrastructure",
+            step3: "Contact",
+            step4: "Review",
+            basicLocation: "Basic Location Details",
+            district: "State District",
+            selectDistrict: "Select District",
+            block: "Block (Tehsil)",
+            selectBlock: "Select Block",
+            gp: "Gram Panchayat",
+            selectGP: "Select Gram Panchayat",
+            village: "Village Name",
+            selectVillage: "Select Village",
+            facilityName: "PWMU Facility Name",
+            facilityPlaceholder: "e.g. Balod Central Resource Recovery Center",
+            setupDate: "Date of Setup",
+            infraCapacity: "Infrastructure & Capacity",
+            capacity: "Processing Capacity (Tons/Day)",
+            capacityPlaceholder: "e.g. 5",
+            installedMachinery: "Installed Machinery",
+            balerTitle: "Hydraulic Baling Machine",
+            balerDesc: "Compresses sorted plastic into dense, transportable bales.",
+            shredderTitle: "Plastic Shredder Machine",
+            shredderDesc: "Cuts hard plastics into smaller, manageable flakes for recycling.",
+            nodalContact: "Nodal Contact & Login Details",
+            officerName: "Officer Name",
+            fullName: "Full Name",
+            phone: "Phone Number",
+            email: "Email Address",
+            setPassword: "Set Password",
+            passwordReq: "Min 6 characters",
+            passwordDesc: "This will be your login password. You can log in after admin approval.",
+            reviewConfirm: "Review & Confirm",
+            facilityReview: "Facility Name:",
+            locationReview: "Location:",
+            capacityReview: "Capacity:",
+            officerReview: "Nodal Officer:",
+            tonsDay: "Tons/Day",
+            verification: "By submitting this form, you verify that the information provided is accurate and official. The dashboard account will be created using the provided email address.",
+            successTitle: "Registration Submitted!",
+            successDesc: "Your PWMU registration has been submitted successfully.",
+            pendingApproval: "⏳ Your account is pending admin approval. You will be able to log in once approved.",
+            goToLogin: "Go to Login Page",
+            cancel: "Cancel",
+            back: "Back",
+            continue: "Continue",
+            submitting: "Submitting...",
+            submitRegistration: "Submit Registration"
+        },
+        hi: {
+            title: "PWMU केंद्र पंजीकरण",
+            subtitle: "राज्य नेटवर्क में एक नई प्लास्टिक अपशिष्ट प्रबंधन इकाई को शामिल करें।",
+            step1: "स्थान",
+            step2: "बुनियादी ढांचा",
+            step3: "संपर्क",
+            step4: "समीक्षा",
+            basicLocation: "बुनियादी स्थान विवरण",
+            district: "राज्य जिला",
+            selectDistrict: "जिला चुनें",
+            block: "ब्लॉक (तहसील)",
+            selectBlock: "ब्लॉक चुनें",
+            gp: "ग्राम पंचायत",
+            selectGP: "ग्राम पंचायत चुनें",
+            village: "गांव का नाम",
+            selectVillage: "गांव चुनें",
+            facilityName: "PWMU सुविधा का नाम",
+            facilityPlaceholder: "जैसे बालोद केंद्रीय संसाधन रिकवरी केंद्र",
+            setupDate: "स्थापना की तिथि",
+            infraCapacity: "बुनियादी ढांचा और क्षमता",
+            capacity: "प्रसंस्करण क्षमता (टन/दिन)",
+            capacityPlaceholder: "जैसे 5",
+            installedMachinery: "स्थापित मशीनरी",
+            balerTitle: "हाइड्रोलिक बेलिंग मशीन",
+            balerDesc: "सॉर्ट किए गए प्लास्टिक को घने, परिवहन योग्य गांठों में संपीड़ित करता है।",
+            shredderTitle: "प्लास्टिक श्रेडर मशीन",
+            shredderDesc: "पुनर्चक्रण के लिए कठोर प्लास्टिक को छोटे, प्रबंधनीय टुकड़ों में काटता है।",
+            nodalContact: "नोडल संपर्क और लॉगिन विवरण",
+            officerName: "अधिकारी का नाम",
+            fullName: "पूरा नाम",
+            phone: "फ़ोन नंबर",
+            email: "ईमेल पता",
+            setPassword: "पासवर्ड सेट करें",
+            passwordReq: "न्यूनतम 6 अक्षर",
+            passwordDesc: "यह आपका लॉगिन पासवर्ड होगा। आप एडमिन की मंजूरी के बाद लॉगिन कर सकते हैं।",
+            reviewConfirm: "समीक्षा और पुष्टि करें",
+            facilityReview: "सुविधा का नाम:",
+            locationReview: "स्थान:",
+            capacityReview: "क्षमता:",
+            officerReview: "नोडल अधिकारी:",
+            tonsDay: "टन/दिन",
+            verification: "इस फॉर्म को सबमिट करके, आप सत्यापित करते हैं कि प्रदान की गई जानकारी सटीक और आधिकारिक है। डैशबोर्ड खाता प्रदान किए गए ईमेल पते का उपयोग करके बनाया जाएगा।",
+            successTitle: "पंजीकरण सबमिट किया गया!",
+            successDesc: "आपका PWMU पंजीकरण सफलतापूर्वक सबमिट कर दिया गया है।",
+            pendingApproval: "⏳ आपका खाता एडमिन की मंजूरी के लिए लंबित है। स्वीकृत होने के बाद आप लॉगिन कर पाएंगे।",
+            goToLogin: "लॉगिन पेज पर जाएं",
+            cancel: "रद्द करें",
+            back: "पीछे",
+            continue: "जारी रखें",
+            submitting: "सबमिट हो रहा है...",
+            submitRegistration: "पंजीकरण सबमिट करें"
+        }
+    };
 
     const [locationData, setLocationData] = useState({});
 
@@ -106,10 +215,10 @@ const PWMUReg = () => {
     };
 
     const steps = [
-        { num: 1, label: 'Location', icon: MapPin },
-        { num: 2, label: 'Infrastructure', icon: Factory },
-        { num: 3, label: 'Contact', icon: User },
-        { num: 4, label: 'Review', icon: CheckCircle2 }
+        { num: 1, label: t('step1', pwmuTranslations), icon: MapPin },
+        { num: 2, label: t('step2', pwmuTranslations), icon: Factory },
+        { num: 3, label: t('step3', pwmuTranslations), icon: User },
+        { num: 4, label: t('step4', pwmuTranslations), icon: CheckCircle2 }
     ];
 
     return (
@@ -120,9 +229,9 @@ const PWMUReg = () => {
                 <div className="bg-gradient-to-r from-[#005DAA] to-[#00427A] p-8 text-white">
                     <div className="flex items-center gap-3 mb-2">
                         <Building2 className="w-8 h-8 text-blue-200" />
-                        <h2 className="text-2xl font-bold">PWMU Center Registration</h2>
+                        <h2 className="text-2xl font-bold">{t('title', pwmuTranslations)}</h2>
                     </div>
-                    <p className="text-blue-100 text-sm">Onboard a new Plastic Waste Management Unit into the state network.</p>
+                    <p className="text-blue-100 text-sm">{t('subtitle', pwmuTranslations)}</p>
                 </div>
 
                 {/* Progress Bar */}
@@ -163,57 +272,57 @@ const PWMUReg = () => {
                 <div className="p-8 mt-6">
                     {step === 1 && (
                         <div className="space-y-6 animate-fade-in-up">
-                            <h3 className="text-lg font-bold text-gray-800 border-b pb-2">Basic Location Details</h3>
+                            <h3 className="text-lg font-bold text-gray-800 border-b pb-2">{t('basicLocation', pwmuTranslations)}</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">State District</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('district', pwmuTranslations)}</label>
                                     <select
                                         name="district" value={formData.district} onChange={handleInputChange} required
                                         className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#005DAA]/20 focus:border-[#005DAA]"
                                     >
-                                        <option value="">Select District</option>
+                                        <option value="">{t('selectDistrict', pwmuTranslations)}</option>
                                         {districts.map(d => <option key={d} value={d}>{d}</option>)}
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Block (Tehsil)</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('block', pwmuTranslations)}</label>
                                     <select
                                         name="block" value={formData.block} onChange={handleInputChange} required disabled={!formData.district}
                                         className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#005DAA]/20 focus:border-[#005DAA] disabled:opacity-50"
                                     >
-                                        <option value="">Select Block</option>
+                                        <option value="">{t('selectBlock', pwmuTranslations)}</option>
                                         {blocks.map(b => <option key={b} value={b}>{b}</option>)}
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Gram Panchayat</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('gp', pwmuTranslations)}</label>
                                     <select
                                         name="gramPanchayat" value={formData.gramPanchayat} onChange={handleInputChange} required disabled={!formData.block}
                                         className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#005DAA]/20 focus:border-[#005DAA] disabled:opacity-50"
                                     >
-                                        <option value="">Select Gram Panchayat</option>
+                                        <option value="">{t('selectGP', pwmuTranslations)}</option>
                                         {gps.map(g => <option key={g} value={g}>{g}</option>)}
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Village Name</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('village', pwmuTranslations)}</label>
                                     <select
                                         name="village" value={formData.village} onChange={handleInputChange} required disabled={!formData.gramPanchayat}
                                         className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#005DAA]/20 focus:border-[#005DAA] disabled:opacity-50"
                                     >
-                                        <option value="">Select Village</option>
+                                        <option value="">{t('selectVillage', pwmuTranslations)}</option>
                                         {villages.map(v => <option key={v} value={v}>{v}</option>)}
                                     </select>
                                 </div>
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">PWMU Facility Name</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('facilityName', pwmuTranslations)}</label>
                                     <input
-                                        type="text" name="pwmuName" value={formData.pwmuName} onChange={handleInputChange} placeholder="e.g. Balod Central Resource Recovery Center"
+                                        type="text" name="pwmuName" value={formData.pwmuName} onChange={handleInputChange} placeholder={t('facilityPlaceholder', pwmuTranslations)}
                                         className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#005DAA]/20 focus:border-[#005DAA]"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Date of Setup</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('setupDate', pwmuTranslations)}</label>
                                     <input
                                         type="date" name="setupDate" value={formData.setupDate} onChange={handleInputChange}
                                         className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#005DAA]/20 focus:border-[#005DAA]"
@@ -225,17 +334,17 @@ const PWMUReg = () => {
 
                     {step === 2 && (
                         <div className="space-y-6 animate-fade-in-up">
-                            <h3 className="text-lg font-bold text-gray-800 border-b pb-2">Infrastructure & Capacity</h3>
+                            <h3 className="text-lg font-bold text-gray-800 border-b pb-2">{t('infraCapacity', pwmuTranslations)}</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Processing Capacity (Tons/Day)</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('capacity', pwmuTranslations)}</label>
                                     <input
-                                        type="number" name="capacity" value={formData.capacity} onChange={handleInputChange} placeholder="e.g. 5"
+                                        type="number" name="capacity" value={formData.capacity} onChange={handleInputChange} placeholder={t('capacityPlaceholder', pwmuTranslations)}
                                         className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#005DAA]/20 focus:border-[#005DAA]"
                                     />
                                 </div>
                                 <div className="md:col-span-2 space-y-4 pt-2">
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Installed Machinery</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">{t('installedMachinery', pwmuTranslations)}</label>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <label
                                             className={`flex items-start p-4 border-2 rounded-xl cursor-pointer transition-all duration-300 
@@ -249,10 +358,10 @@ const PWMUReg = () => {
                                             </div>
                                             <div className="flex-1">
                                                 <span className={`block text-lg font-bold ${formData.hasBaler ? 'text-[#00427A]' : 'text-gray-800'}`}>
-                                                    Hydraulic Baling Machine
+                                                    {t('balerTitle', pwmuTranslations)}
                                                 </span>
                                                 <span className="block text-sm text-gray-500 mt-1">
-                                                    Compresses sorted plastic into dense, transportable bales.
+                                                    {t('balerDesc', pwmuTranslations)}
                                                 </span>
                                             </div>
                                             <div className={`mt-2 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors 
@@ -278,10 +387,10 @@ const PWMUReg = () => {
                                             </div>
                                             <div className="flex-1">
                                                 <span className={`block text-lg font-bold ${formData.hasShredder ? 'text-[#00427A]' : 'text-gray-800'}`}>
-                                                    Plastic Shredder Machine
+                                                    {t('shredderTitle', pwmuTranslations)}
                                                 </span>
                                                 <span className="block text-sm text-gray-500 mt-1">
-                                                    Cuts hard plastics into smaller, manageable flakes for recycling.
+                                                    {t('shredderDesc', pwmuTranslations)}
                                                 </span>
                                             </div>
                                             <div className={`mt-2 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors 
@@ -302,36 +411,36 @@ const PWMUReg = () => {
 
                     {step === 3 && (
                         <div className="space-y-6 animate-fade-in-up">
-                            <h3 className="text-lg font-bold text-gray-800 border-b pb-2">Nodal Contact & Login Details</h3>
+                            <h3 className="text-lg font-bold text-gray-800 border-b pb-2">{t('nodalContact', pwmuTranslations)}</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Officer Name</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('officerName', pwmuTranslations)}</label>
                                     <input
-                                        type="text" name="nodalName" value={formData.nodalName} onChange={handleInputChange} placeholder="Full Name"
+                                        type="text" name="nodalName" value={formData.nodalName} onChange={handleInputChange} placeholder={t('fullName', pwmuTranslations)}
                                         className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#005DAA]/20 focus:border-[#005DAA]"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('phone', pwmuTranslations)}</label>
                                     <input
                                         type="tel" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="+91"
                                         className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#005DAA]/20 focus:border-[#005DAA]"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Email Address <span className="text-red-500">*</span></label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('email', pwmuTranslations)} <span className="text-red-500">*</span></label>
                                     <input
                                         type="email" name="email" value={formData.email} onChange={handleInputChange} placeholder="official@email.com" required
                                         className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#005DAA]/20 focus:border-[#005DAA]"
                                     />
                                 </div>
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Set Password <span className="text-red-500">*</span></label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('setPassword', pwmuTranslations)} <span className="text-red-500">*</span></label>
                                     <input
-                                        type="password" name="password" value={formData.password} onChange={handleInputChange} placeholder="Min 6 characters" required
+                                        type="password" name="password" value={formData.password} onChange={handleInputChange} placeholder={t('passwordReq', pwmuTranslations)} required
                                         className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#005DAA]/20 focus:border-[#005DAA]"
                                     />
-                                    <p className="text-xs text-gray-400 mt-1">This will be your login password. You can log in after admin approval.</p>
+                                    <p className="text-xs text-gray-400 mt-1">{t('passwordDesc', pwmuTranslations)}</p>
                                 </div>
                             </div>
                         </div>
@@ -339,27 +448,27 @@ const PWMUReg = () => {
 
                     {step === 4 && (
                         <div className="space-y-6 animate-fade-in-up">
-                            <h3 className="text-lg font-bold text-gray-800 border-b pb-2">Review & Confirm</h3>
+                            <h3 className="text-lg font-bold text-gray-800 border-b pb-2">{t('reviewConfirm', pwmuTranslations)}</h3>
                             <div className="bg-gray-50 rounded-lg p-5 border border-gray-200 space-y-4">
                                 <div className="grid grid-cols-2 gap-y-3 text-sm">
-                                    <div className="text-gray-500">Facility Name:</div>
+                                    <div className="text-gray-500">{t('facilityReview', pwmuTranslations)}</div>
                                     <div className="font-semibold text-gray-800 text-right">{formData.pwmuName || 'N/A'}</div>
 
-                                    <div className="text-gray-500">Location:</div>
+                                    <div className="text-gray-500">{t('locationReview', pwmuTranslations)}</div>
                                     <div className="font-semibold text-gray-800 text-right">
                                         {[formData.village, formData.gramPanchayat, formData.block, formData.district].filter(Boolean).join(', ') || 'N/A'}
                                     </div>
 
-                                    <div className="text-gray-500">Capacity:</div>
-                                    <div className="font-semibold text-gray-800 text-right">{formData.capacity ? `${formData.capacity} Tons/Day` : 'N/A'}</div>
+                                    <div className="text-gray-500">{t('capacityReview', pwmuTranslations)}</div>
+                                    <div className="font-semibold text-gray-800 text-right">{formData.capacity ? `${formData.capacity} ${t('tonsDay', pwmuTranslations)}` : 'N/A'}</div>
 
-                                    <div className="text-gray-500">Nodal Officer:</div>
+                                    <div className="text-gray-500">{t('officerReview', pwmuTranslations)}</div>
                                     <div className="font-semibold text-gray-800 text-right">{formData.nodalName || 'N/A'} ({formData.phone})</div>
                                 </div>
                             </div>
                             <div className="bg-blue-50 text-blue-800 p-4 rounded-lg flex items-start gap-3 text-sm mt-4 border border-blue-100">
                                 <ShieldAlert className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                                <p>By submitting this form, you verify that the information provided is accurate and official. The dashboard account will be created using the provided email address.</p>
+                                <p>{t('verification', pwmuTranslations)}</p>
                             </div>
                         </div>
                     )}
@@ -370,14 +479,14 @@ const PWMUReg = () => {
                             <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-6">
                                 <CheckCircle2 className="w-10 h-10 text-green-600" />
                             </div>
-                            <h3 className="text-2xl font-bold text-gray-800 mb-3">Registration Submitted!</h3>
-                            <p className="text-gray-500 max-w-md mx-auto mb-2">Your PWMU registration has been submitted successfully.</p>
-                            <p className="text-amber-600 font-semibold mb-8">⏳ Your account is pending admin approval. You will be able to log in once approved.</p>
+                            <h3 className="text-2xl font-bold text-gray-800 mb-3">{t('successTitle', pwmuTranslations)}</h3>
+                            <p className="text-gray-500 max-w-md mx-auto mb-2">{t('successDesc', pwmuTranslations)}</p>
+                            <p className="text-amber-600 font-semibold mb-8">{t('pendingApproval', pwmuTranslations)}</p>
                             <button
                                 onClick={() => navigate('/login')}
                                 className="px-8 py-3 rounded-lg text-sm font-medium text-white bg-[#005DAA] hover:bg-[#00427A] shadow-sm transition-colors"
                             >
-                                Go to Login Page
+                                {t('goToLogin', pwmuTranslations)}
                             </button>
                         </div>
                     )}
@@ -398,7 +507,7 @@ const PWMUReg = () => {
                                 disabled={submitting}
                             >
                                 <ArrowLeft className="w-4 h-4 mr-2" />
-                                {step === 1 ? 'Cancel' : 'Back'}
+                                {step === 1 ? t('cancel', pwmuTranslations) : t('back', pwmuTranslations)}
                             </button>
 
                             {step < 4 ? (
@@ -406,7 +515,7 @@ const PWMUReg = () => {
                                     onClick={nextStep}
                                     className="px-6 py-2.5 rounded-lg text-sm font-medium text-white bg-[#005DAA] hover:bg-[#00427A] shadow-sm transition-colors flex items-center"
                                 >
-                                    Continue
+                                    {t('continue', pwmuTranslations)}
                                     <ArrowRight className="w-4 h-4 ml-2" />
                                 </button>
                             ) : (
@@ -416,9 +525,9 @@ const PWMUReg = () => {
                                     className="px-6 py-2.5 rounded-lg text-sm font-medium text-white bg-[#28A745] hover:bg-[#218838] disabled:bg-gray-300 disabled:cursor-not-allowed shadow-sm transition-colors flex items-center"
                                 >
                                     {submitting ? (
-                                        <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Submitting...</>
+                                        <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {t('submitting', pwmuTranslations)}</>
                                     ) : (
-                                        <>Submit Registration <CheckCircle2 className="w-4 h-4 ml-2" /></>
+                                        <>{t('submitRegistration', pwmuTranslations)} <CheckCircle2 className="w-4 h-4 ml-2" /></>
                                     )}
                                 </button>
                             )}

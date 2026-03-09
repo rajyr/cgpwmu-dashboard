@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Shield, Building2, Home as HomeIcon, Truck, Mail, Lock, ArrowRight, Loader2, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 const Login = () => {
     const [activeRole, setActiveRole] = useState('admin');
@@ -12,12 +13,62 @@ const Login = () => {
     const [errorMsg, setErrorMsg] = useState('');
     const navigate = useNavigate();
     const { signIn } = useAuth();
+    const { t } = useLanguage();
+
+    const loginTranslations = {
+        en: {
+            welcome: "Welcome Back",
+            brandingDesc: "Sign in to access your personalized dashboard. The CG-PWMU Digital Platform streamlines plastic waste management tracking, reporting, and market linkages across Chhattisgarh.",
+            needHelp: "Need help?",
+            contactSupport: "Contact Support",
+            signInTitle: "Sign In to Dashboard",
+            selectRole: "Select your portal role to continue",
+            emailLabel: "Email Address",
+            gpLabel: "Gram Panchayat ID / Email",
+            emailPlaceholder: "Enter your email",
+            gpPlaceholder: "Enter your ID or email",
+            passwordLabel: "Password",
+            forgotPassword: "Forgot Password?",
+            passwordPlaceholder: "Enter your password",
+            signInBtn: "Sign In",
+            signingIn: "Signing In...",
+            noAccount: "Don't have an account or need to register a new entity?",
+            goRegister: "Go to Registration Portal",
+            roleAdmin: "Admin / Nodal",
+            rolePWMU: "PWMU Center",
+            roleVillage: "Village Sarpanch",
+            roleVendor: "Vendor / Market"
+        },
+        hi: {
+            welcome: "वापसी पर स्वागत है",
+            brandingDesc: "अपने व्यक्तिगत डैशबोर्ड तक पहुँचने के लिए साइन इन करें। CG-PWMU डिजिटल प्लेटफ़ॉर्म पूरे छत्तीसगढ़ में प्लास्टिक कचरा प्रबंधन ट्रैकिंग, रिपोर्टिंग और बाजार संबंधों को सुव्यवस्थित करता है।",
+            needHelp: "क्या आपको मदद चाहिए?",
+            contactSupport: "सहायता केंद्र",
+            signInTitle: "डैशबोर्ड में साइन इन करें",
+            selectRole: "जारी रखने के लिए अपनी पोर्टल भूमिका चुनें",
+            emailLabel: "ईमेल पता",
+            gpLabel: "ग्राम पंचायत आईडी / ईमेल",
+            emailPlaceholder: "अपना ईमेल दर्ज करें",
+            gpPlaceholder: "अपनी आईडी या ईमेल दर्ज करें",
+            passwordLabel: "पासवर्ड",
+            forgotPassword: "पासवर्ड भूल गए?",
+            passwordPlaceholder: "अपना पासवर्ड दर्ज करें",
+            signInBtn: "साइन इन करें",
+            signingIn: "साइन इन हो रहा है...",
+            noAccount: "खाता नहीं है या नई इकाई पंजीकृत करने की आवश्यकता है?",
+            goRegister: "पंजीकरण पोर्टल पर जाएं",
+            roleAdmin: "एडमिन / नोडल",
+            rolePWMU: "PWMU केंद्र",
+            roleVillage: "ग्राम सरपंच",
+            roleVendor: "विक्रेता / बाजार"
+        }
+    };
 
     const roles = [
-        { id: 'admin', label: 'Admin / Nodal', icon: Shield },
-        { id: 'pwmu', label: 'PWMU Center', icon: Building2 },
-        { id: 'village', label: 'Village Sarpanch', icon: HomeIcon },
-        { id: 'vendor', label: 'Vendor / Market', icon: Truck },
+        { id: 'admin', label: t('roleAdmin', loginTranslations), icon: Shield },
+        { id: 'pwmu', label: t('rolePWMU', loginTranslations), icon: Building2 },
+        { id: 'village', label: t('roleVillage', loginTranslations), icon: HomeIcon },
+        { id: 'vendor', label: t('roleVendor', loginTranslations), icon: Truck },
     ];
 
     const handleLogin = async (e) => {
@@ -75,15 +126,15 @@ const Login = () => {
 
                     <div className="relative z-10">
                         <img src="/assets/Logo/CGPWMUlogo.webp" alt="CG-PWMU Logo" className="h-16 w-auto object-contain bg-white rounded-lg p-2 mb-8 shadow-md" />
-                        <h2 className="text-3xl font-bold mb-4">Welcome Back</h2>
+                        <h2 className="text-3xl font-bold mb-4">{t('welcome', loginTranslations)}</h2>
                         <p className="text-blue-100 text-sm leading-relaxed mb-6">
-                            Sign in to access your personalized dashboard. The CG-PWMU Digital Platform streamlines plastic waste management tracking, reporting, and market linkages across Chhattisgarh.
+                            {t('brandingDesc', loginTranslations)}
                         </p>
                     </div>
 
                     <div className="relative z-10 border-t border-white/20 pt-6 mt-8">
-                        <p className="text-sm text-blue-100 flexitems-center gap-2">
-                            Need help? <a href="#" className="font-semibold text-white hover:underline">Contact Support</a>
+                        <p className="text-sm text-blue-100 flex items-center gap-2">
+                            {t('needHelp', loginTranslations)} <a href="#" className="font-semibold text-white hover:underline">{t('contactSupport', loginTranslations)}</a>
                         </p>
                     </div>
                 </div>
@@ -91,8 +142,8 @@ const Login = () => {
                 {/* Right Side - Form */}
                 <div className="md:w-7/12 p-8 lg:p-12 flex flex-col pt-8">
                     <div className="text-center md:text-left mb-8">
-                        <h3 className="text-2xl font-bold text-gray-800 tracking-tight">Sign In to Dashboard</h3>
-                        <p className="text-sm text-gray-500 mt-1">Select your portal role to continue</p>
+                        <h3 className="text-2xl font-bold text-gray-800 tracking-tight">{t('signInTitle', loginTranslations)}</h3>
+                        <p className="text-sm text-gray-500 mt-1">{t('selectRole', loginTranslations)}</p>
                     </div>
 
                     {/* Role Selection Tabs */}
@@ -128,7 +179,7 @@ const Login = () => {
                             )}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    {activeRole === 'village' ? 'Gram Panchayat ID / Email' : 'Email Address'}
+                                    {activeRole === 'village' ? t('gpLabel', loginTranslations) : t('emailLabel', loginTranslations)}
                                 </label>
                                 <div className="relative">
                                     <Mail className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
@@ -138,15 +189,15 @@ const Login = () => {
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
                                         className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#005DAA]/20 focus:border-[#005DAA] transition-all"
-                                        placeholder={`Enter your ${activeRole === 'village' ? 'ID or email' : 'email'}`}
+                                        placeholder={activeRole === 'village' ? t('gpPlaceholder', loginTranslations) : t('emailPlaceholder', loginTranslations)}
                                     />
                                 </div>
                             </div>
 
                             <div>
                                 <div className="flex items-center justify-between mb-1">
-                                    <label className="block text-sm font-medium text-gray-700">Password</label>
-                                    <a href="#" className="text-[12px] text-[#005DAA] hover:underline font-medium">Forgot Password?</a>
+                                    <label className="block text-sm font-medium text-gray-700">{t('passwordLabel', loginTranslations)}</label>
+                                    <a href="#" className="text-[12px] text-[#005DAA] hover:underline font-medium">{t('forgotPassword', loginTranslations)}</a>
                                 </div>
                                 <div className="relative">
                                     <Lock className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
@@ -156,7 +207,7 @@ const Login = () => {
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
                                         className="w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#005DAA]/20 focus:border-[#005DAA] transition-all"
-                                        placeholder="Enter your password"
+                                        placeholder={t('passwordPlaceholder', loginTranslations)}
                                     />
                                     <button
                                         type="button"
@@ -180,11 +231,11 @@ const Login = () => {
                                 {loading ? (
                                     <>
                                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                        Signing In...
+                                        {t('signingIn', loginTranslations)}
                                     </>
                                 ) : (
                                     <>
-                                        Sign In
+                                        {t('signInBtn', loginTranslations)}
                                         <ArrowRight className="w-4 h-4 ml-2 opacity-70 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
                                     </>
                                 )}
@@ -194,8 +245,8 @@ const Login = () => {
 
                     {/* Registration Link */}
                     <div className="mt-8 text-center text-sm text-gray-600 border-t border-gray-100 pt-6">
-                        Don't have an account or need to register a new entity? <br className="hidden md:block" />
-                        <Link to="/register" className="text-[#FF9933] font-semibold hover:underline mt-1 inline-block">Go to Registration Portal</Link>
+                        {t('noAccount', loginTranslations)} <br className="hidden md:block" />
+                        <Link to="/register" className="text-[#FF9933] font-semibold hover:underline mt-1 inline-block">{t('goRegister', loginTranslations)}</Link>
                     </div>
                 </div>
             </div>

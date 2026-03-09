@@ -1,15 +1,50 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Building2, Home as HomeIcon, Truck, ArrowRight, ArrowLeft } from 'lucide-react';
+import { useLanguage } from '../../context/LanguageContext';
 
 const Register = () => {
     const navigate = useNavigate();
+    const { t } = useLanguage();
+
+    const registerTranslations = {
+        en: {
+            backToLogin: "Back to Login",
+            selectType: "Select Registration Type",
+            welcome: "Welcome to the CG-PWMU platform. Choose the entity type you are registering to be directed to the correct onboarding wizard.",
+            villageTitle: "Village Sarpanch",
+            villageDesc: "Register a Gram Panchayat to log daily waste collection, segregated quantities, and manage local sanitization workers.",
+            pwmuTitle: "PWMU Center",
+            pwmuDesc: "Onboard a new Plastic Waste Management Unit. Set up processing capacity, asset register, and monthly financial reporting.",
+            vendorTitle: "Vendor / Recycler",
+            vendorDesc: "Join the marketplace as an authorized buyer or recycler of processed plastic materials from PWMU centers.",
+            startRegistration: "Start Registration",
+            adminInfoTitle: "Are you an Admin or existing Nodal Officer?",
+            adminInfoDesc: "Government officials do not need to register. Your credentials are provided by the State Directorate.",
+            returnToLogin: "Return to Login"
+        },
+        hi: {
+            backToLogin: "लॉगिन पर वापस जाएं",
+            selectType: "पंजीकरण प्रकार चुनें",
+            welcome: "CG-PWMU प्लेटफॉर्म पर आपका स्वागत है। सही ऑनबोर्डिंग विज़ार्ड पर निर्देशित होने के लिए वह इकाई प्रकार चुनें जिसे आप पंजीकृत कर रहे हैं।",
+            villageTitle: "ग्राम सरपंच",
+            villageDesc: "दैनिक कचरा संग्रह, पृथक मात्रा को लॉग करने और स्थानीय स्वच्छता श्रमिकों के प्रबंधन के लिए ग्राम पंचायत पंजीकृत करें।",
+            pwmuTitle: "PWMU केंद्र",
+            pwmuDesc: "एक नई प्लास्टिक अपशिष्ट प्रबंधन इकाई को ऑनबोर्ड करें। प्रसंस्करण क्षमता, संपत्ति रजिस्टर और मासिक वित्तीय रिपोर्टिंग सेट करें।",
+            vendorTitle: "विक्रेता / पुनर्चक्रणकर्ता",
+            vendorDesc: "PWMU केंद्रों से प्रसंस्कृत प्लास्टिक सामग्री के अधिकृत खरीदार या पुनर्चक्रणकर्ता के रूप में बाजार में शामिल हों।",
+            startRegistration: "पंजीकरण शुरू करें",
+            adminInfoTitle: "क्या आप एडमिन या मौजूदा नोडल अधिकारी हैं?",
+            adminInfoDesc: "सरकारी अधिकारियों को पंजीकरण करने की आवश्यकता नहीं है। आपके क्रेडेंशियल राज्य निदेशालय द्वारा प्रदान किए जाते हैं।",
+            returnToLogin: "लॉगिन पर लौटें"
+        }
+    };
 
     const registrationOptions = [
         {
             id: 'village',
-            title: 'Village Sarpanch',
-            description: 'Register a Gram Panchayat to log daily waste collection, segregated quantities, and manage local sanitization workers.',
+            title: t('villageTitle', registerTranslations),
+            description: t('villageDesc', registerTranslations),
             icon: HomeIcon,
             path: '/register/village',
             color: 'text-green-600',
@@ -19,8 +54,8 @@ const Register = () => {
         },
         {
             id: 'pwmu',
-            title: 'PWMU Center',
-            description: 'Onboard a new Plastic Waste Management Unit. Set up processing capacity, asset register, and monthly financial reporting.',
+            title: t('pwmuTitle', registerTranslations),
+            description: t('pwmuDesc', registerTranslations),
             icon: Building2,
             path: '/register/pwmu',
             color: 'text-[#005DAA]',
@@ -30,8 +65,8 @@ const Register = () => {
         },
         {
             id: 'vendor',
-            title: 'Vendor / Recycler',
-            description: 'Join the marketplace as an authorized buyer or recycler of processed plastic materials from PWMU centers.',
+            title: t('vendorTitle', registerTranslations),
+            description: t('vendorDesc', registerTranslations),
             icon: Truck,
             path: '/register/vendor',
             color: 'text-[#FF9933]',
@@ -51,14 +86,14 @@ const Register = () => {
                 <div className="mb-6">
                     <Link to="/login" className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-[#005DAA] transition-colors">
                         <ArrowLeft className="w-4 h-4 mr-1" />
-                        Back to Login
+                        {t('backToLogin', registerTranslations)}
                     </Link>
                 </div>
 
                 <div className="text-center mb-10">
-                    <h2 className="text-3xl md:text-4xl font-bold text-gray-800 tracking-tight mb-4">Select Registration Type</h2>
+                    <h2 className="text-3xl md:text-4xl font-bold text-gray-800 tracking-tight mb-4">{t('selectType', registerTranslations)}</h2>
                     <p className="text-gray-500 max-w-2xl mx-auto text-lg hover:text-gray-700 transition-colors">
-                        Welcome to the CG-PWMU platform. Choose the entity type you are registering to be directed to the correct onboarding wizard.
+                        {t('welcome', registerTranslations)}
                     </p>
                 </div>
 
@@ -79,7 +114,7 @@ const Register = () => {
                                     {option.description}
                                 </p>
                                 <div className={`flex items-center text-sm font-semibold ${option.color} group-hover:underline`}>
-                                    Start Registration
+                                    {t('startRegistration', registerTranslations)}
                                     <ArrowRight className="w-4 h-4 ml-1 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
                                 </div>
                             </div>
@@ -88,9 +123,9 @@ const Register = () => {
                 </div>
 
                 <div className="mt-12 text-center text-sm text-gray-500 bg-white/50 backdrop-blur border border-gray-200 rounded-xl p-6 max-w-2xl mx-auto">
-                    <p>Are you an Admin or existing Nodal Officer?</p>
+                    <p>{t('adminInfoTitle', registerTranslations)}</p>
                     <p className="mt-1">
-                        Government officials do not need to register. Your credentials are provided by the State Directorate. <Link to="/login" className="text-[#005DAA] font-semibold hover:underline">Return to Login</Link>
+                        {t('adminInfoDesc', registerTranslations)} <Link to="/login" className="text-[#005DAA] font-semibold hover:underline">{t('returnToLogin', registerTranslations)}</Link>
                     </p>
                 </div>
             </div>

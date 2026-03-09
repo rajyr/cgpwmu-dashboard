@@ -8,13 +8,84 @@ import {
     Tooltip as RechartsTooltip, ResponsiveContainer
 } from 'recharts';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const getProxyUrl = () => (import.meta.env.DEV ? '/supabase' : import.meta.env.VITE_SUPABASE_URL);
 
 function VendorDashboard() {
     const { userRole: authRole, userName } = useAuth();
+    const { t, language } = useLanguage();
     const userRole = authRole || 'Admin';
+
+    const venTrans = {
+        en: {
+            stateDir: "State Vendor Directory",
+            overview: "Overview of all {count} registered Market Partners.",
+            category: "Category",
+            gstin: "GSTIN",
+            district: "District",
+            allVendors: "All Vendors",
+            totalVendors: "Total Registered Vendors",
+            pickupsMonth: "Total Pickups This Month",
+            marketRate: "Avg. Market Rate Payment",
+            networkDir: "Vendor Network Directory",
+            colVendor: "Vendor Name",
+            colDistrict: "District",
+            colCategory: "Category",
+            colGstin: "GSTIN",
+            colRegistered: "Registered",
+            colAction: "Action",
+            noVendors: "No vendors registered yet.",
+            viewDashboard: "View Dashboard",
+            marketAvailability: "State Market Availability",
+            hotItems: "Hot Items",
+            noMarket: "No market listings available.",
+            highDemand: "High Demand",
+            availableStock: "Available Stock",
+            viewAllState: "View All State Postings",
+            ytdProcurement: "YTD Procurement",
+            pwmusPartnered: "PWMUs Partnered",
+            pickupHistory: "My Pickups History",
+            volKg: "Volume in Kilograms (kg)",
+            fetching: "Loading vendor data...",
+            mt: "MT",
+            kg: "kg"
+        },
+        hi: {
+            stateDir: "राज्य विक्रेता निर्देशिका",
+            overview: "सभी {count} पंजीकृत बाजार भागीदारों का विवरण।",
+            category: "श्रेणी",
+            gstin: "जीएसटीआईएन",
+            district: "ज़िला",
+            allVendors: "सभी विक्रेता",
+            totalVendors: "कुल पंजीकृत विक्रेता",
+            pickupsMonth: "इस महीने की कुल पिकअप",
+            marketRate: "औसत बाजार दर भुगतान",
+            networkDir: "विक्रेता नेटवर्क निर्देशिका",
+            colVendor: "विक्रेता का नाम",
+            colDistrict: "ज़िला",
+            colCategory: "श्रेणी",
+            colGstin: "जीएसटीआईएन",
+            colRegistered: "पंजीकृत",
+            colAction: "कार्रवाई",
+            noVendors: "अभी तक कोई विक्रेता पंजीकृत नहीं है।",
+            viewDashboard: "डैशबोर्ड देखें",
+            marketAvailability: "राज्य बाजार उपलब्धता",
+            hotItems: "हॉट आइटम्स",
+            noMarket: "कोई बाजार लिस्टिंग उपलब्ध नहीं है।",
+            highDemand: "उच्च मांग",
+            availableStock: "उपलब्ध स्टॉक",
+            viewAllState: "सभी राज्य पोस्टिंग देखें",
+            ytdProcurement: "YTD खरीद",
+            pwmusPartnered: "साझेदार PWMU",
+            pickupHistory: "मेरा पिकअप इतिहास",
+            volKg: "किलोग्राम (किलो) में मात्रा",
+            fetching: "विक्रेता डेटा लोड हो रहा है...",
+            mt: "मीट्रिक टन",
+            kg: "किलो"
+        }
+    };
 
     const [selectedVendor, setSelectedVendor] = useState(userRole === 'Vendor' ? 'self' : 'All Vendors');
     const [vendorProfile, setVendorProfile] = useState(null);
@@ -127,16 +198,16 @@ function VendorDashboard() {
     };
 
     const getSubtitle = () => {
-        if (selectedVendor === 'All Vendors') return `Overview of all registered Market Partners. ${allVendors.length} vendors registered.`;
-        if (selectedVendor === 'self') return `Category: ${vendorCategory} • GSTIN: ${vendorGstin} • District: ${vendorDistrict}`;
-        if (selectedVendorObj) return `District: ${selectedVendorObj.district || '—'}`;
-        return `Category: ${vendorCategory}`;
+        if (selectedVendor === 'All Vendors') return t('overview', venTrans).replace('{count}', allVendors.length);
+        if (selectedVendor === 'self') return `${t('category', venTrans)}: ${vendorCategory} • ${t('gstin', venTrans)}: ${vendorGstin} • ${t('district', venTrans)}: ${vendorDistrict}`;
+        if (selectedVendorObj) return `${t('district', venTrans)}: ${selectedVendorObj.district || '—'}`;
+        return `${t('category', venTrans)}: ${vendorCategory}`;
     };
 
     if (loadingProfile) {
         return (
             <div className="flex items-center justify-center h-64 text-gray-400">
-                <Loader2 className="w-6 h-6 animate-spin mr-2" /> Loading vendor data...
+                <Loader2 className="w-6 h-6 animate-spin mr-2" /> {t('fetching', venTrans)}
             </div>
         );
     }
@@ -163,7 +234,7 @@ function VendorDashboard() {
                             value={selectedVendor}
                             onChange={(e) => setSelectedVendor(e.target.value)}
                         >
-                            <option value="All Vendors">All Vendors</option>
+                            <option value="All Vendors">{t('allVendors', venTrans)}</option>
                             {allVendors.map(v => (
                                 <option key={v.id} value={v.id}>
                                     {v.registration_data?.companyName || v.full_name}
@@ -184,7 +255,7 @@ function VendorDashboard() {
                                 <Store className="w-6 h-6" />
                             </div>
                             <div>
-                                <p className="text-sm font-medium text-gray-500">Total Registered Vendors</p>
+                                <p className="text-sm font-medium text-gray-500">{t('totalVendors', venTrans)}</p>
                                 <p className="text-2xl font-bold text-gray-800">{allVendors.length}</p>
                             </div>
                         </div>
@@ -193,8 +264,8 @@ function VendorDashboard() {
                                 <Truck className="w-6 h-6" />
                             </div>
                             <div>
-                                <p className="text-sm font-medium text-gray-500">Total Pickups This Month</p>
-                                <p className="text-2xl font-bold text-gray-800">{totalPickupsThisMonth.toLocaleString()} <span className="text-sm font-medium text-gray-500">kg</span></p>
+                                <p className="text-sm font-medium text-gray-500">{t('pickupsMonth', venTrans)}</p>
+                                <p className="text-2xl font-bold text-gray-800">{totalPickupsThisMonth.toLocaleString()} <span className="text-sm font-medium text-gray-500">{t('kg', venTrans)}</span></p>
                             </div>
                         </div>
                         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
@@ -202,8 +273,8 @@ function VendorDashboard() {
                                 <TrendingUp className="w-6 h-6" />
                             </div>
                             <div>
-                                <p className="text-sm font-medium text-gray-500">Avg. Market Rate Payment</p>
-                                <p className="text-2xl font-bold text-gray-800">₹{avgMarketRate} / kg</p>
+                                <p className="text-sm font-medium text-gray-500">{t('marketRate', venTrans)}</p>
+                                <p className="text-2xl font-bold text-gray-800">₹{avgMarketRate} / {t('kg', venTrans)}</p>
                             </div>
                         </div>
                     </div>
@@ -211,23 +282,23 @@ function VendorDashboard() {
                     {/* Vendor Directory Table — from real data */}
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                         <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
-                            <h3 className="font-bold text-gray-800">Vendor Network Directory</h3>
+                            <h3 className="font-bold text-gray-800">{t('networkDir', venTrans)}</h3>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="bg-white text-gray-500 text-xs uppercase tracking-wider border-b border-gray-100">
-                                        <th className="p-4 font-medium">Vendor Name</th>
-                                        <th className="p-4 font-medium">District</th>
-                                        <th className="p-4 font-medium">Category</th>
-                                        <th className="p-4 font-medium">GSTIN</th>
-                                        <th className="p-4 font-medium">Registered</th>
-                                        <th className="p-4 font-medium text-right">Action</th>
+                                        <th className="p-4 font-medium">{t('colVendor', venTrans)}</th>
+                                        <th className="p-4 font-medium">{t('colDistrict', venTrans)}</th>
+                                        <th className="p-4 font-medium">{t('colCategory', venTrans)}</th>
+                                        <th className="p-4 font-medium">{t('colGstin', venTrans)}</th>
+                                        <th className="p-4 font-medium">{t('colRegistered', venTrans)}</th>
+                                        <th className="p-4 font-medium text-right">{t('colAction', venTrans)}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="text-sm text-gray-700">
                                     {allVendors.length === 0 ? (
-                                        <tr><td colSpan={6} className="p-8 text-center text-gray-400">No vendors registered yet.</td></tr>
+                                        <tr><td colSpan={6} className="p-8 text-center text-gray-400">{t('noVendors', venTrans)}</td></tr>
                                     ) : allVendors.map(v => {
                                         const rd = v.registration_data || {};
                                         const initials = (v.full_name || '?').split(' ').map(n => n[0]).join('').substring(0, 2);
@@ -242,7 +313,7 @@ function VendorDashboard() {
                                                 <td className="p-4 font-mono text-xs">{rd.gstin || '—'}</td>
                                                 <td className="p-4 text-xs text-gray-400">{v.created_at ? new Date(v.created_at).toLocaleDateString() : '—'}</td>
                                                 <td className="p-4 text-right">
-                                                    <button onClick={() => setSelectedVendor(v.id)} className="text-[#005DAA] font-medium hover:underline text-xs">View Dashboard</button>
+                                                    <button onClick={() => setSelectedVendor(v.id)} className="text-[#005DAA] font-medium hover:underline text-xs">{t('viewDashboard', venTrans)}</button>
                                                 </td>
                                             </tr>
                                         );
@@ -261,15 +332,15 @@ function VendorDashboard() {
                             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
                                 <div className="flex items-center gap-2">
                                     <PackageSearch className="w-5 h-5 text-gray-600" />
-                                    <h3 className="font-bold text-gray-800">State Market Availability</h3>
+                                    <h3 className="font-bold text-gray-800">{t('marketAvailability', venTrans)}</h3>
                                 </div>
                                 <span className="text-xs font-bold bg-orange-100 text-orange-700 px-3 py-1.5 rounded-lg flex items-center gap-1">
-                                    <Flame className="w-3 h-3" /> Hot Items
+                                    <Flame className="w-3 h-3" /> {t('hotItems', venTrans)}
                                 </span>
                             </div>
                             <div className="p-4 space-y-3">
                                 {marketData.length === 0 ? (
-                                    <p className="text-center py-8 text-gray-400">No market listings available.</p>
+                                    <p className="text-center py-8 text-gray-400">{t('noMarket', venTrans)}</p>
                                 ) : marketData.map((item) => (
                                     <div key={item.id} className="group border border-gray-100 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between hover:border-orange-200 hover:bg-orange-50/30 transition-all cursor-pointer">
                                         <div className="flex items-start sm:items-center gap-4 mb-4 sm:mb-0">
@@ -280,7 +351,7 @@ function VendorDashboard() {
                                                 <div className="flex items-center gap-2">
                                                     <h4 className="font-bold text-gray-800">{item.material}</h4>
                                                     {item.is_hot && (
-                                                        <span className="bg-red-100 text-red-600 text-[10px] uppercase font-bold px-2 py-0.5 rounded border border-red-200">High Demand</span>
+                                                        <span className="bg-red-100 text-red-600 text-[10px] uppercase font-bold px-2 py-0.5 rounded border border-red-200">{t('highDemand', venTrans)}</span>
                                                     )}
                                                 </div>
                                                 <p className="text-sm text-gray-500 font-medium flex items-center gap-1 mt-1">
@@ -292,8 +363,8 @@ function VendorDashboard() {
                                         </div>
                                         <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-6 sm:pl-4 sm:border-l border-gray-100">
                                             <div className="text-left sm:text-right">
-                                                <p className="text-xs text-gray-500 font-medium mb-0.5">Available Stock</p>
-                                                <p className="text-xl font-bold text-[#005DAA]">{item.stock_kg.toLocaleString()} <span className="text-sm font-medium text-gray-500">{item.unit || 'kg'}</span></p>
+                                                <p className="text-xs text-gray-500 font-medium mb-0.5">{t('availableStock', venTrans)}</p>
+                                                <p className="text-xl font-bold text-[#005DAA]">{item.stock_kg.toLocaleString()} <span className="text-sm font-medium text-gray-500">{item.unit || t('kg', venTrans)}</span></p>
                                             </div>
                                             <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center group-hover:bg-white group-hover:shadow-sm group-hover:text-orange-600 transition-colors">
                                                 <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-orange-500" />
@@ -303,7 +374,7 @@ function VendorDashboard() {
                                 ))}
                             </div>
                             <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 text-center">
-                                <button className="text-sm font-bold text-[#005DAA] hover:underline">View All State Postings</button>
+                                <button className="text-sm font-bold text-[#005DAA] hover:underline">{t('viewAllState', venTrans)}</button>
                             </div>
                         </div>
                     </div>
@@ -318,9 +389,9 @@ function VendorDashboard() {
                                     </div>
                                 </div>
                                 <p className="text-2xl font-bold text-gray-800">
-                                    {(pickupData.reduce((sum, p) => sum + Number(p.quantity_kg || 0), 0) / 1000).toFixed(1)} <span className="text-sm font-medium text-gray-500">MT</span>
+                                    {(pickupData.reduce((sum, p) => sum + Number(p.quantity_kg || 0), 0) / 1000).toFixed(1)} <span className="text-sm font-medium text-gray-500">{t('mt', venTrans)}</span>
                                 </p>
-                                <p className="text-xs text-gray-500 font-medium mt-1">YTD Procurement</p>
+                                <p className="text-xs text-gray-500 font-medium mt-1">{t('ytdProcurement', venTrans)}</p>
                             </div>
                             <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex flex-col justify-between">
                                 <div className="flex items-center gap-2 mb-3">
@@ -331,7 +402,7 @@ function VendorDashboard() {
                                 <p className="text-2xl font-bold text-gray-800">
                                     {[...new Set(pickupData.map(p => p.pwmu_name))].length}
                                 </p>
-                                <p className="text-xs text-gray-500 font-medium mt-1">PWMUs Partnered</p>
+                                <p className="text-xs text-gray-500 font-medium mt-1">{t('pwmusPartnered', venTrans)}</p>
                             </div>
                         </div>
 
@@ -340,7 +411,7 @@ function VendorDashboard() {
                             <div className="flex items-center justify-between mb-6">
                                 <div className="flex items-center gap-2">
                                     <Truck className="w-5 h-5 text-orange-600" />
-                                    <h3 className="font-bold text-gray-800">My Pickups History</h3>
+                                    <h3 className="font-bold text-gray-800">{t('pickupHistory', venTrans)}</h3>
                                 </div>
                             </div>
                             <div className="h-56">
