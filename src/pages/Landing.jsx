@@ -457,7 +457,7 @@ const Landing = () => {
                         </g>
                     </svg>
                 </div>
-                <div className="relative z-10 w-full pt-0 pb-12">
+                <div className="relative z-10 w-full pt-20 pb-12">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center animate-fade-in-up">
                         <h1 className="text-5xl md:text-7xl font-extrabold text-slate-900 leading-tight mb-4 flex flex-wrap justify-center items-center gap-x-4">
                             <span>{t('heroTitle', translations)}</span>
@@ -586,58 +586,6 @@ const Landing = () => {
                     </div>
                 </div>
             </section>
-            <section className="py-24 bg-slate-900 relative overflow-hidden min-h-[800px] flex flex-col justify-center">
-                <div className="absolute top-0 left-0 w-full h-full opacity-10">
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-500/20 via-transparent to-transparent"></div>
-                </div>
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 w-full">
-                    <div className="flex flex-col lg:flex-row items-center gap-16">
-                        <div className="flex-1 space-y-8">
-                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold uppercase tracking-widest">{t('liveTelemetry', translations)}</div>
-                            <h2 className="text-4xl md:text-5xl font-black text-white leading-tight">{t('geospatialTitle', translations)}</h2>
-                            <p className="text-slate-400 text-lg leading-relaxed">{t('geospatialDesc', translations)}</p>
-                            <div className="grid grid-cols-2 gap-6 pt-4">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-3 h-3 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]"></div>
-                                    <span className="text-slate-300 text-sm font-semibold">{t('hdpe', translations)}</span>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <div className="w-3 h-3 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]"></div>
-                                    <span className="text-slate-300 text-sm font-semibold">{t('wetflow', translations)}</span>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <div className="w-3 h-3 rounded-full bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]"></div>
-                                    <span className="text-slate-300 text-sm font-semibold">{t('ewaste', translations)}</span>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <div className="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]"></div>
-                                    <span className="text-slate-300 text-sm font-semibold">{t('metals', translations)}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="flex-1 w-full relative">
-                            <div className="aspect-square rounded-3xl bg-slate-800/50 border border-slate-700/50 p-4 shadow-2xl relative overflow-hidden group">
-                                <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
-                                    <div className="px-3 py-1.5 rounded-lg bg-slate-900/80 backdrop-blur-md border border-slate-700 text-xs flex items-center gap-2">
-                                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                                        <span className="text-white font-bold">{t('topDistrict', translations)}: {t('durg', translations)}</span>
-                                    </div>
-                                    <div className="px-3 py-1.5 rounded-lg bg-slate-900/80 backdrop-blur-md border border-slate-700 text-xs text-white">
-                                        <span className="text-slate-400">{t('topPWMU', translations)}:</span> <span className="font-bold">{t('durgCentral', translations)}</span>
-                                    </div>
-                                </div>
-                                <img src="https://images.unsplash.com/photo-1526772662000-3f88f10405ff?auto=format&fit=crop&q=80" alt="Map" className="w-full h-full object-cover rounded-2xl opacity-40 group-hover:scale-105 transition-transform duration-1000 grayscale" />
-                                <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent"></div>
-                                <div className="absolute bottom-6 left-6 right-6 flex justify-center">
-                                    <button className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm transition-all shadow-xl flex items-center gap-2">
-                                        <Map className="w-4 h-4" /> {t('viewLiveMap', translations)}
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
             <section className="py-24 bg-white relative overflow-hidden">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex flex-col lg:flex-row items-center gap-16 mb-16">
@@ -707,22 +655,6 @@ const Landing = () => {
                     </div>
                 </div>
             </section>
-            <footer className="bg-gray-900 border-t border-gray-800 py-12">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-                    <div className="flex flex-col md:flex-row items-center justify-between gap-8">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-green-600 flex items-center justify-center shadow-lg shadow-green-900/50"><Recycle className="w-6 h-6 text-white" /></div>
-                            <span className="text-xl font-black text-white tracking-tight italic">PWMU digital <span className="text-green-500">CG</span></span>
-                        </div>
-                        <div className="flex gap-8 text-sm font-bold text-gray-400">
-                            {['ABOUT', 'DASHBOARD', 'REPORTING', 'COMPLIANCE'].map((link) => (
-                                <a key={link} href="#" className="hover:text-green-500 transition-colors tracking-widest">{link}</a>
-                            ))}
-                        </div>
-                        <p className="text-xs font-bold text-gray-500 tracking-widest uppercase">&copy; {new Date().getFullYear()} Government of Chhattisgarh</p>
-                    </div>
-                </div>
-            </footer>
         </div>
     );
 };

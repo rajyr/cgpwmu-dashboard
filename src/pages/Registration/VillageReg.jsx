@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Home as HomeIcon, MapPin, User, CheckCircle2, ArrowRight, ArrowLeft, Check, ShieldAlert, Loader2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { supabase } from '../../lib/supabaseClient';
 
 const VillageReg = () => {
     const [step, setStep] = useState(1);
@@ -54,7 +55,10 @@ const VillageReg = () => {
             back: "Back",
             continue: "Continue",
             submitting: "Submitting...",
-            submitRegistration: "Submit GP Registration"
+            submitRegistration: "Submit GP Registration",
+            pwmuUnit: "Linked PWMU Unit",
+            selectPWMU: "Select PWMU Center",
+            pwmuReview: "Linked PWMU:"
         },
         hi: {
             title: "ग्राम पंचायत पंजीकरण",
@@ -96,19 +100,16 @@ const VillageReg = () => {
             back: "पीछे",
             continue: "जारी रखें",
             submitting: "सबमिट हो रहा है...",
-            submitRegistration: "जीपी पंजीकरण सबमिट करें"
+            submitRegistration: "जीपी पंजीकरण सबमिट करें",
+            pwmuUnit: "लिंक की गई PWMU इकाई",
+            selectPWMU: "PWMU केंद्र चुनें",
+            pwmuReview: "लिंक किया गया PWMU:"
         }
     };
 
     const [locationData, setLocationData] = useState({});
-
-    React.useEffect(() => {
-        fetch('/data/locationData.json')
-            .then(res => res.json())
-            .then(data => setLocationData(data))
-            .catch(err => console.error("Error loading location data:", err));
-    }, []);
-
+    const [pwmuCenters, setPwmuCenters] = useState([]);
+    const [autoLinkedPWMU, setAutoLinkedPWMU] = useState('');
     const [formData, setFormData] = useState({
         district: '',
         block: '',
@@ -119,7 +120,70 @@ const VillageReg = () => {
         phone: '',
         email: '',
         password: '',
+        pwmuId: '',
     });
+
+    React.useEffect(() => {
+        fetch('/data/locationData.json')
+            .then(res => res.json())
+            .then(data => setLocationData(data))
+            .catch(err => console.error("Error loading location data:", err));
+
+        const stripCode = (str) => str ? str.replace(/\s*\(\d+\)\s*/g, '').trim() : '';
+
+        const fetchPWMUs = async () => {
+            try {
+                const proxyUrl = import.meta.env.DEV ? `${window.location.origin}/supabase` : import.meta.env.VITE_SUPABASE_URL;
+                const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+                const res = await fetch(`${proxyUrl}/rest/v1/users?role=eq.PWMUManager&status=eq.approved&select=id,registration_data`, {
+                    headers: { 'apikey': ANON_KEY }
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    const formatted = data.map(u => {
+                        const reg = u.registration_data || {};
+                        const locString = [
+                            stripCode(reg.district),
+                            stripCode(reg.block),
+                            stripCode(reg.gramPanchayat),
+                            stripCode(reg.village)
+                        ].filter(Boolean).join(', ');
+
+                        return {
+                            id: u.id,
+                            name: reg.pwmuName || 'PWMU Center',
+                            location: locString,
+                            serviceVillages: reg.serviceVillages || []
+                        };
+                    });
+                    setPwmuCenters(formatted);
+                } else {
+                    console.error("Failed to fetch PWMUs from users table.");
+                }
+            } catch (err) {
+                console.error("Error fetching PWMUs:", err);
+            }
+        };
+        fetchPWMUs();
+    }, []);
+
+    // Effect for auto-linking based on selected Village or GP
+    React.useEffect(() => {
+        const villageToCheck = formData.primaryVillage || formData.gramPanchayatName;
+        if (villageToCheck && pwmuCenters.length > 0) {
+            const linkedPWMU = pwmuCenters.find(p => p.serviceVillages.includes(villageToCheck));
+            if (linkedPWMU) {
+                setAutoLinkedPWMU(linkedPWMU.name);
+                setFormData(prev => ({ ...prev, pwmuId: linkedPWMU.id }));
+            } else {
+                setAutoLinkedPWMU('');
+            }
+        } else {
+            setAutoLinkedPWMU('');
+        }
+    }, [formData.primaryVillage, formData.gramPanchayatName, pwmuCenters]);
+
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -172,6 +236,7 @@ const VillageReg = () => {
                     totalHouseholds: formData.totalHouseholds,
                     block: formData.block,
                     district: formData.district,
+                    pwmuId: formData.pwmuId,
                 },
             });
 
@@ -288,6 +353,26 @@ const VillageReg = () => {
                                         className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500/20 focus:border-green-600"
                                     />
                                 </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        {t('pwmuUnit', villageTranslations)}
+                                        {autoLinkedPWMU && <span className="ml-2 text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">Auto-linked</span>}
+                                    </label>
+                                    <select
+                                        name="pwmuId" value={formData.pwmuId} onChange={handleInputChange} required disabled={!!autoLinkedPWMU}
+                                        className={`w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500/20 focus:border-green-600 ${autoLinkedPWMU ? 'opacity-70 bg-blue-50/50 cursor-not-allowed' : ''}`}
+                                    >
+                                        <option value="">{t('selectPWMU', villageTranslations)}</option>
+                                        {pwmuCenters.map(p => (
+                                            <option key={p.id} value={p.id}>
+                                                {p.name} ({p.location})
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {autoLinkedPWMU && (
+                                        <p className="text-xs text-blue-600 mt-1">You are automatically linked to {autoLinkedPWMU}</p>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     )}
@@ -345,6 +430,11 @@ const VillageReg = () => {
 
                                     <div className="text-gray-500">{t('sarpanchReview', villageTranslations)}</div>
                                     <div className="font-semibold text-gray-800 text-right">{formData.sarpanchName || 'N/A'} ({formData.phone})</div>
+
+                                    <div className="text-gray-500">{t('pwmuReview', villageTranslations)}</div>
+                                    <div className="font-semibold text-gray-800 text-right">
+                                        {pwmuCenters.find(p => p.id === formData.pwmuId)?.name || 'N/A'}
+                                    </div>
                                 </div>
                             </div>
                             <div className="bg-blue-50 text-blue-800 p-4 rounded-lg flex items-start gap-3 text-sm mt-4 border border-blue-100">

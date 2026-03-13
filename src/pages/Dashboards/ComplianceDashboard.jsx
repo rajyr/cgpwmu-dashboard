@@ -65,18 +65,20 @@ function ComplianceDashboard() {
 
                     return {
                         month: m,
-                        intake: intake || (Math.random() * 5000 + 10000), // Fallback to realistic mock if no data
-                        processed: processed || (Math.random() * 4000 + 9000),
-                        sold: sold || (Math.random() * 3000 + 8000),
+                        intake: intake || 0,
+                        processed: processed || 0,
+                        sold: sold || 0,
                         leakage: Math.max(0, intake - processed)
                     };
                 });
 
                 setLeakageData(trend);
 
-                // 3. Generate Compliance Watchlist
                 const watchlist = centers.slice(0, 5).map(center => {
-                    const daysAgo = Math.floor(Math.random() * 15);
+                    // Logic to check last reported date from center profile vs today
+                    const lastUpdated = new Date(center.last_updated || center.created_at);
+                    const today = new Date();
+                    const daysAgo = Math.floor((today - lastUpdated) / (1000 * 60 * 60 * 24));
                     const status = daysAgo < 3 ? 'Compliant' : daysAgo < 7 ? 'Warning' : 'Critical';
                     return {
                         id: center.id,
@@ -90,11 +92,13 @@ function ComplianceDashboard() {
                 setComplianceList(watchlist);
 
                 // 4. Summary Stats
+                const missing = watchlist.reduce((acc, curr) => acc + curr.pending, 0);
+                const complianceRate = watchlist.length > 0 ? Math.round((watchlist.filter(w => w.status === 'Compliant').length / watchlist.length) * 100) : 0;
                 setStats({
-                    complianceRate: 85 + Math.floor(Math.random() * 10),
-                    missingReports: watchlist.reduce((acc, curr) => acc + curr.pending, 0) + 12,
-                    leakagePercent: 3.2,
-                    avgDiscrepancy: 420
+                    complianceRate: complianceRate,
+                    missingReports: missing,
+                    leakagePercent: trend.length > 0 ? (trend.reduce((acc, t) => acc + t.leakage, 0) / trend.reduce((acc, t) => acc + t.intake, 0)) * 100 || 0 : 0,
+                    avgDiscrepancy: trend.length > 0 ? Math.round(trend.reduce((acc, t) => acc + (t.intake - t.processed), 0) / trend.length) : 0
                 });
 
             } catch (err) {
@@ -158,8 +162,8 @@ function ComplianceDashboard() {
                         </div>
                         <h3 className="font-semibold text-gray-600 text-sm">Est. Waste Leakage</h3>
                     </div>
-                    <p className="text-3xl font-bold text-orange-700">{stats.leakagePercent}%</p>
-                    <p className="text-xs text-orange-600 mt-1 flex items-center gap-1"><TrendingDown className="w-3 h-3" /> Improved by 1.2%</p>
+                    <p className="text-3xl font-bold text-orange-700">{stats.leakagePercent.toFixed(1)}%</p>
+                    <p className="text-xs text-orange-600 mt-1 flex items-center gap-1"></p>
                 </div>
 
                 <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">

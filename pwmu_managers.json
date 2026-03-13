@@ -1,0 +1,33 @@
+[
+  {
+    "id": "6b4db30f-1e91-4121-8c7a-5e12a2a00f7e",
+    "full_name": "Raj",
+    "registration_data": {
+      "type": "PWMU",
+      "block": "Basna (3680)",
+      "capacity": "2",
+      "district": "Mahasamund (385)",
+      "hasBaler": true,
+      "pwmuName": "Raj Chilka",
+      "setupDate": "2026-03-02",
+      "hasShredder": true,
+      "gramPanchayat": "Bhukel (127502)",
+      "serviceVillages": [
+        "Amapali (445828)",
+        "Hadapathara (445823)",
+        "Ankori (445845)",
+        "Arekel (445794)"
+      ]
+    }
+  },
+  {
+    "id": "b26a2ae4-f4f3-4e74-bfab-2390039f2d10",
+    "full_name": "Test Post",
+    "registration_data": null
+  },
+  {
+    "id": "b8f82d70-5655-484f-aa44-dd4ddd0705d6",
+    "full_name": "PWMU Manager",
+    "registration_data": null
+  }
+]

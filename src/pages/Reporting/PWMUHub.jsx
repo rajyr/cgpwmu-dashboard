@@ -1,11 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Truck, FileBarChart, Bell, Calendar as CalendarIcon, Clock, CheckCircle2, AlertTriangle, ArrowRight, Factory, History, XCircle, ChevronLeft, ChevronRight, TrendingUp, Users, Activity } from 'lucide-react';
+import { Truck, FileBarChart, Bell, MapPin, Calendar as CalendarIcon, Clock, CheckCircle2, AlertTriangle, ArrowRight, Factory, History, XCircle, ChevronLeft, ChevronRight, TrendingUp, Users, Activity, Loader2 } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
+import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../lib/supabaseClient';
 
 const PWMUHub = () => {
     const navigate = useNavigate();
     const { t, language } = useLanguage();
+    const { user } = useAuth();
+    const [loading, setLoading] = useState(true);
+    const [pwmuData, setPwmuData] = useState(null);
+    const [submittedDays, setSubmittedDays] = useState([]);
+    const [weeklyKpis, setWeeklyKpis] = useState({
+        totalIntake: 0,
+        reportingRate: 0,
+        transport: 0,
+        recovery: 0
+    });
+    const [recentActivity, setRecentActivity] = useState([]);
+    const [notifications, setNotifications] = useState([]);
+    const [logDetails, setLogDetails] = useState({});
+
+    const currentDateObj = new Date();
+    const today = currentDateObj.toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
     const hubTranslations = {
         en: {
@@ -80,21 +98,6 @@ const PWMUHub = () => {
         }
     };
 
-    const currentDateObj = new Date();
-    const today = currentDateObj.toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-
-    const [notifications] = useState([
-        { id: 1, type: 'warning', text: t('unsubmittedLogs', hubTranslations), unread: true },
-        { id: 2, type: 'info', text: t('monthlyDue', hubTranslations), unread: true },
-        { id: 3, type: 'success', text: t('logApproved', hubTranslations), unread: false },
-    ]);
-
-    const recentActivity = [
-        { id: 101, title: t('dailyLogTitle', hubTranslations), date: 'Yesterday, 5:30 PM', status: t('statusSubmitted', hubTranslations), icon: Truck },
-        { id: 102, title: t('dailyLogTitle', hubTranslations), date: '2 Days Ago, 6:00 PM', status: t('statusApproved', hubTranslations), icon: Truck },
-        { id: 103, title: t('monthlyReportTitle', hubTranslations), date: 'Oct 2, 10:15 AM', status: t('statusApproved', hubTranslations), icon: FileBarChart },
-    ];
-
     const [currentDate, setCurrentDate] = useState(new Date());
     const currentMonth = currentDate.getMonth();
     const currentYear = currentDate.getFullYear();
@@ -105,17 +108,129 @@ const PWMUHub = () => {
 
     const monthName = currentDate.toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-US', { month: 'long', year: 'numeric' });
 
-    const submittedDays = currentMonth === realToday.getMonth()
-        ? [1, 2, 3, 4, 5, 8, 9, 10, 11, 12, 15, 16, 17, 18, 19, 22, 23, 24, 25, 26]
-        : Array.from({ length: 20 }, () => Math.floor(Math.random() * 28) + 1);
+    useEffect(() => {
+        const fetchHubData = async () => {
+            if (!user) return;
+            setLoading(true);
+
+            try {
+                // 1. Identify PWMU Center
+                let centerData = null;
+                const reg = user.registration_data || {};
+
+                // Role can be in user.role OR reg.role/type
+                const isManager = user.role === 'PWMUManager' || reg.role === 'PWMUManager' || reg.type === 'PWMU';
+
+                if (isManager) {
+                    centerData = {
+                        id: user.id, // Primary ID for Managers
+                        name: reg.pwmuName || reg.centerName || 'PWMU Center',
+                        district: reg.district,
+                        block: reg.block,
+                        gramPanchayat: reg.gramPanchayat,
+                        village: reg.village,
+                        status: 'operational'
+                    };
+                }
+
+                if (!centerData) {
+                    const { data } = await supabase
+                        .from('pwmu_centers')
+                        .select('*')
+                        .or(`id.eq.${user.id},nodal_officer_id.eq.${user.id}`)
+                        .maybeSingle();
+                    if (data) centerData = data;
+                }
+
+                if (centerData) {
+                    setPwmuData(centerData);
+
+                    // Local-time safe date range (YYYY-MM-DD)
+                    const formatLocal = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+                    const startStr = formatLocal(new Date(currentYear, currentMonth, 1));
+                    const endStr = formatLocal(new Date(currentYear, currentMonth + 1, 0));
+
+                    const { data: pwmuLogs } = await supabase
+                        .from('pwmu_daily_logs')
+                        .select('log_date, total_intake_kg')
+                        .eq('pwmu_id', centerData.id)
+                        .gte('log_date', startStr)
+                        .lte('log_date', endStr);
+
+                    if (pwmuLogs) {
+                        const days = [...new Set(pwmuLogs.map(l => parseInt(l.log_date.split('-')[2])))];
+                        setSubmittedDays(days);
+
+                        const details = {};
+                        pwmuLogs.forEach(l => {
+                            const dayNum = parseInt(l.log_date.split('-')[2]);
+                            details[dayNum] = l;
+                        });
+                        setLogDetails(details);
+
+                        // Weekly KPIs
+                        const last7 = new Date();
+                        last7.setDate(realToday.getDate() - 7);
+                        const last7Str = formatLocal(last7);
+                        const weeklyLogs = pwmuLogs.filter(l => l.log_date >= last7Str);
+
+                        const totalIntake = weeklyLogs.reduce((sum, l) => sum + (Number(l.total_intake_kg) || 0), 0);
+                        setWeeklyKpis({
+                            totalIntake: Math.round(totalIntake),
+                            reportingRate: Math.round((weeklyLogs.length / 7) * 100),
+                            transport: Math.round(totalIntake * 0.4),
+                            recovery: centerData.recovery_rate || 76
+                        });
+
+                        // Recent History
+                        setRecentActivity(pwmuLogs.slice(0, 3).map((l, idx) => ({
+                            id: idx,
+                            title: t('dailyLogTitle', hubTranslations),
+                            date: new Date(l.log_date).toLocaleDateString(),
+                            status: t('statusSubmitted', hubTranslations),
+                            icon: Truck
+                        })));
+
+                        // Alerts
+                        const todayStr = formatLocal(realToday);
+                        const alerts = [];
+                        if (!pwmuLogs.some(l => l.log_date === todayStr)) {
+                            alerts.push({ id: 1, type: 'warning', text: t('unsubmittedLogs', hubTranslations), unread: true });
+                        }
+                        if (realToday.getDate() <= 5) {
+                            alerts.push({ id: 2, type: 'info', text: t('monthlyDue', hubTranslations), unread: true });
+                        }
+                        setNotifications(alerts);
+                    }
+                }
+            } catch (err) {
+                console.error('Error fetching hub data:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchHubData();
+    }, [user, currentMonth, currentYear]);
 
     const missedDays = Array.from({ length: daysInMonth }, (_, i) => i + 1).filter(d => {
         const dDate = new Date(currentYear, currentMonth, d);
-        return dDate < realToday && !submittedDays.includes(d);
+        // Important: Use a date threshold for "Missed" that is strictly BEFORE today
+        const startOfToday = new Date(realToday.getFullYear(), realToday.getMonth(), realToday.getDate());
+        return dDate < startOfToday && !submittedDays.includes(d);
     });
 
     const handlePrevMonth = () => setCurrentDate(new Date(currentYear, currentMonth - 1, 1));
     const handleNextMonth = () => setCurrentDate(new Date(currentYear, currentMonth + 1, 1));
+
+    if (loading && !pwmuData) {
+        return (
+            <div className="flex flex-col items-center justify-center h-64 text-[#005DAA]">
+                <Loader2 className="w-10 h-10 animate-spin mb-4" />
+                <p className="font-bold">Loading your PWMU Hub...</p>
+            </div>
+        );
+    }
 
     return (
         <div className="animate-fade-in-up space-y-6 max-w-7xl mx-auto">
@@ -126,15 +241,21 @@ const PWMUHub = () => {
                 </div>
                 <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
-                        <h1 className="text-3xl font-bold mb-2">{t('welcome', hubTranslations)}</h1>
-                        <p className="text-blue-100 flex items-center gap-2">
-                            <CalendarIcon className="w-5 h-5 opacity-80" />
-                            {today}
+                        <h1 className="text-3xl font-bold mb-2">{t('welcome', hubTranslations)}, {user?.full_name?.split(' ')[0]}</h1>
+                        <p className="text-blue-100 flex flex-wrap items-center gap-x-4 gap-y-1">
+                            <span className="flex items-center gap-1.5 opacity-90">
+                                <CalendarIcon className="w-4 h-4" />
+                                {today}
+                            </span>
+                            <span className="flex items-center gap-1.5 opacity-90 border-l border-white/20 pl-4">
+                                <MapPin className="w-4 h-4" />
+                                {[pwmuData?.district, pwmuData?.block, pwmuData?.gramPanchayat, pwmuData?.village].filter(Boolean).join(' - ')}
+                            </span>
                         </p>
                     </div>
                     <div className="bg-white/20 backdrop-blur-sm px-4 py-2 rounded-xl border border-white/30 flex items-center gap-3">
-                        <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.8)]"></div>
-                        <span className="font-semibold tracking-wide text-sm">{t('activeStatus', hubTranslations)}</span>
+                        <div className={`w-3 h-3 ${pwmuData?.status === 'operational' ? 'bg-green-400' : 'bg-red-400'} rounded-full animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.8)]`}></div>
+                        <span className="font-semibold tracking-wide text-sm">{pwmuData?.name || t('activeStatus', hubTranslations)} {pwmuData?.status?.toUpperCase()}</span>
                     </div>
                 </div>
             </div>
@@ -222,12 +343,14 @@ const PWMUHub = () => {
                                         else if (isFuture) { bgClass = "bg-transparent border-dashed opacity-50"; textClass = "text-gray-400"; }
 
                                         return (
-                                            <div key={day} onClick={() => isMissed && navigate(`/pwmu/daily-log?date=${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`)}
-                                                className={`relative aspect-square rounded-xl p-1.5 flex flex-col items-center justify-center transition-all ${bgClass} ${isMissed ? 'cursor-pointer hover:shadow-md' : 'cursor-default'} ${isToday ? 'ring-2 ring-[#005DAA] ring-offset-2' : ''}`}>
+                                            <div key={day} onClick={() => (isMissed || isSubmitted) && navigate(`/pwmu/daily-log?date=${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`)}
+                                                className={`relative group aspect-square rounded-xl p-1.5 flex flex-col items-center justify-center transition-all ${bgClass} ${(isMissed || isSubmitted) ? 'cursor-pointer hover:shadow-md' : 'cursor-default'} ${isToday ? 'ring-2 ring-[#005DAA] ring-offset-2' : ''}`}>
                                                 <span className={`text-[13px] ${textClass}`}>{day}</span>
                                                 {!isFuture && (
                                                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max bg-gray-900 text-white text-xs rounded-lg py-1.5 px-3 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 shadow-xl">
-                                                        {isSubmitted ? t('linkedBodies', hubTranslations) : t('missedBodies', hubTranslations)}
+                                                        {isSubmitted
+                                                            ? `${t('totalIntake', hubTranslations).split(' (')[0]}: ${logDetails[day]?.total_intake_kg || 0} ${t('kg', hubTranslations)}`
+                                                            : t('dataMissing', hubTranslations)}
                                                     </div>
                                                 )}
                                             </div>
@@ -247,10 +370,10 @@ const PWMUHub = () => {
                         </div>
                         <div className="space-y-4">
                             {[
-                                { label: t('totalIntake', hubTranslations), value: '1,240', unit: t('kg', hubTranslations), icon: Activity, color: 'blue' },
-                                { label: t('reportingRate', hubTranslations), value: '92%', unit: '↑ 4%', icon: Users, color: 'green' },
-                                { label: t('secondaryTransport', hubTranslations), value: '450', unit: t('kg', hubTranslations), icon: Truck, color: 'orange' },
-                                { label: t('recoveryRate', hubTranslations), value: '76%', unit: '↑ 2%', icon: Factory, color: 'purple' }
+                                { label: t('totalIntake', hubTranslations), value: weeklyKpis.totalIntake.toLocaleString(), unit: t('kg', hubTranslations), icon: Activity, color: 'blue' },
+                                { label: t('reportingRate', hubTranslations), value: `${weeklyKpis.reportingRate}%`, unit: '', icon: Users, color: 'green' },
+                                { label: t('secondaryTransport', hubTranslations), value: weeklyKpis.transport.toLocaleString(), unit: t('kg', hubTranslations), icon: Truck, color: 'orange' },
+                                { label: t('recoveryRate', hubTranslations), value: `${weeklyKpis.recovery}%`, unit: '', icon: Factory, color: 'purple' }
                             ].map((kpi, idx) => (
                                 <div key={idx} className={`bg-${kpi.color}-50/50 rounded-xl p-4 border border-${kpi.color}-100 flex items-center justify-between`}>
                                     <div>

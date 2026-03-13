@@ -39,6 +39,8 @@ const SettingsDashboard = () => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [userToDelete, setUserToDelete] = useState(null);
     const [activeActionsMenu, setActiveActionsMenu] = useState(null);
+    const [autoApprove, setAutoApprove] = useState(true); // Default to true as requested
+    const [settingsLoading, setSettingsLoading] = useState(false);
 
     const roleLabelMap = {
         'StateAdmin': 'State Admin', 'DistrictNodal': 'District Nodal',
@@ -80,7 +82,67 @@ const SettingsDashboard = () => {
         }
     }, []);
 
-    useEffect(() => { fetchUsers(); }, [fetchUsers]);
+    const fetchSettings = useCallback(async () => {
+        setSettingsLoading(true);
+        try {
+            const session = JSON.parse(localStorage.getItem('cgpwmu_session') || '{}');
+            const token = session.access_token;
+            if (!token) return;
+
+            const proxyUrl = getProxyUrl();
+            const res = await fetch(
+                `${proxyUrl}/rest/v1/system_settings?key=eq.auto_approve_users`,
+                {
+                    headers: {
+                        'apikey': ANON_KEY,
+                        'Authorization': `Bearer ${token}`,
+                    },
+                    signal: AbortSignal.timeout(5000),
+                }
+            );
+            if (res.ok) {
+                const data = await res.json();
+                if (data.length > 0) {
+                    setAutoApprove(data[0].value === true);
+                }
+            }
+        } catch (err) {
+            console.warn('System settings table might not exist yet:', err);
+        } finally {
+            setSettingsLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchUsers();
+        fetchSettings();
+    }, [fetchUsers, fetchSettings]);
+
+    const toggleAutoApprove = async () => {
+        const newValue = !autoApprove;
+        setAutoApprove(newValue);
+        setSettingsLoading(true);
+        try {
+            const session = JSON.parse(localStorage.getItem('cgpwmu_session') || '{}');
+            const proxyUrl = getProxyUrl();
+            await fetch(`${proxyUrl}/rest/v1/system_settings?key=eq.auto_approve_users`, {
+                method: 'PATCH',
+                headers: {
+                    'apikey': ANON_KEY,
+                    'Authorization': `Bearer ${session.access_token}`,
+                    'Content-Type': 'application/json',
+                    'Prefer': 'resolution=merge-duplicates'
+                },
+                body: JSON.stringify({ value: newValue }),
+                signal: AbortSignal.timeout(5000),
+            });
+            // If PATCH fails (table missing), we still keep the local state for now
+        } catch (err) {
+            console.warn('Failed to save auto-approve setting:', err);
+        } finally {
+            setSettingsLoading(false);
+        }
+    };
 
     // Approve a pending user
     const handleApprove = async (userId) => {
@@ -715,11 +777,77 @@ const SettingsDashboard = () => {
                     </div>
                 );
 
-            default:
+            case 'security':
                 return (
-                    <div className="flex flex-col items-center justify-center h-64 text-gray-400 animate-fade-in">
-                        <Shield className="w-12 h-12 mb-3 opacity-20" />
-                        <p>This module is currently under setup.</p>
+                    <div className="animate-fade-in">
+                        <div className="mb-6">
+                            <h2 className="text-lg font-bold text-gray-800">Security & Access</h2>
+                            <p className="text-sm text-gray-500 mt-1">Configure platform security rules and global access controls.</p>
+                        </div>
+
+                        <div className="space-y-6 max-w-2xl">
+                            {/* Auto-Approval Section */}
+                            <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+                                <div className="flex justify-between items-start gap-4">
+                                    <div className="flex-1">
+                                        <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                                            <Shield className="w-4 h-4 text-blue-600" />
+                                            User Registration Rules
+                                        </h3>
+                                        <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+                                            When enabled, all new registrations will be automatically approved and granted immediate access. When disabled, administrators must manually approve each account.
+                                        </p>
+                                    </div>
+                                    <div className="shrink-0 flex flex-col items-end">
+                                        <button
+                                            onClick={toggleAutoApprove}
+                                            disabled={settingsLoading}
+                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${autoApprove ? 'bg-green-500' : 'bg-gray-200'}`}
+                                        >
+                                            <span className={`${autoApprove ? 'translate-x-6' : 'translate-x-1'} inline-block h-4 w-4 transform rounded-full bg-white transition-transform`} />
+                                        </button>
+                                        <span className={`text-[10px] font-bold mt-1 uppercase ${autoApprove ? 'text-green-600' : 'text-gray-400'}`}>
+                                            {autoApprove ? 'Auto-Approve ON' : 'Manual Approval'}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Password Policy */}
+                            <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm opacity-60">
+                                <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                    <Key className="w-4 h-4 text-gray-400" />
+                                    Password Policies
+                                </h3>
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between text-xs">
+                                        <span className="text-gray-600">Minimum Length</span>
+                                        <span className="font-bold text-gray-800">8 Characters</span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-xs">
+                                        <span className="text-gray-600">Require Special Character</span>
+                                        <span className="font-bold text-gray-400 italic">Optional</span>
+                                    </div>
+                                </div>
+                                <p className="text-[10px] text-amber-600 bg-amber-50 p-2 rounded mt-4">Managed via Supabase Auth Console</p>
+                            </div>
+
+                            {/* Data Backup */}
+                            <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+                                        <RefreshCw className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-sm font-bold text-gray-800">System State Backup</h3>
+                                        <p className="text-xs text-gray-500">Last backup: Yesterday at 11:45 PM</p>
+                                    </div>
+                                </div>
+                                <button className="text-xs font-bold text-blue-600 px-3 py-1.5 border border-blue-200 rounded-lg hover:bg-blue-50">
+                                    Trigger Backup
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 );
         }

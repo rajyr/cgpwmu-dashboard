@@ -42,6 +42,15 @@ export const AuthProvider = ({ children }) => {
                 if (savedSession) {
                     const session = JSON.parse(savedSession);
                     if (session.access_token && session.user) {
+                        // Check if token has expired
+                        const expiresAt = session.expires_at ? session.expires_at * 1000 : null;
+                        if (expiresAt && Date.now() > expiresAt) {
+                            console.warn('[AUTH] Session token expired. Logging out.');
+                            localStorage.removeItem('cgpwmu_session');
+                            if (isMounted) setLoading(false);
+                            return;
+                        }
+
                         if (isMounted) {
                             setUser(session.user);
                             await fetchUserProfile(session.user.id, session.access_token, session.user.email);
@@ -71,7 +80,7 @@ export const AuthProvider = ({ children }) => {
         try {
             const proxyUrl = getProxyUrl();
             const response = await fetch(
-                `${proxyUrl}/rest/v1/users?id=eq.${userId}&select=role,full_name,status`,
+                `${proxyUrl}/rest/v1/users?id=eq.${userId}&select=id,role,full_name,status,registration_data`,
                 {
                     headers: {
                         'apikey': ANON_KEY,
@@ -90,28 +99,53 @@ export const AuthProvider = ({ children }) => {
 
                 if (data && data.length > 0) {
                     const profile = data[0];
-                    console.log('[AUTH] ✅ User found — role:', profile.role, 'status:', profile.status);
-                    if (profile.role) setUserRole(profile.role);
-                    if (profile.full_name) setUserName(profile.full_name);
-                    return profile;
+                    console.log('[AUTH] ✅ Profile found in DB. Merging...');
+
+                    // 1. Compute the merged object immediately (avoiding race condition)
+                    const mergedUser = {
+                        id: userId,
+                        email: email,
+                        registration_data: profile.registration_data || {},
+                        full_name: profile.full_name,
+                        role: profile.role,
+                        profile_id: profile.id,
+                        status: profile.status
+                    };
+
+                    // 2. Update React state
+                    setUser(mergedUser);
+                    setUserRole(profile.role);
+
+                    console.log('[AUTH] 🔄 Merged User Success. ID:', mergedUser.profile_id);
+                    return { ...profile, mergedUser };
                 }
 
                 // Query OK but empty — no row in DB for this user
-                console.warn('[AUTH] ⚠️ No row found in users table. Blocking as pending.');
+                console.warn('[AUTH] ⚠️ No row found in users table for ID:', userId);
                 setUserRole(roleFromEmail);
-                return { role: roleFromEmail, status: 'pending' };
+
+                // Fallback: merge user_metadata into the auth user object anyway
+                setUser(prev => {
+                    if (!prev) return prev;
+                    return {
+                        ...prev,
+                        registration_data: prev?.user_metadata?.registration_data,
+                        full_name: prev?.user_metadata?.full_name,
+                        role: roleFromEmail
+                    };
+                });
+
+                return { role: roleFromEmail, status: 'not_found' }; // Change to not_found
             } else {
                 // Non-OK response (RLS 403, auth 401, etc.)
                 const errBody = await response.text().catch(() => '');
-                console.warn('[AUTH] ❌ Server error:', response.status, errBody);
-                setUserRole(roleFromEmail);
-                return { role: roleFromEmail, status: 'pending' };
+                console.warn('[AUTH] ❌ Server error during profile fetch:', response.status, errBody);
+                return { role: roleFromEmail, status: 'error', error: `Server error ${response.status}` };
             }
         } catch (error) {
             // True network failure / timeout
-            console.warn('[AUTH] 🌐 Network error:', error.message);
-            setUserRole(roleFromEmail);
-            return { role: roleFromEmail, status: 'approved' };
+            console.warn('[AUTH] 🌐 Network error during profile fetch:', error.message);
+            return { role: roleFromEmail, status: 'error', error: error.message };
         }
     };
 
@@ -154,6 +188,12 @@ export const AuthProvider = ({ children }) => {
         // Fetch profile to check approval status BEFORE allowing login
         const profile = await fetchUserProfile(data.user.id, data.access_token, data.user.email);
 
+        if (profile.status === 'not_found') {
+            throw new Error(`Profile not found in database for ID: ${data.user.id}. Please contact the administrator to sync your account.`);
+        }
+        if (profile.status === 'error') {
+            throw new Error(`Unable to fetch your profile: ${profile.error || 'Unknown error'}. Please try again later.`);
+        }
         if (profile.status === 'pending') {
             throw new Error('Your account is pending admin approval. Please wait for the administrator to approve your registration.');
         }
@@ -163,7 +203,13 @@ export const AuthProvider = ({ children }) => {
 
         // Save session to localStorage for persistence
         localStorage.setItem('cgpwmu_session', JSON.stringify(data));
-        setUser(data.user);
+
+        // Use the merged user if profile fetch succeeded
+        if (profile.mergedUser) {
+            setUser(profile.mergedUser);
+        } else {
+            setUser(data.user);
+        }
 
         return { ...data, resolvedRole: profile.role };
     };
@@ -180,8 +226,19 @@ export const AuthProvider = ({ children }) => {
                 headers: {
                     'apikey': ANON_KEY,
                     'Content-Type': 'application/json',
+                    'Prefer': 'return=minimal',
                 },
-                body: JSON.stringify({ email, password }),
+                body: JSON.stringify({
+                    email,
+                    password,
+                    options: {
+                        data: {
+                            full_name,
+                            role,
+                            registration_data
+                        }
+                    }
+                }),
                 signal: AbortSignal.timeout(12000),
             }
         );
@@ -190,7 +247,27 @@ export const AuthProvider = ({ children }) => {
             throw new Error(authData.msg || authData.error_description || 'Registration failed');
         }
 
-        // 2. Insert into public.users table with pending status
+        // 2. Determine initial status based on global "Auto-Approve" setting
+        let initialStatus = 'approved'; // Default to auto-approve as requested
+        try {
+            const settingsRes = await fetch(
+                `${proxyUrl}/rest/v1/system_settings?key=eq.auto_approve_users&select=value`,
+                {
+                    headers: { 'apikey': ANON_KEY },
+                    signal: AbortSignal.timeout(4000),
+                }
+            );
+            if (settingsRes.ok) {
+                const settingsData = await settingsRes.json();
+                if (settingsData && settingsData.length > 0) {
+                    initialStatus = settingsData[0].value === true ? 'approved' : 'pending';
+                }
+            }
+        } catch (err) {
+            console.warn('[AUTH] Could not fetch auto-approval setting, defaulting to approved:', err.message);
+        }
+
+        // 3. Insert into public.users table
         const token = authData.access_token || ANON_KEY;
         const userId = authData.user?.id;
         if (userId) {
@@ -208,7 +285,7 @@ export const AuthProvider = ({ children }) => {
                         id: userId,
                         full_name: full_name || '',
                         role: role || 'DistrictNodal',
-                        status: 'pending',
+                        status: initialStatus,
                         district: district || null,
                         phone_number: phone_number || null,
                         registration_data: registration_data || null,
@@ -255,13 +332,25 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    // Force refresh profile from database
+    const refreshProfile = async () => {
+        if (!user?.id) return;
+        const session = JSON.parse(localStorage.getItem('cgpwmu_session') || '{}');
+        if (!session.access_token) return;
+        console.log('[AUTH] 🔄 Manual Profile Refresh Triggered...');
+        return await fetchUserProfile(user.id, session.access_token, user.email);
+    };
+
     const value = {
         user,
         userRole,
         userName,
+        loading,
         signIn,
         signUp,
         signOut,
+        refreshProfile, // Exported for manual sync
+        fetchUserProfile
     };
 
     return (

@@ -64,7 +64,13 @@ const PWMUReg = () => {
             back: "Back",
             continue: "Continue",
             submitting: "Submitting...",
-            submitRegistration: "Submit Registration"
+            submitRegistration: "Submit Registration",
+            serviceArea: "Service Area (Linked Villages)",
+            addVillage: "Add Village/GP",
+            selectedVillages: "Selected Villages:",
+            noVillages: "No villages selected yet.",
+            selectAllGP: "Select All in GP",
+            villageReview: "Service Villages:"
         },
         hi: {
             title: "PWMU केंद्र पंजीकरण",
@@ -116,7 +122,13 @@ const PWMUReg = () => {
             back: "पीछे",
             continue: "जारी रखें",
             submitting: "सबमिट हो रहा है...",
-            submitRegistration: "पंजीकरण सबमिट करें"
+            submitRegistration: "पंजीकरण सबमिट करें",
+            serviceArea: "सेवा क्षेत्र (लिंक किए गए गांव)",
+            addVillage: "गांव/जीपी जोड़ें",
+            selectedVillages: "चयनित गांव:",
+            noVillages: "अभी तक कोई गांव नहीं चुना गया है।",
+            selectAllGP: "जीपी में सभी चुनें",
+            villageReview: "सेवा गांव:"
         }
     };
 
@@ -143,8 +155,18 @@ const PWMUReg = () => {
         phone: '',
         email: '',
         password: '',
+        serviceVillages: [], // Array of strings or objects
     });
 
+    const [serviceDistrict, setServiceDistrict] = useState('');
+    const [serviceBlock, setServiceBlock] = useState('');
+    const [showOtherFilters, setShowOtherFilters] = useState(false);
+
+    // Sync service filters with main location initially and whenever main location changes
+    React.useEffect(() => {
+        if (formData.district) setServiceDistrict(formData.district);
+        if (formData.block) setServiceBlock(formData.block);
+    }, [formData.district, formData.block]);
     const handleInputChange = (e) => {
         const { name, value, type, checked } = e.target;
         setFormData(prev => {
@@ -155,14 +177,37 @@ const PWMUReg = () => {
             if (name === 'district') {
                 newData.block = '';
                 newData.gramPanchayat = '';
-                newData.village = '';
             } else if (name === 'block') {
                 newData.gramPanchayat = '';
-                newData.village = '';
-            } else if (name === 'gramPanchayat') {
-                newData.village = '';
             }
             return newData;
+        });
+    };
+
+    const toggleVillage = (vName) => {
+        setFormData(prev => {
+            const current = prev.serviceVillages;
+            if (current.includes(vName)) {
+                return { ...prev, serviceVillages: current.filter(v => v !== vName) };
+            } else {
+                return { ...prev, serviceVillages: [...current, vName] };
+            }
+        });
+    };
+
+    const toggleGP = (gpName) => {
+        const gpVillages = locationData[serviceDistrict || formData.district][serviceBlock || formData.block][gpName] || [];
+        setFormData(prev => {
+            const current = prev.serviceVillages;
+            const allInGP = gpVillages.every(v => current.includes(v));
+            if (allInGP) {
+                // Remove all
+                return { ...prev, serviceVillages: current.filter(v => !gpVillages.includes(v)) };
+            } else {
+                // Add missing
+                const uniqueNew = [...new Set([...current, ...gpVillages])];
+                return { ...prev, serviceVillages: uniqueNew };
+            }
         });
     };
 
@@ -199,10 +244,10 @@ const PWMUReg = () => {
                     capacity: formData.capacity,
                     hasBaler: formData.hasBaler,
                     hasShredder: formData.hasShredder,
-                    village: formData.village,
                     block: formData.block,
                     gramPanchayat: formData.gramPanchayat,
                     district: formData.district,
+                    serviceVillages: formData.serviceVillages,
                 },
             });
 
@@ -327,6 +372,105 @@ const PWMUReg = () => {
                                         type="date" name="setupDate" value={formData.setupDate} onChange={handleInputChange}
                                         className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#005DAA]/20 focus:border-[#005DAA]"
                                     />
+                                </div>
+                            </div>
+
+                            {/* Service Area Selection */}
+                            <div className="mt-8 pt-6 border-t border-gray-100">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-lg font-bold text-gray-800">{t('serviceArea', pwmuTranslations)}</h3>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowOtherFilters(!showOtherFilters)}
+                                        className="text-[11px] font-bold text-[#FF9933] bg-[#FF9933]/10 px-3 py-1.5 rounded-lg border border-[#FF9933]/20 hover:bg-[#FF9933]/20 transition-all flex items-center gap-2"
+                                    >
+                                        <MapPin className="w-3.5 h-3.5" />
+                                        {showOtherFilters ? "Hide Other Filters" : "Add from Other Region"}
+                                    </button>
+                                </div>
+
+                                {showOtherFilters && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 p-4 bg-gray-50 rounded-xl border border-dashed border-gray-200 animate-fade-in">
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Browse District</label>
+                                            <select
+                                                value={serviceDistrict}
+                                                onChange={(e) => { setServiceDistrict(e.target.value); setServiceBlock(''); }}
+                                                className="w-full p-2 bg-white border border-gray-200 rounded-lg text-xs"
+                                            >
+                                                <option value="">Select District</option>
+                                                {districts.map(d => <option key={d} value={d}>{d}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Browse Block</label>
+                                            <select
+                                                value={serviceBlock}
+                                                onChange={(e) => setServiceBlock(e.target.value)}
+                                                className="w-full p-2 bg-white border border-gray-200 rounded-lg text-xs"
+                                                disabled={!serviceDistrict}
+                                            >
+                                                <option value="">Select Block</option>
+                                                {serviceDistrict && Object.keys(locationData[serviceDistrict] || {}).map(b => <option key={b} value={b}>{b}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-4">
+                                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                                                Available in {serviceBlock || formData.block || 'Selected Region'}
+                                            </p>
+                                            <div className="max-h-60 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                                                {serviceDistrict && serviceBlock && Object.keys(locationData[serviceDistrict][serviceBlock] || {}).map(gp => (
+                                                    <div key={gp} className="space-y-1">
+                                                        <div className="flex items-center justify-between bg-white p-2 rounded-lg border border-gray-200">
+                                                            <span className="text-sm font-bold text-gray-700">{gp}</span>
+                                                            <button
+                                                                type="button" onClick={() => toggleGP(gp)}
+                                                                className="text-xs font-bold text-[#005DAA] hover:underline"
+                                                            >
+                                                                {t('selectAllGP', pwmuTranslations)}
+                                                            </button>
+                                                        </div>
+                                                        <div className="grid grid-cols-1 gap-1 pl-4">
+                                                            {(locationData[serviceDistrict][serviceBlock][gp] || []).map(v => (
+                                                                <label key={v} className="flex items-center gap-2 cursor-pointer py-1 px-2 hover:bg-gray-100 rounded transition-colors group">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={formData.serviceVillages.includes(v)}
+                                                                        onChange={() => toggleVillage(v)}
+                                                                        className="w-4 h-4 text-[#005DAA] border-gray-300 rounded focus:ring-[#005DAA]/20"
+                                                                    />
+                                                                    <span className="text-xs text-gray-600 group-hover:text-gray-900">{v}</span>
+                                                                </label>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                {(!serviceDistrict || !serviceBlock) && (
+                                                    <div className="text-center py-8">
+                                                        <MapPin className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+                                                        <p className="text-xs text-gray-400 font-medium">Please select your primary location <br />or use "Add from Other Region"</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="space-y-4 border-l md:pl-6 border-gray-200">
+                                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">{t('selectedVillages', pwmuTranslations)} ({formData.serviceVillages.length})</p>
+                                            <div className="flex flex-wrap gap-2 max-h-60 overflow-y-auto">
+                                                {formData.serviceVillages.map(v => (
+                                                    <div key={v} className="flex items-center gap-1.5 bg-[#005DAA]/10 text-[#005DAA] px-2.5 py-1 rounded-full text-[11px] font-bold border border-[#005DAA]/20 animate-fade-in">
+                                                        {v}
+                                                        <button type="button" onClick={() => toggleVillage(v)} className="hover:text-red-600">×</button>
+                                                    </div>
+                                                ))}
+                                                {formData.serviceVillages.length === 0 && <p className="text-xs text-gray-400 italic pt-2">{t('noVillages', pwmuTranslations)}</p>}
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -464,6 +608,11 @@ const PWMUReg = () => {
 
                                     <div className="text-gray-500">{t('officerReview', pwmuTranslations)}</div>
                                     <div className="font-semibold text-gray-800 text-right">{formData.nodalName || 'N/A'} ({formData.phone})</div>
+
+                                    <div className="text-gray-500 col-span-2 pt-2 border-t border-gray-100">{t('villageReview', pwmuTranslations)}</div>
+                                    <div className="col-span-2 text-xs text-gray-600 bg-white p-2 rounded-lg border border-gray-100 max-h-24 overflow-y-auto shadow-inner">
+                                        {formData.serviceVillages.join(', ') || 'N/A'}
+                                    </div>
                                 </div>
                             </div>
                             <div className="bg-blue-50 text-blue-800 p-4 rounded-lg flex items-start gap-3 text-sm mt-4 border border-blue-100">

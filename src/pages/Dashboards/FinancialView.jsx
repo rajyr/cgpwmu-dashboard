@@ -72,7 +72,7 @@ const FinancialView = () => {
             name: p.name,
             userCharge: Math.round((pUserCharge / total) * 100),
             sale: Math.round((p.revenue / total) * 100),
-            grants: 0 // Mocked for now
+            grants: 0
         };
     });
 

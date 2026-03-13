@@ -49,22 +49,18 @@ function PolicyPlanDashboard() {
 
                 // Group by district for allocation chart
                 const districts = [...new Set(centers.map(c => c.district))];
-                const allocation = districts.map(d => ({
+                const colorScale = ['#005DAA', '#28A745', '#FFC107', '#E83E8C', '#6C757D', '#17A2B8', '#FD7E14', '#20C997'];
+                const allocation = districts.map((d, i) => ({
                     name: d,
                     value: centers.filter(c => c.district === d).length,
-                    color: `#${Math.floor(Math.random() * 16777215).toString(16)}`
+                    color: colorScale[i % colorScale.length]
                 })).slice(0, 4);
 
                 setStats({
                     totalRevenue: totalRev,
                     totalExpense: totalExp,
                     centerCount: centers.length,
-                    allocation: allocation.length > 0 ? allocation : [
-                        { name: 'Raipur', value: 45, color: '#005DAA' },
-                        { name: 'Durg', value: 30, color: '#28A745' },
-                        { name: 'Bilaspur', value: 15, color: '#FFC107' },
-                        { name: 'Others', value: 10, color: '#6C757D' }
-                    ]
+                    allocation: allocation.length > 0 ? allocation : []
                 });
             } catch (err) {
                 console.error('Policy Data Error:', err);
@@ -119,7 +115,7 @@ function PolicyPlanDashboard() {
                         <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
                             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Expansion Score</h3>
                             <div className="flex items-baseline gap-2">
-                                <span className="text-3xl font-bold text-orange-600">8.2</span>
+                                <span className="text-3xl font-bold text-orange-600">{stats.allocation.length > 0 ? (stats.allocation.length * 1.5).toFixed(1) : "0.0"}</span>
                                 <span className="text-xs font-medium text-gray-500">/ 10</span>
                             </div>
                         </div>
@@ -133,11 +129,8 @@ function PolicyPlanDashboard() {
                             </h2>
                         </div>
                         <div className="space-y-6">
-                            {[
-                                { name: 'Durg Phase II Expansion', status: 'In Progress', progress: 65, date: 'Mar 2024' },
-                                { name: 'Raipur Digital Integration', status: 'Planning', progress: 15, date: 'May 2024' },
-                                { name: 'Bemetara Operations Hub', status: 'Review', progress: 90, date: 'Apr 2024' }
-                            ].map((project, i) => (
+                            {/* Roadmap will be dynamically loaded from a projects table in the future */}
+                            {false && [].map((project, i) => (
                                 <div key={i} className="relative pl-6 border-l-2 border-gray-100 pb-2">
                                     <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-white border-2 border-blue-500"></div>
                                     <div className="flex justify-between items-start mb-2">
@@ -146,7 +139,7 @@ function PolicyPlanDashboard() {
                                             <p className="text-xs text-gray-500">Scheduled Completion: {project.date}</p>
                                         </div>
                                         <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${project.status === 'In Progress' ? 'bg-blue-50 text-blue-600' :
-                                                project.status === 'Planning' ? 'bg-gray-50 text-gray-600' : 'bg-green-50 text-green-600'
+                                            project.status === 'Planning' ? 'bg-gray-50 text-gray-600' : 'bg-green-50 text-green-600'
                                             }`}>
                                             {project.status}
                                         </span>
@@ -156,6 +149,7 @@ function PolicyPlanDashboard() {
                                     </div>
                                 </div>
                             ))}
+                            <p className="text-sm text-gray-500 italic">No strategic updates available for this cycle.</p>
                         </div>
                     </div>
                 </div>
@@ -192,16 +186,7 @@ function PolicyPlanDashboard() {
                         <h2 className="text-lg font-bold mb-2">Policy Documents</h2>
                         <p className="text-sm text-blue-100 mb-6 italic">Access state-wide regulatory frameworks and guidelines.</p>
                         <div className="space-y-3">
-                            {[
-                                { name: 'State PWM Policy 2024', icon: FileText },
-                                { name: 'Vendor Compliance Code', icon: Gavel },
-                                { name: 'Village Incentives Memo', icon: Target }
-                            ].map((doc, i) => (
-                                <button key={i} className="w-full flex items-center gap-3 p-3 bg-white/10 hover:bg-white/20 rounded-xl transition-all text-left">
-                                    <doc.icon className="w-4 h-4" />
-                                    <span className="text-sm font-semibold">{doc.name}</span>
-                                </button>
-                            ))}
+                            <p className="text-sm text-blue-100 italic">Policy repository is being synced...</p>
                         </div>
                     </div>
                 </div>

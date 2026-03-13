@@ -5,7 +5,7 @@ import { useLanguage } from '../context/LanguageContext';
 import {
     LayoutDashboard, Map, DollarSign, Activity,
     ShieldAlert, ScrollText, LineChart, PieChart, Settings, LogOut,
-    ChevronLeft, ChevronRight, Menu, X, Home, Store
+    ChevronLeft, ChevronRight, Menu, X, Home, Store, Factory
 } from 'lucide-react';
 
 const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
@@ -44,9 +44,12 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
             compliance: "Compliance & Logs",
             monitoring: "Monitoring Hub",
             policy: "Policy & Plan",
+            pwmuHub: "PWMU Hub",
             villageHub: "Village Hub",
             vendorHub: "Vendor Hub",
-            settings: "Settings"
+            settings: "Settings",
+            dailyLog: "Daily Log",
+            monthlyReport: "Monthly Report"
         },
         hi: {
             overview: "राज्य अवलोकन",
@@ -56,9 +59,12 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
             compliance: "अनुपालन और लॉग",
             monitoring: "निगरानी हब",
             policy: "नीति और योजना",
+            pwmuHub: "PWMU हब",
             villageHub: "गांव हब",
             vendorHub: "विक्रेता हब",
-            settings: "सेटिंग्स"
+            settings: "सेटिंग्स",
+            dailyLog: "दैनिक लॉग",
+            monthlyReport: "मासिक रिपोर्ट"
         }
     };
 
@@ -67,6 +73,7 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
     const allNavItems = [
         // Main
         { name: t('overview', sidebarTranslations), icon: LayoutDashboard, path: '/dashboard', roles: ['Admin', 'Nodal', 'PWMU', 'Village'] },
+        { name: t('pwmuHub', sidebarTranslations), icon: Factory, path: '/dashboard/pwmu', roles: ['Admin', 'Nodal', 'PWMU'] },
 
         // Advanced Analytics
         { name: t('directory', sidebarTranslations), icon: Map, path: '/dashboard/district', roles: ['Admin', 'Nodal', 'PWMU'] },
@@ -78,6 +85,8 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
 
         // Stakeholders
         { name: t('villageHub', sidebarTranslations), icon: Home, path: '/dashboard/village-hub', roles: ['Admin', 'Nodal', 'PWMU', 'Village'] },
+        { name: t('dailyLog', sidebarTranslations), icon: ScrollText, path: '/dashboard/village/daily-log', roles: ['Village'] },
+        { name: t('monthlyReport', sidebarTranslations), icon: PieChart, path: '/dashboard/village/monthly-report', roles: ['Village'] },
         { name: t('vendorHub', sidebarTranslations), icon: Store, path: '/dashboard/vendor-hub', roles: ['Admin', 'Nodal', 'PWMU', 'Vendor'] },
 
         // System

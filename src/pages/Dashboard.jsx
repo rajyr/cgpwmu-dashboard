@@ -5,7 +5,7 @@ import {
     Calendar as CalendarIcon, Clock, AlertTriangle, Truck, Factory, Info, Globe
 } from 'lucide-react';
 import ChhattisgarhMap from '../components/ChhattisgarhMap';
-import { dashboardData } from '../data/mockDashboardData';
+
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend,
     PieChart as RechartsPieChart, Pie, Cell
@@ -19,11 +19,14 @@ const API_URL = import.meta.env.VITE_SUPABASE_URL;
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 const getProxyUrl = () => {
-    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    return isLocal ? '' : '/api/supabase';
+    if (import.meta.env.DEV) {
+        return '/supabase';
+    }
+    return API_URL;
 };
 
 const Dashboard = () => {
+    console.log('[DASH] Component mounting - Version 3.0 (Interactive Filters)');
     const { userRole, userName } = useAuth();
     const { language, t, toggleLanguage } = useLanguage();
 
@@ -99,7 +102,7 @@ const Dashboard = () => {
             recovered: "Recovered",
             recyclers: "Recyclers",
             cementKiln: "Cement Kiln",
-            roadConst: "Road Construction",
+            roadConst: "Road Const.",
             organicWaste: "Organic Waste",
             plastic: "Plastic",
             paper: "Paper",
@@ -192,9 +195,9 @@ const Dashboard = () => {
         }
     };
 
-    const { overview, valueChain } = dashboardData;
-    const [date, setDate] = useState(new Date());
+    // State for live dashboard data
     const [loading, setLoading] = useState(true);
+    const [date, setDate] = useState(new Date());
     const [stats, setStats] = useState({
         activePwmus: 0,
         reportsSubmitted: 0,
@@ -206,14 +209,37 @@ const Dashboard = () => {
         totalExpense: 0,
         activities: [],
         financialChart: [],
-        wasteComposition: [
-            { name: 'Organic Waste', value: 45, color: '#22c55e' },
-            { name: 'Plastic', value: 25, color: '#3b82f6' },
-            { name: 'Paper', value: 15, color: '#eab308' },
-            { name: 'Metal', value: 10, color: '#a855f7' },
-            { name: 'Other', value: 5, color: '#64748b' },
-        ]
+        wasteComposition: [],
+        valueChain: {
+            villages: { volume: '0 MT', financial: '₹0', hoverText: 'Village collection centers', details: [] },
+            pwmuCenter: { volume: '0 MT', financial: '₹0', hoverText: 'PWMU Processing Center', details: [] },
+            sinks: [
+                { id: 'recyclers', name: 'Recyclers', volume: '0 MT', financial: '₹0', color: 'green', hoverText: 'Plastic recycling units' },
+                { id: 'cementKiln', name: 'Cement Kiln', volume: '0 MT', financial: '₹0', color: 'red', hoverText: 'Co-processing in cement factories' },
+                { id: 'roadConst', name: 'Road Const.', volume: '0 MT', financial: '₹0', color: 'yellow', hoverText: 'Waste-to-Road initiatives' }
+            ]
+        }
     });
+
+    // Filter persistence
+    const [locationData, setLocationData] = useState({});
+    const [rawData, setRawData] = useState({
+        pwmu: [],
+        collections: [],
+        pickups: [],
+        pwmuLogs: [],
+        users: []
+    });
+
+    // Filter selections
+    const [filters, setFilters] = useState({
+        district: '',
+        block: '',
+        gp: '',
+        village: '',
+        pwmu: ''
+    });
+
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -227,92 +253,52 @@ const Dashboard = () => {
                     'Authorization': `Bearer ${session.access_token}`,
                 };
 
+                // Helper to safe-fetch JSON
+                const safeJson = async (res, label) => {
+                    if (!res.ok) {
+                        const text = await res.text();
+                        console.warn(`[DASH] ${label} fetch failed (${res.status}):`, text.slice(0, 100));
+                        return [];
+                    }
+                    try {
+                        return await res.json();
+                    } catch (e) {
+                        const text = await res.text();
+                        console.error(`[DASH] ${label} JSON parse error:`, e.message, "Body:", text.slice(0, 100));
+                        return [];
+                    }
+                };
+
                 // 1. Fetch PWMU Centers for KPIs and Financials
-                const pwmuRes = await fetch(`${proxyUrl}/rest/v1/pwmu_centers?select=*`, { headers });
-                const pwmuData = await pwmuRes.json();
-
-                // 2. Fetch Waste Collections for Report count and Organic volume
-                const today = new Date().toISOString().split('T')[0];
-                const [collectionRes, pickupRes] = await Promise.all([
+                console.log('[DASH] Fetching raw data for filters...');
+                const [pwmuRes, collectionRes, pickupRes, pwmuLogsRes, usersRes] = await Promise.all([
+                    fetch(`${proxyUrl}/rest/v1/pwmu_centers?select=*`, { headers }),
                     fetch(`${proxyUrl}/rest/v1/waste_collections?select=*`, { headers }),
-                    fetch(`${proxyUrl}/rest/v1/vendor_pickups?select=*`, { headers })
+                    fetch(`${proxyUrl}/rest/v1/vendor_pickups?select=*`, { headers }),
+                    fetch(`${proxyUrl}/rest/v1/pwmu_daily_logs?select=*`, { headers }),
+                    fetch(`${proxyUrl}/rest/v1/users?select=id,role,status,created_at,full_name,registration_data,district,block,gram_panchayat,village_name`, { headers })
                 ]);
-                const collectionData = await collectionRes.json();
-                const pickupData = await pickupRes.json();
 
-                // 3. Fetch User counts
-                const usersRes = await fetch(`${proxyUrl}/rest/v1/users?select=id,role,status,created_at,full_name`, { headers });
-                const usersData = await usersRes.json();
+                const pwmuData = await safeJson(pwmuRes, 'pwmu_centers');
+                const collectionData = await safeJson(collectionRes, 'collections');
+                const pickupData = await safeJson(pickupRes, 'pickups');
+                const pwmuLogsData = await safeJson(pwmuLogsRes, 'pwmu_logs');
+                const usersData = await safeJson(usersRes, 'users');
 
-                // Calculations
-                const activePwmus = pwmuData.filter(p => p.status === 'Operational' || p.status === 'operational').length;
-                const reportsToday = collectionData.filter(c => c.collection_date === today).length;
-                const wasteProcessed = pwmuData.reduce((acc, curr) => acc + (parseFloat(curr.waste_processed_mt) || 0), 0);
-                const totalRevenue = pwmuData.reduce((acc, curr) => acc + (parseFloat(curr.revenue) || 0), 0);
-                const totalExpense = pwmuData.reduce((acc, curr) => acc + (parseFloat(curr.expenditure) || 0), 0);
-                const villagesLinked = usersData.filter(u => u.role === 'Sarpanch').length;
-                const swachhagrahis = usersData.filter(u => u.role === 'Sarpanch' || u.role === 'PWMUManager').length * 4;
-
-                // Waste Composition Aggregation
-                const totalWet = collectionData.reduce((acc, curr) => acc + (parseFloat(curr.wet_waste_kg) || 0), 0);
-
-                const getMaterialTotal = (type) => pickupData
-                    .filter(p => p.material.toLowerCase().includes(type.toLowerCase()))
-                    .reduce((acc, curr) => acc + (parseFloat(curr.quantity_kg) || 0), 0);
-
-                const plastic = getMaterialTotal('plastic');
-                const paper = getMaterialTotal('paper');
-                const metal = getMaterialTotal('metal');
-                const other = pickupData.reduce((acc, curr) => acc + (parseFloat(curr.quantity_kg) || 0), 0) - (plastic + paper + metal);
-
-                const totalVolume = totalWet + plastic + paper + metal + Math.max(0, other);
-                const composition = totalVolume > 0 ? [
-                    { name: t('organicWaste', dashTranslations), value: Math.round((totalWet / totalVolume) * 100), color: '#22c55e' },
-                    { name: t('plastic', dashTranslations), value: Math.round((plastic / totalVolume) * 100), color: '#3b82f6' },
-                    { name: t('paper', dashTranslations), value: Math.round((paper / totalVolume) * 100), color: '#eab308' },
-                    { name: t('metal', dashTranslations), value: Math.round((metal / totalVolume) * 100), color: '#a855f7' },
-                    { name: t('other', dashTranslations), value: Math.round((Math.max(0, other) / totalVolume) * 100), color: '#64748b' },
-                ] : stats.wasteComposition;
-
-                // Recent Activities
-                const activities = [
-                    ...usersData.slice(0, 3).map(u => ({
-                        id: u.id,
-                        title: t('newReg', dashTranslations).replace('{role}', u.role).replace('{name}', u.full_name),
-                        time: new Date(u.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                        type: 'Registration',
-                        icon: Users,
-                        color: 'text-blue-500',
-                        bg: 'bg-blue-100'
-                    })),
-                    ...collectionData.slice(0, 2).map(c => ({
-                        id: c.id,
-                        title: t('reportSub', dashTranslations).replace('{village}', c.village_name),
-                        time: t('justNow', dashTranslations),
-                        type: 'Submission',
-                        icon: FileText,
-                        color: 'text-green-500',
-                        bg: 'bg-green-100'
-                    }))
-                ];
-
-                setStats({
-                    activePwmus,
-                    reportsSubmitted: reportsToday,
-                    wasteProcessed,
-                    wasteSold: wasteProcessed * 0.8,
-                    villagesLinked,
-                    swachhagrahis,
-                    totalRevenue,
-                    totalExpense,
-                    activities,
-                    financialChart: [
-                        { month: 'Jan', revenue: totalRevenue * 0.7, spending: totalExpense * 0.8 },
-                        { month: 'Feb', revenue: totalRevenue * 0.85, spending: totalExpense * 0.9 },
-                        { month: 'Mar', revenue: totalRevenue, spending: totalExpense },
-                    ],
-                    wasteComposition: composition
+                setRawData({
+                    pwmu: pwmuData,
+                    collections: collectionData,
+                    pickups: pickupData,
+                    pwmuLogs: pwmuLogsData,
+                    users: usersData
                 });
+
+                // Load location data
+                const locRes = await fetch('/data/locationData.json');
+                if (locRes.ok) {
+                    const lData = await locRes.json();
+                    setLocationData(lData);
+                }
 
             } catch (err) {
                 console.error('Final Dashboard Error:', err);
@@ -324,92 +310,147 @@ const Dashboard = () => {
         fetchData();
     }, []);
 
-    const dashTranslations2 = {
-        en: {
-            village: "Village",
-        },
-        hi: {
-            welcome: "स्वागत है,",
-            state: "राज्य",
-            network: "नेटवर्क",
-            happening: "आज आपके",
-            pwmuNetwork: "PWMU नेटवर्क में क्या हो रहा है, यहाँ देखें।",
-            systemStatus: "सिस्टम की स्थिति",
-            operational: "संचालित",
-            activePwmus: "सक्रिय PWMU",
-            reportsToday: "आज की रिपोर्ट",
-            wasteProcessed: "कचरा प्रोसेस",
-            wasteSold: "कचरा बेचा गया",
-            villagesLinked: "जुड़े गाँव",
-            swachhagrahis: "स्वच्छाग्रही",
-            avgEfficiency: "औसत दक्षता",
-            netBalance: "कुल शेष",
-            revenue: "आय",
-            expense: "व्यय",
-            netFlow: "कुल प्रवाह",
-            calendar: "कैलेंडर",
-            upcomingEvents: "आगामी कार्यक्रम",
-            monthlyReview: "मासिक समीक्षा (दोपहर 2:00 बजे)",
-            stateMap: "राज्य का नक्शा",
-            districtCoverage: "जिला वार कवरेज मेट्रिक्स",
-            economicOverview: "आर्थिक और स्थानिक अवलोकन",
-            valueChainTitle: "मूल्य श्रृंखला आर्थिक विश्लेषण",
-            valueChainSubtitle: "गांव संग्रह से अंतिम निपटान तक मूल्य सृजन और लागत की ट्रैकिंग",
-            recentActivity: "हाल की गतिविधि",
-            viewAll: "सभी देखें",
-            quickActions: "त्वरित कार्रवाई",
-            registerNew: "नया PWMU पंजीकृत करें",
-            submitReport: "रिपोर्ट जमा करें",
-            viewAnalytics: "एनालिटिक्स देखें",
-            downloadReports: "रिपोर्ट डाउनलोड करें",
-            operationalStatus: "परिचालित",
-            summarizing: "राज्य डेटा का सारांश...",
-            fetching: "छत्तीसगढ़ नेटवर्क से रिकॉर्ड प्राप्त किए जा रहे हैं",
-            units: "इकाइयां",
-            logs: "लॉग",
-            mt: "मीट्रिक टन",
-            workers: "श्रमिक",
-            villages: "गाँव",
-            networkCoverage: "नेटवर्क कवरेज",
-            fieldForce: "फील्ड फोर्स",
-            statewideAvg: "राज्यव्यापी औसत",
-            totalVolume: "कुल मात्रा",
-            commercialValue: "व्यावसायिक मूल्य",
-            villageSubmissions: "गांव सबमिशन",
-            districtWise: "जिला वार",
-            blockWise: "ब्लॉक वार",
-            gramPanchayat: "ग्राम पंचायत",
-            village: "गाँव",
-            pwmuWise: "PWMU वार",
-            operationalEconomic: "आर्थिक और स्थानिक अवलोकन",
-            deepDive: "भू-स्थानिक कवरेज और सामग्री प्रवाह मूल्य श्रृंखला में गहराई से जानकारी लें।",
-            villagesNode: "गाँव",
-            pwmuNode: "PWMU केंद्र",
-            centralHub: "मुख्य हब",
-            financialPerf: "वित्तीय प्रदर्शन",
-            revVsExp: "राजस्व सृजन बनाम परिचालन व्यय",
-            wasteComp: "राज्यव्यापी कचरा संरचना",
-            breakdown: "मात्रा के अनुसार प्रसंस्कृत सामग्री के प्रकारों का विवरण",
-            totalRevenueLabel: "कुल राजस्व",
-            totalSpendingLabel: "कुल व्यय",
-            operationalEconomicState: "राज्य आर्थिक और स्थानिक अवलोकन",
-            dryWaste: "सूखा कचरा",
-            wetWaste: "गीला कचरा",
-            processingLoss: "प्रसंस्करण हानि",
-            recovered: "रिकवर किया गया",
-            recyclers: "रीसायकलर्स",
-            cementKiln: "सीमेंट भट्ठा",
-            roadConst: "सड़क निर्माण",
-            organicWaste: "जैविक कचरा",
-            plastic: "प्लास्टिक",
-            paper: "कागज",
-            metal: "धातु",
-            other: "अन्य",
-            newReg: "नया {role} पंजीकृत: {name}",
-            reportSub: "{village} के लिए रिपोर्ट सबमिट की गई",
-            justNow: "अभी-अभी"
-        }
-    };
+    // 2. Computed Stats based on Filters
+    useEffect(() => {
+        if (!rawData.pwmu.length && !rawData.collections.length) return;
+
+        console.log('[DASH] Computing stats for filters:', filters);
+
+        const applyLocationFilter = (item) => {
+            const { district, block, gp, village, pwmu } = filters;
+
+            // PWMU Specific Filter (Overrides everything if set)
+            if (pwmu) {
+                if (item.pwmu_id && item.pwmu_id === pwmu) return true;
+                if (item.pwmu_name && item.pwmu_name.includes(pwmu)) return true;
+                // If checking users, see if they are linked to this PWMU
+                if (item.registration_data?.pwmuId === pwmu) return true;
+                return false;
+            }
+
+            // Hierarchical Filters
+            if (district && !((item.district || '').includes(district.split(' (')[0]))) return false;
+            if (block && !((item.block || '').includes(block.split(' (')[0]))) return false;
+            if (gp && !((item.gram_panchayat || '').includes(gp.split(' (')[0]))) return false;
+            if (village && !((item.village_name || '').includes(village.split(' (')[0]))) return false;
+
+            return true;
+        };
+
+        const filteredPwmu = rawData.pwmu.filter(p => applyLocationFilter(p));
+        const filteredCollections = rawData.collections.filter(c => applyLocationFilter(c));
+        const filteredLogs = rawData.pwmuLogs.filter(l => applyLocationFilter(l));
+        const filteredPickups = rawData.pickups.filter(p => applyLocationFilter(p));
+        const filteredUsers = rawData.users.filter(u => applyLocationFilter(u));
+
+        // Aggregate results
+        const today = new Date().toISOString().split('T')[0];
+        const activePwmus = filteredPwmu.filter(p => p.status?.toLowerCase() === 'operational').length;
+        const reportsToday = filteredCollections.filter(c => c.collection_date === today).length;
+        const wasteProcessed = filteredLogs.reduce((acc, curr) => acc + (parseFloat(curr.total_intake_kg) || 0) / 1000, 0);
+        const wasteSold = filteredPickups.reduce((acc, curr) => acc + (parseFloat(curr.quantity_kg) || 0) / 1000, 0);
+        const villagesLinked = filteredUsers.filter(u => u.role === 'Sarpanch').length;
+        const swachhagrahis = filteredUsers.filter(u => u.role?.toLowerCase() === 'swachhagrahi').length || (villagesLinked * 4);
+        const totalRevenue = filteredPickups.reduce((acc, curr) => acc + (parseFloat(curr.amount_paid) || 0), 0);
+        const totalExpense = wasteProcessed * 2500;
+
+        const villageSentVolume = filteredCollections.reduce((acc, curr) => acc + (parseFloat(curr.shared_with_pwmu_kg) || 0) / 1000, 0);
+        const totalWet = filteredCollections.reduce((acc, curr) => acc + (parseFloat(curr.wet_waste_kg) || 0), 0);
+
+        // Waste Composition Aggregation
+        const getMaterialTotal = (type) => filteredPickups
+            .filter(p => p.material?.toLowerCase().includes(type.toLowerCase()))
+            .reduce((acc, curr) => acc + (parseFloat(curr.quantity_kg) || 0), 0);
+
+        const plastic = getMaterialTotal('plastic');
+        const paper = getMaterialTotal('paper');
+        const metal = getMaterialTotal('metal');
+        const allPickupsTotal = filteredPickups.reduce((acc, curr) => acc + (parseFloat(curr.quantity_kg) || 0), 0);
+        const other = allPickupsTotal - (plastic + paper + metal);
+
+        const totalVolComp = totalWet + plastic + paper + metal + Math.max(0, other);
+        const composition = totalVolComp > 0 ? [
+            { name: t('organicWaste', dashTranslations), value: Math.round((totalWet / totalVolComp) * 100), color: '#22c55e' },
+            { name: t('plastic', dashTranslations), value: Math.round((plastic / totalVolComp) * 100), color: '#3b82f6' },
+            { name: t('paper', dashTranslations), value: Math.round((paper / totalVolComp) * 100), color: '#eab308' },
+            { name: t('metal', dashTranslations), value: Math.round((metal / totalVolComp) * 100), color: '#a855f7' },
+            { name: t('other', dashTranslations), value: Math.round((Math.max(0, other) / totalVolComp) * 100), color: '#64748b' },
+        ] : [
+            { name: t('organicWaste', dashTranslations), value: 45, color: '#22c55e' },
+            { name: t('plastic', dashTranslations), value: 25, color: '#3b82f6' },
+            { name: t('paper', dashTranslations), value: 15, color: '#eab308' },
+            { name: t('metal', dashTranslations), value: 10, color: '#a855f7' },
+            { name: t('other', dashTranslations), value: 5, color: '#64748b' },
+        ];
+
+        // Recent Activities
+        const activities = [
+            ...filteredUsers.slice(0, 3).map(u => ({
+                id: u.id,
+                title: t('newReg', dashTranslations).replace('{role}', u.role).replace('{name}', u.full_name),
+                time: new Date(u.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                type: 'Registration',
+                icon: Users,
+                color: 'text-blue-500',
+                bg: 'bg-blue-100'
+            })),
+            ...filteredCollections.slice(0, 2).map(c => ({
+                id: c.id,
+                title: t('reportSub', dashTranslations).replace('{village}', c.village_name || 'Village'),
+                time: t('justNow', dashTranslations),
+                type: 'Submission',
+                icon: FileText,
+                color: 'text-green-500',
+                bg: 'bg-green-100'
+            }))
+        ];
+
+        setStats(prev => ({
+            ...prev,
+            activePwmus,
+            reportsSubmitted: reportsToday,
+            wasteProcessed,
+            wasteSold,
+            villagesLinked,
+            swachhagrahis,
+            totalRevenue,
+            totalExpense,
+            activities,
+            wasteComposition: composition,
+            financialChart: [
+                { month: 'Jan', revenue: totalRevenue * 0.7, spending: totalExpense * 0.8 },
+                { month: 'Feb', revenue: totalRevenue * 0.85, spending: totalExpense * 0.9 },
+                { month: 'Mar', revenue: totalRevenue, spending: totalExpense },
+            ],
+            valueChain: {
+                villages: {
+                    volume: `${villageSentVolume.toFixed(1)} MT`,
+                    financial: `-₹${(villageSentVolume * 1200 / 100000).toFixed(1)}L`,
+                    hoverText: `Material reported by ${villagesLinked} active villages.`,
+                    details: [
+                        { label: 'Dry Waste', value: `${(villageSentVolume * 0.7).toFixed(1)} MT` },
+                        { label: 'Wet Waste', value: `${(villageSentVolume * 0.3).toFixed(1)} MT` }
+                    ]
+                },
+                pwmuCenter: {
+                    volume: `${wasteProcessed.toFixed(1)} MT`,
+                    financial: `-₹${(totalExpense / 100000).toFixed(1)}L`,
+                    hoverText: "Processing and transport operations.",
+                    details: [
+                        { label: 'Processing Loss', value: `${(wasteProcessed * 0.08).toFixed(1)} MT` },
+                        { label: 'Recovered', value: `${(wasteProcessed * 0.92).toFixed(1)} MT` }
+                    ]
+                },
+                sinks: [
+                    { id: 'recyclers', name: 'Recyclers', volume: `${(totalRevenue > 0 ? (wasteProcessed * 0.45) : 0).toFixed(1)} MT`, financial: `+₹${(totalRevenue * 0.65 / 100000).toFixed(1)}L`, color: 'green' },
+                    { id: 'cementKiln', name: 'Cement Kiln', volume: `${(totalRevenue > 0 ? (wasteProcessed * 0.25) : 0).toFixed(1)} MT`, financial: `+₹${(totalRevenue * 0.15 / 100000).toFixed(1)}L`, color: 'red' },
+                    { id: 'roadConst', name: 'Road Const.', volume: `${(totalRevenue > 0 ? (wasteProcessed * 0.20) : 0).toFixed(1)} MT`, financial: `+₹${(totalRevenue * 0.20 / 100000).toFixed(1)}L`, color: 'yellow' }
+                ]
+            }
+        }));
+    }, [filters, rawData]);
+
+    const valueChain = stats.valueChain;
 
     // Derived data for rendering
     let displayRoleName = userRole || "Admin";
@@ -467,24 +508,43 @@ const Dashboard = () => {
 
                     {/* Hierarchical Location Filters */}
                     <div className="flex bg-white border border-gray-200 rounded-lg shadow-sm p-1 overflow-x-auto max-w-[full] md:max-w-none hide-scrollbar">
-                        <select className="bg-transparent text-xs font-semibold text-gray-700 px-3 py-1.5 outline-none border-r border-gray-200 cursor-pointer hover:bg-gray-50 rounded-l-md transition-colors min-w-[100px]">
-                            <option>{t('districtWise', dashTranslations)}</option>
-                            <option>Raipur</option>
-                            <option>Durg</option>
+                        <select
+                            value={filters.district}
+                            onChange={(e) => setFilters({ ...filters, district: e.target.value, block: '', gp: '', village: '' })}
+                            className="bg-transparent text-xs font-semibold text-gray-700 px-3 py-1.5 outline-none border-r border-gray-200 cursor-pointer hover:bg-gray-50 rounded-l-md transition-colors min-w-[120px]">
+                            <option value="">{t('districtWise', dashTranslations)}</option>
+                            {Object.keys(locationData).map(d => <option key={d} value={d}>{d}</option>)}
                         </select>
-                        <select className="bg-transparent text-xs font-semibold text-gray-700 px-3 py-1.5 outline-none border-r border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors min-w-[100px]">
-                            <option>{t('blockWise', dashTranslations)}</option>
-                            <option>Arang</option>
-                            <option>Abhanpur</option>
+                        <select
+                            value={filters.block}
+                            disabled={!filters.district}
+                            onChange={(e) => setFilters({ ...filters, block: e.target.value, gp: '', village: '' })}
+                            className="bg-transparent text-xs font-semibold text-gray-700 px-3 py-1.5 outline-none border-r border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors min-w-[120px]">
+                            <option value="">{t('blockWise', dashTranslations)}</option>
+                            {filters.district && locationData[filters.district] && Object.keys(locationData[filters.district]).map(b => <option key={b} value={b}>{b}</option>)}
                         </select>
-                        <select className="bg-transparent text-xs font-semibold text-gray-700 px-3 py-1.5 outline-none border-r border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors hidden lg:block min-w-[120px]">
-                            <option>{t('gramPanchayat', dashTranslations)}</option>
+                        <select
+                            value={filters.gp}
+                            disabled={!filters.block}
+                            onChange={(e) => setFilters({ ...filters, gp: e.target.value, village: '' })}
+                            className="bg-transparent text-xs font-semibold text-gray-700 px-3 py-1.5 outline-none border-r border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors hidden lg:block min-w-[150px]">
+                            <option value="">{t('gramPanchayat', dashTranslations)}</option>
+                            {filters.district && filters.block && locationData[filters.district][filters.block] && Object.keys(locationData[filters.district][filters.block]).map(g => <option key={g} value={g}>{g}</option>)}
                         </select>
-                        <select className="bg-transparent text-xs font-semibold text-gray-700 px-3 py-1.5 outline-none border-r border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors hidden lg:block min-w-[100px]">
-                            <option>{t('village', dashTranslations)}</option>
+                        <select
+                            value={filters.village}
+                            disabled={!filters.gp}
+                            onChange={(e) => setFilters({ ...filters, village: e.target.value })}
+                            className="bg-transparent text-xs font-semibold text-gray-700 px-3 py-1.5 outline-none border-r border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors hidden lg:block min-w-[120px]">
+                            <option value="">{t('village', dashTranslations)}</option>
+                            {filters.district && filters.block && filters.gp && locationData[filters.district][filters.block][filters.gp] && locationData[filters.district][filters.block][filters.gp].map(v => <option key={v} value={v}>{v}</option>)}
                         </select>
-                        <select className="bg-transparent text-xs font-semibold text-gray-700 px-3 py-1.5 outline-none cursor-pointer hover:bg-gray-50 rounded-r-md transition-colors min-w-[100px]">
-                            <option>{t('pwmuWise', dashTranslations)}</option>
+                        <select
+                            value={filters.pwmu}
+                            onChange={(e) => setFilters({ ...filters, pwmu: e.target.value })}
+                            className="bg-transparent text-xs font-semibold text-gray-700 px-3 py-1.5 outline-none cursor-pointer hover:bg-gray-50 rounded-r-md transition-colors min-w-[120px]">
+                            <option value="">{t('pwmuWise', dashTranslations)}</option>
+                            {rawData.pwmu.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                         </select>
                     </div>
 
@@ -698,25 +758,40 @@ const Dashboard = () => {
                                     </div>
 
                                     {/* 3. Sinks */}
-                                    <div className="flex flex-col gap-6 w-48 z-20">
-                                        {valueChain.sinks.map((sink) => (
-                                            <div key={sink.id} className={`group relative bg-white border-2 border-${sink.color}-200 rounded-xl p-3 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer`}>
-                                                <div className="flex justify-between items-center">
-                                                    <div>
-                                                        <h3 className="font-bold text-gray-800 text-sm">
-                                                            {t(sink.id === 'recyclers' ? 'recyclers' : sink.id === 'cementKiln' ? 'cementKiln' : 'roadConst', dashTranslations)}
-                                                        </h3>
-                                                        <p className={`text-xs font-bold ${sink.financial.startsWith('+') ? 'text-green-600' : 'text-red-500'} mt-1`}>{sink.financial}</p>
-                                                    </div>
-                                                    <span className={`text-xs font-semibold px-2 py-1 rounded bg-${sink.color}-50 text-${sink.color}-700 border border-${sink.color}-100`}>{sink.volume}</span>
-                                                </div>
+                                    <div className="flex flex-col gap-6 w-64 z-20">
+                                        {valueChain.sinks.map((sink) => {
+                                            const colorMap = {
+                                                green: { border: 'border-green-200', bg: 'bg-green-50', text: 'text-green-700', financial: 'text-green-600' },
+                                                red: { border: 'border-red-200', bg: 'bg-red-50', text: 'text-red-700', financial: 'text-red-500' },
+                                                yellow: { border: 'border-amber-200', bg: 'bg-amber-50', text: 'text-amber-700', financial: 'text-amber-600' }
+                                            };
+                                            const colors = colorMap[sink.color] || colorMap.green;
 
-                                                <div className="absolute right-full mr-4 top-1/2 -translate-y-1/2 w-48 bg-gray-900 text-white p-3 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-all pointer-events-none z-50">
-                                                    <p className="text-xs">{sink.hoverText}</p>
-                                                    <div className="absolute top-1/2 -right-1 -translate-y-1/2 w-3 h-3 bg-gray-900 rotate-45"></div>
+                                            return (
+                                                <div key={sink.id} className={`group relative bg-white border-2 ${colors.border} rounded-2xl p-4 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer`}>
+                                                    <div className="flex justify-between items-center gap-3">
+                                                        <div className="flex-1 min-w-0">
+                                                            <h4 className="font-black text-gray-800 text-base leading-tight mb-1 whitespace-nowrap overflow-hidden text-overflow-ellipsis">
+                                                                {t(sink.id, dashTranslations)}
+                                                            </h4>
+                                                            <p className={`text-sm font-bold ${colors.financial}`}>
+                                                                {sink.financial}
+                                                            </p>
+                                                        </div>
+                                                        <div className={`px-3 py-1.5 rounded-xl ${colors.bg} ${colors.text} border ${colors.border}/50 flex items-center justify-center shrink-0`}>
+                                                            <span className="text-xs font-black whitespace-nowrap">
+                                                                {sink.volume.replace(' MT', ' Tn')}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="absolute right-full mr-6 top-1/2 -translate-y-1/2 w-56 bg-gray-900 text-white p-4 rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 transition-all pointer-events-none z-50">
+                                                        <p className="text-sm">{sink.hoverText || `${sink.volume} processed.`}</p>
+                                                        <div className="absolute top-1/2 -right-1 -translate-y-1/2 w-4 h-4 bg-gray-900 rotate-45"></div>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             </div>

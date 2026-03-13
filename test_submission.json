@@ -1,0 +1,10 @@
+[
+  {
+    "village_name": "Test Village",
+    "collection_date": "2026-03-12",
+    "wet_waste_kg": 10.5,
+    "dry_waste_kg": 5.2,
+    "shared_with_pwmu_kg": 2.0,
+    "submitted": true
+  }
+]

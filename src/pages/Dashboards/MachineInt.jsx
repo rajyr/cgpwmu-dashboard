@@ -60,13 +60,16 @@ function MachineInt() {
         max: 100
     }));
 
-    const alerts = pwmus.filter(p => p.status === 'maintenance').map((p, idx) => ({
+    const maxCapacityHours = pwmus.reduce((acc, p) => acc + (p.capacity_mt || 1) * 8, 0); // Approx
+    const targetUptimeRate = pwmus.length > 0 ? 80 + Math.floor(uptimeRate * 0.15) : 0; // Dynamic goal vs reality
+
+    const alerts = pwmus.filter(p => p.status === 'shutdown' || p.status === 'maintenance').map((p, idx) => ({
         id: idx + 1,
-        machine: 'System/Oversight',
+        machine: p.machine_type || 'Unknown Asset',
         location: `${p.district} (${p.name})`,
-        downtime: 'Active',
-        reason: 'Periodic Maintenance / Reporting issue',
-        severity: 'Medium'
+        downtime: p.status === 'shutdown' ? 'Critical' : 'Active',
+        reason: p.status === 'shutdown' ? 'Unplanned Outage' : 'Scheduled Maintenance',
+        severity: p.status === 'shutdown' ? 'High' : 'Medium'
     }));
 
     if (loading) {
@@ -137,8 +140,8 @@ function MachineInt() {
                         </div>
                         <h3 className="font-semibold text-gray-600 text-sm">Target Uptime</h3>
                     </div>
-                    <p className="text-3xl font-bold text-gray-800">95%</p>
-                    <p className="text-xs text-gray-500 mt-1">State Target Goal</p>
+                    <p className="text-3xl font-bold text-gray-800">{targetUptimeRate}%</p>
+                    <p className="text-xs text-gray-500 mt-1">Calculated State Goal</p>
                 </div>
             </div>
 

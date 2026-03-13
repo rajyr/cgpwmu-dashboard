@@ -1,9 +1,14 @@
-import { FileText, IndianRupee, Users, ShoppingCart, CheckCircle2, Calendar, MapPin } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../context/LanguageContext';
+import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../lib/supabaseClient';
+import { AlertCircle, RefreshCcw, FileText, IndianRupee, Users, ShoppingCart, CheckCircle2, Calendar, MapPin, Leaf } from 'lucide-react';
 
 const VillageMonthlyReport = () => {
     const navigate = useNavigate();
     const { t } = useLanguage();
+    const { user, refreshProfile } = useAuth();
 
     const villageMonthlyTranslations = {
         en: {
@@ -68,6 +73,44 @@ const VillageMonthlyReport = () => {
 
     const [isSaving, setIsSaving] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
+    const [basicInfo, setBasicInfo] = useState({
+        villageName: '...',
+        month: (new Date().getMonth() + 1).toString().padStart(2, '0'),
+        year: new Date().getFullYear().toString()
+    });
+    const [salesInfo, setSalesInfo] = useState({
+        recyclerType: '',
+        wasteSold: '',
+        earningAmount: ''
+    });
+    const [expensesInfo, setExpensesInfo] = useState({
+        numWorkers: '',
+        honorariumPerWorker: '',
+        otherExpenses: ''
+    });
+
+    const [syncing, setSyncing] = useState(false);
+    const [sessionWarning, setSessionWarning] = useState(false);
+    const [existingId, setExistingId] = useState(null);
+    const [isLocked, setIsLocked] = useState(false);
+    const [loadingReport, setLoadingReport] = useState(false);
+
+    // Profile Sync Logic (Same as Daily Log)
+    const handleSync = async () => {
+        setSyncing(true);
+        try {
+            await refreshProfile();
+            console.log('[SYNC] Profile refreshed successfully.');
+            setSessionWarning(false);
+        } catch (err) {
+            console.error('[SYNC] Refresh failed:', err);
+        } finally {
+            setSyncing(false);
+        }
+    };
+
+    const currentYearNum = new Date().getFullYear();
+    const years = [(currentYearNum - 1).toString(), currentYearNum.toString(), (currentYearNum + 1).toString()];
 
     const months = [
         { val: '01', label: t('jan', villageMonthlyTranslations) }, { val: '02', label: t('feb', villageMonthlyTranslations) }, { val: '03', label: t('mar', villageMonthlyTranslations) },
@@ -90,18 +133,128 @@ const VillageMonthlyReport = () => {
     const totalEarnings = Number(salesInfo.earningAmount) || 0;
     const netBalance = totalEarnings - totalExpenses;
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        setIsSaving(true);
-        // Simulate API call
-        setTimeout(() => {
+        if (!user) return;
+
+        // Strict Blocking Check
+        const reg = user?.registration_data || {};
+        if (!reg.pwmuId) {
+            console.error('[MONTHLY_REPORT] ❌ Blocked submission due to missing pwmuId:', {
+                user_id: user.id,
+                full_name: user.full_name,
+                reg_data: reg
+            });
+            alert("⚠️ CANNOT SAVE REPORT: Your account is not properly linked to a PWMU center in the database.\n\nACTION: Click the 'Sync Profile Data' button at the top and try again.\n\nIf the error persists, please contact support and provide your Village Name: " + (reg.villageName || 'Unknown'));
             setIsSaving(false);
+            setSessionWarning(true);
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            const reportData = {
+                village_id: user.id,
+                village_name: basicInfo.villageName,
+                pwmu_id: reg.pwmuId,
+                report_month: basicInfo.month,
+                report_year: parseInt(basicInfo.year),
+                recycler_type: salesInfo.recyclerType,
+                waste_sold_kg: parseFloat(salesInfo.wasteSold) || 0,
+                revenue_earned: parseFloat(salesInfo.earningAmount) || 0,
+                num_workers: parseInt(expensesInfo.numWorkers) || 0,
+                honorarium_per_worker: parseFloat(expensesInfo.honorariumPerWorker) || 0,
+                other_expenses: parseFloat(expensesInfo.otherExpenses) || 0,
+                total_honorarium: totalHonorarium,
+                total_expenses: totalExpenses,
+                net_balance: netBalance,
+                net_balance: netBalance
+            };
+
+            const { data, error } = existingId
+                ? await supabase
+                    .from('village_monthly_reports')
+                    .update(reportData)
+                    .eq('id', existingId)
+                : await supabase
+                    .from('village_monthly_reports')
+                    .insert([reportData]);
+
+            if (error) throw error;
+
+            setIsSaving(false);
+            setIsLocked(true);
             setShowSuccess(true);
             setTimeout(() => {
                 navigate('/dashboard');
             }, 2000);
-        }, 1500);
+
+        } catch (err) {
+            console.error('Submission error:', err);
+            alert(`Failed to save report: ${err.message || 'Unknown error'}`);
+            setIsSaving(false);
+        }
     };
+
+    // Fetch Existing Report Logic
+    useEffect(() => {
+        const fetchExisting = async () => {
+            if (!user || !basicInfo.month || !basicInfo.year) return;
+            setLoadingReport(true);
+            try {
+                const { data, error } = await supabase
+                    .from('village_monthly_reports')
+                    .select('*')
+                    .eq('village_id', user.id)
+                    .eq('report_month', basicInfo.month)
+                    .eq('report_year', parseInt(basicInfo.year))
+                    .maybeSingle();
+
+                if (data) {
+                    setExistingId(data.id);
+                    setSalesInfo({
+                        recyclerType: data.recycler_type || '',
+                        wasteSold: data.waste_sold_kg?.toString() || '',
+                        earningAmount: data.revenue_earned?.toString() || ''
+                    });
+                    setExpensesInfo({
+                        numWorkers: data.num_workers?.toString() || '',
+                        honorariumPerWorker: data.honorarium_per_worker?.toString() || '',
+                        otherExpenses: data.other_expenses?.toString() || ''
+                    });
+                    setIsLocked(true);
+                } else {
+                    setExistingId(null);
+                    setIsLocked(false);
+                    // Reset fields for new entry
+                    setSalesInfo({ recyclerType: '', wasteSold: '', earningAmount: '' });
+                    setExpensesInfo({ numWorkers: '', honorariumPerWorker: '', otherExpenses: '' });
+                }
+            } catch (err) {
+                console.error("Error fetching existing report:", err);
+            } finally {
+                setLoadingReport(false);
+            }
+        };
+        fetchExisting();
+    }, [user, basicInfo.month, basicInfo.year]);
+
+    useEffect(() => {
+        if (user) {
+            const reg = user.registration_data || {};
+            setBasicInfo(prev => ({
+                ...prev,
+                villageName: reg.villageName || reg.primaryVillage || reg.gramPanchayat || user.full_name || 'Village'
+            }));
+
+            // Check if vital metadata is missing
+            if (!reg.pwmuId || !reg.district) {
+                setSessionWarning(true);
+            } else {
+                setSessionWarning(false);
+            }
+        }
+    }, [user]);
 
     if (showSuccess) {
         return (
@@ -126,34 +279,91 @@ const VillageMonthlyReport = () => {
         <div className="min-h-[calc(100vh-80px)] bg-[#f4f7f6] p-4 lg:p-8 pb-32">
             <div className="max-w-4xl mx-auto space-y-6">
 
+                {/* Session Warning Banner */}
+                {sessionWarning && (
+                    <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-4 animate-pulse-slow">
+                        <div className="flex items-start gap-4">
+                            <div className="p-3 bg-amber-100 text-amber-600 rounded-full">
+                                <AlertCircle className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <h3 className="text-amber-900 font-bold">Session Data Missing</h3>
+                                <p className="text-amber-700 text-sm">Your login session is missing linked PWMU or Location codes. This happens if your account was recently updated.</p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={handleSync}
+                            disabled={syncing}
+                            className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold shadow-sm transition-all disabled:opacity-50"
+                        >
+                            <RefreshCcw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+                            {syncing ? 'Syncing...' : 'Sync Profile Data'}
+                        </button>
+                    </div>
+                )}
+
                 {/* Header Section */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div>
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 relative overflow-hidden">
+                    {/* Loading Overlay for Report Fetching */}
+                    {loadingReport && (
+                        <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] flex items-center justify-center z-10">
+                            <RefreshCcw className="w-6 h-6 text-green-600 animate-spin" />
+                        </div>
+                    )}
+
+                    <div className="relative z-0">
                         <div className="flex items-center gap-3 mb-1">
                             <div className="p-2 bg-green-100 text-green-700 rounded-lg">
                                 <FileText className="w-6 h-6" />
                             </div>
-                            <h1 className="text-2xl font-bold text-gray-800 uppercase tracking-tight">{t('title', villageMonthlyTranslations)}</h1>
+                            <div className="flex flex-col">
+                                <h1 className="text-2xl font-bold text-gray-800 uppercase tracking-tight">{t('title', villageMonthlyTranslations)}</h1>
+                                {existingId && (
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-full uppercase tracking-wider border border-blue-200">
+                                            Existing Report
+                                        </span>
+                                        {isLocked && (
+                                            <span className="px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-black rounded-full uppercase tracking-wider border border-red-200 animate-pulse">
+                                                Locked
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                         <p className="text-gray-500 text-sm pl-12 flex items-center gap-2">
                             <MapPin className="w-4 h-4 text-green-600" /> {basicInfo.villageName}
                         </p>
                     </div>
 
-                    <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-200">
-                        <Calendar className="w-5 h-5 text-gray-400" />
-                        <select
-                            name="month" value={basicInfo.month} onChange={handleBasicChange}
-                            className="bg-transparent border-none text-gray-700 font-semibold focus:ring-0 p-0 text-right cursor-pointer outline-none"
-                        >
-                            {months.map(m => <option key={m.val} value={m.val}>{m.label}</option>)}
-                        </select>
-                        <select
-                            name="year" value={basicInfo.year} onChange={handleBasicChange}
-                            className="bg-transparent border-none text-gray-700 font-semibold focus:ring-0 p-0 md:pl-2 cursor-pointer outline-none md:border-l md:border-gray-300"
-                        >
-                            {years.map(y => <option key={y} value={y}>{y}</option>)}
-                        </select>
+                    <div className="flex flex-wrap items-center gap-3">
+                        {existingId && isLocked && (
+                            <button
+                                type="button"
+                                onClick={() => setIsLocked(false)}
+                                className="flex items-center gap-2 px-4 py-2 bg-white border border-blue-300 text-blue-600 rounded-xl text-sm font-bold hover:bg-blue-50 transition-all shadow-sm"
+                            >
+                                <RefreshCcw className="w-4 h-4" />
+                                Edit Report
+                            </button>
+                        )}
+
+                        <div className="flex items-center gap-3 bg-gray-50 p-2 rounded-xl border border-gray-200">
+                            <Calendar className="w-5 h-5 text-gray-400" />
+                            <select
+                                name="month" value={basicInfo.month} onChange={handleBasicChange}
+                                className="bg-transparent border-none text-gray-700 font-semibold focus:ring-0 p-1 text-right cursor-pointer outline-none text-sm"
+                            >
+                                {months.map(m => <option key={m.val} value={m.val}>{m.label}</option>)}
+                            </select>
+                            <select
+                                name="year" value={basicInfo.year} onChange={handleBasicChange}
+                                className="bg-transparent border-none text-gray-700 font-semibold focus:ring-0 p-1 md:pl-2 cursor-pointer outline-none md:border-l md:border-gray-300 text-sm"
+                            >
+                                {years.map(y => <option key={y} value={y}>{y}</option>)}
+                            </select>
+                        </div>
                     </div>
                 </div>
 
@@ -168,13 +378,13 @@ const VillageMonthlyReport = () => {
                         <div className="p-6 space-y-6">
 
                             {/* Recycler Selection */}
-                            <div>
+                            <div className={isLocked ? 'opacity-70 pointer-events-none' : ''}>
                                 <label className="block text-sm font-medium text-gray-700 mb-3">{t('whereSoldLabel', villageMonthlyTranslations)}</label>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     {recyclerOptions.map(type => (
                                         <div
                                             key={type.id}
-                                            onClick={() => selectRecycler(type.id)}
+                                            onClick={() => !isLocked && selectRecycler(type.id)}
                                             className={`p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 ${salesInfo.recyclerType === type.id
                                                 ? 'border-green-500 bg-green-50 shadow-sm'
                                                 : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
@@ -197,7 +407,8 @@ const VillageMonthlyReport = () => {
                                     <div className="relative">
                                         <input
                                             type="number" name="wasteSold" value={salesInfo.wasteSold} onChange={handleSalesChange} required min="0" placeholder="0"
-                                            className="w-full p-2.5 pl-3 pr-8 bg-white border border-gray-300 rounded-lg text-sm text-right focus:ring-2 focus:ring-green-500/20 focus:border-green-500 font-mono"
+                                            disabled={isLocked}
+                                            className="w-full p-2.5 pl-3 pr-8 bg-white border border-gray-300 rounded-lg text-sm text-right focus:ring-2 focus:ring-green-500/20 focus:border-green-500 font-mono disabled:bg-gray-100 disabled:text-gray-500"
                                         />
                                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">{t('kg', villageMonthlyTranslations)}</span>
                                     </div>
@@ -208,7 +419,8 @@ const VillageMonthlyReport = () => {
                                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">₹</span>
                                         <input
                                             type="number" name="earningAmount" value={salesInfo.earningAmount} onChange={handleSalesChange} required min="0" placeholder="0"
-                                            className="w-full p-2.5 pl-8 bg-white border border-gray-300 rounded-lg text-sm text-right focus:ring-2 focus:ring-green-500/20 focus:border-green-500 font-mono text-green-700 font-bold"
+                                            disabled={isLocked}
+                                            className="w-full p-2.5 pl-8 bg-white border border-gray-300 rounded-lg text-sm text-right focus:ring-2 focus:ring-green-500/20 focus:border-green-500 font-mono text-green-700 font-bold disabled:bg-gray-100 disabled:text-gray-500"
                                         />
                                     </div>
                                 </div>
@@ -231,7 +443,8 @@ const VillageMonthlyReport = () => {
                                     <label className="block text-sm font-medium text-gray-700 mb-1">{t('numWorkersLabel', villageMonthlyTranslations)}</label>
                                     <input
                                         type="number" name="numWorkers" value={expensesInfo.numWorkers} onChange={handleExpensesChange} required min="0" placeholder="0"
-                                        className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-green-500/20 focus:border-green-500 font-mono"
+                                        disabled={isLocked}
+                                        className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-green-500/20 focus:border-green-500 font-mono disabled:bg-gray-200 disabled:text-gray-500"
                                     />
                                     <p className="text-xs text-gray-500 mt-1">{t('activeWorkersDesc', villageMonthlyTranslations)}</p>
                                 </div>
@@ -243,7 +456,8 @@ const VillageMonthlyReport = () => {
                                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">₹</span>
                                         <input
                                             type="number" name="honorariumPerWorker" value={expensesInfo.honorariumPerWorker} onChange={handleExpensesChange} required min="0" placeholder="0"
-                                            className="w-full p-2.5 pl-8 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-green-500/20 focus:border-green-500 font-mono"
+                                            disabled={isLocked}
+                                            className="w-full p-2.5 pl-8 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-green-500/20 focus:border-green-500 font-mono disabled:bg-gray-200 disabled:text-gray-500"
                                         />
                                     </div>
                                     <p className="text-xs text-gray-500 mt-1">{t('paidIndividualDesc', villageMonthlyTranslations)}</p>
@@ -266,7 +480,8 @@ const VillageMonthlyReport = () => {
                                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">₹</span>
                                     <input
                                         type="number" name="otherExpenses" value={expensesInfo.otherExpenses} onChange={handleExpensesChange} min="0" placeholder="0"
-                                        className="w-full p-2.5 pl-8 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-green-500/20 focus:border-green-500 font-mono"
+                                        disabled={isLocked}
+                                        className="w-full p-2.5 pl-8 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-green-500/20 focus:border-green-500 font-mono disabled:bg-gray-200 disabled:text-gray-500"
                                     />
                                 </div>
                                 <p className="text-xs text-gray-500 mt-1">{t('transportMaintenanceDesc', villageMonthlyTranslations)}</p>
@@ -292,7 +507,7 @@ const VillageMonthlyReport = () => {
                             </button>
                             <button
                                 type="submit"
-                                disabled={isSaving || !salesInfo.recyclerType}
+                                disabled={isSaving || !salesInfo.recyclerType || isLocked}
                                 className="flex-1 sm:flex-none px-8 py-2.5 rounded-xl bg-green-600 text-white font-bold hover:bg-green-700 shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-w-[160px]"
                             >
                                 {isSaving ? (
@@ -303,7 +518,7 @@ const VillageMonthlyReport = () => {
                                 ) : (
                                     <>
                                         <CheckCircle2 className="w-5 h-5 mr-2" />
-                                        {t('saveReport', villageMonthlyTranslations)}
+                                        {existingId ? 'Update Report' : t('saveReport', villageMonthlyTranslations)}
                                     </>
                                 )}
                             </button>

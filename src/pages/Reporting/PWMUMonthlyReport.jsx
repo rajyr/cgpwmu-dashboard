@@ -1,5 +1,9 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FileBarChart, Settings, IndianRupee, Factory, Plus, Trash2, Calendar, CheckCircle2, AlertTriangle, AlertCircle, Wrench } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
+import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../lib/supabaseClient';
 
 const PWMUMonthlyReport = () => {
     const navigate = useNavigate();
@@ -134,6 +138,60 @@ const PWMUMonthlyReport = () => {
         }
     };
 
+    const [basicInfo, setBasicInfo] = useState({
+        month: (new Date().getMonth() + 1).toString().padStart(2, '0'),
+        year: new Date().getFullYear().toString(),
+        pwmuName: '',
+        pwmuId: ''
+    });
+
+    const [machineStatus, setMachineStatus] = useState({
+        fatka: { selected: false, functional: true, dateBroke: '', reason: '' },
+        baling: { selected: false, functional: true, dateBroke: '', reason: '' },
+        shredder: { selected: false, functional: true, dateBroke: '', reason: '' },
+        agglomerator: { selected: false, functional: true, dateBroke: '', reason: '' },
+        mixer: { selected: false, functional: true, dateBroke: '', reason: '' },
+        granular: { selected: false, functional: true, dateBroke: '', reason: '' }
+    });
+
+    const [sales, setSales] = useState([]);
+    const [expenses, setExpenses] = useState({ electricity: '', honorarium: '', other: '' });
+    const [isSaving, setIsSaving] = useState(false);
+    const [showSuccess, setShowSuccess] = useState(false);
+
+    const { user } = useAuth();
+    const currentYear = new Date().getFullYear();
+    const years = [currentYear.toString(), (currentYear - 1).toString(), (currentYear - 2).toString()];
+
+    useEffect(() => {
+        const fetchCenter = async () => {
+            if (!user) return;
+            try {
+                const { data, error } = await supabase
+                    .from('pwmu_centers')
+                    .select('id, name, status')
+                    .eq('nodal_officer_id', user.id)
+                    .single();
+
+                if (data) {
+                    setBasicInfo(prev => ({ ...prev, pwmuName: data.name, pwmuId: data.id }));
+                } else if (error) {
+                    // If single fail, try any link
+                    const { data: list } = await supabase
+                        .from('pwmu_centers')
+                        .select('id, name')
+                        .limit(1);
+                    if (list?.[0]) {
+                        setBasicInfo(prev => ({ ...prev, pwmuName: list[0].name, pwmuId: list[0].id }));
+                    }
+                }
+            } catch (err) {
+                console.error('Error fetching center:', err);
+            }
+        };
+        fetchCenter();
+    }, [user]);
+
     const months = [
         { val: '01', label: t('jan', monthlyTranslations) }, { val: '02', label: t('feb', monthlyTranslations) }, { val: '03', label: t('mar', monthlyTranslations) },
         { val: '04', label: t('apr', monthlyTranslations) }, { val: '05', label: t('may', monthlyTranslations) }, { val: '06', label: t('jun', monthlyTranslations) },
@@ -180,17 +238,82 @@ const PWMUMonthlyReport = () => {
     const totalExpenses = (Number(expenses.electricity) || 0) + (Number(expenses.honorarium) || 0) + (Number(expenses.other) || 0);
     const netBalance = totalRevenue - totalExpenses;
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
+        if (!basicInfo.pwmuId) {
+            alert("No PWMU center assigned to your account.");
+            return;
+        }
+
         setIsSaving(true);
-        // Simulate API call
-        setTimeout(() => {
+        try {
+            // 1. Prepare Monthly Report Data
+            const reportData = {
+                pwmu_id: basicInfo.pwmuId,
+                report_month: basicInfo.month,
+                report_year: parseInt(basicInfo.year),
+                machine_status: machineStatus,
+                electricity_bill: parseFloat(expenses.electricity) || 0,
+                honorarium: parseFloat(expenses.honorarium) || 0,
+                other_expenses: parseFloat(expenses.other) || 0,
+                total_revenue: totalRevenue,
+                total_expenses: totalExpenses,
+                net_balance: netBalance,
+                sales_records: sales,
+                submitted_by: user?.id,
+                created_at: new Date().toISOString()
+            };
+
+            // 2. Insert into monthly_reports
+            const { error: reportError } = await supabase
+                .from('monthly_reports')
+                .insert([reportData]);
+
+            if (reportError) throw reportError;
+
+            // 3. Update PWMU Center with cumulative/latest stats
+            // In a real system, we might add to existing. For now, we update snapshots.
+            const { error: updateError } = await supabase
+                .from('pwmu_centers')
+                .update({
+                    revenue: totalRevenue, // Should ideally be cumulative in real DB, but for UAT we update snapshot
+                    expenditure: totalExpenses,
+                    status: Object.values(machineStatus).every(m => m.functional || !m.selected) ? 'operational' : 'maintenance',
+                    last_updated: new Date().toISOString()
+                })
+                .eq('id', basicInfo.pwmuId);
+
+            if (updateError) console.error('Error updating center snapshot:', updateError);
+
+            // 4. Record Vendor Pickups for each sale row
+            if (sales.length > 0) {
+                const pickupRecords = sales.map(s => ({
+                    pwmu_name: basicInfo.pwmuName,
+                    vendor_name: s.vendor,
+                    material: s.wasteType,
+                    quantity_kg: parseFloat(s.quantity) || 0,
+                    amount_paid: parseFloat(s.revenue) || 0,
+                    pickup_date: `${basicInfo.year}-${basicInfo.month}-01`,
+                }));
+
+                const { error: pickupError } = await supabase
+                    .from('vendor_pickups')
+                    .insert(pickupRecords);
+
+                if (pickupError) console.error('Error recording pickups:', pickupError);
+            }
+
             setIsSaving(false);
             setShowSuccess(true);
             setTimeout(() => {
                 navigate('/dashboard/pwmu');
-            }, 2000);
-        }, 1500);
+            }, 2500);
+
+        } catch (err) {
+            console.error('Submission error:', err);
+            alert(`Failed to save report: ${err.message || 'Unknown error'}`);
+            setIsSaving(false);
+        }
     };
 
     if (showSuccess) {

@@ -1,0 +1,18 @@
+[
+  {
+    "id": "eeefc3fb-b6b2-4813-ad83-5ac1c230a6bc",
+    "village_id": "415ea029-a11e-4345-9b6f-1370ad2c8ba7",
+    "village_name": "Raj sarpanch",
+    "district": "Balod (646)",
+    "block": "Balod (3629)",
+    "gram_panchayat": "Amora (124051)",
+    "collection_date": "2026-03-12",
+    "wet_waste_kg": 2,
+    "dry_waste_kg": 33,
+    "user_charge_collected": 0,
+    "submitted": true,
+    "created_at": "2026-03-12T10:50:09.443+00:00",
+    "pwmu_id": "aea9fd0c-9c66-4c5e-9204-9bc0ff7f2b74",
+    "shared_with_pwmu_kg": 33.0
+  }
+]
