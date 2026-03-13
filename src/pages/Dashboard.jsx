@@ -15,15 +15,8 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useEffect } from 'react';
 
-const API_URL = import.meta.env.VITE_SUPABASE_URL;
+const API_BASE = '/cgpwmu/api';
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-const getProxyUrl = () => {
-    if (import.meta.env.DEV) {
-        return '/supabase';
-    }
-    return API_URL;
-};
 
 const Dashboard = () => {
     console.log('[DASH] Component mounting - Version 3.0 (Interactive Filters)');
@@ -195,6 +188,20 @@ const Dashboard = () => {
         }
     };
 
+    // Helper: Scale units for small volumes
+    const formatVolume = (kg) => {
+        if (!kg) return `0 ${t('mt', dashTranslations)}`;
+        if (kg < 1000) return `${Math.round(kg)} Kg`;
+        return `${(kg / 1000).toFixed(1)} MT`;
+    };
+
+    // Helper: Scale units for small currency
+    const formatFinance = (val) => {
+        if (!val) return t('revenue', dashTranslations) + ': ₹0';
+        if (val < 10000) return `₹${Math.round(val).toLocaleString()}`;
+        return `₹${(val / 100000).toFixed(1)}L`;
+    };
+
     // State for live dashboard data
     const [loading, setLoading] = useState(true);
     const [date, setDate] = useState(new Date());
@@ -240,13 +247,14 @@ const Dashboard = () => {
         pwmu: ''
     });
 
+    const [mapMetric, setMapMetric] = useState('waste'); // 'waste' or 'revenue'
+
     const navigate = useNavigate();
 
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const proxyUrl = getProxyUrl();
                 const session = JSON.parse(localStorage.getItem('cgpwmu_session') || '{}');
                 const headers = {
                     'apikey': ANON_KEY,
@@ -272,11 +280,11 @@ const Dashboard = () => {
                 // 1. Fetch PWMU Centers for KPIs and Financials
                 console.log('[DASH] Fetching raw data for filters...');
                 const [pwmuRes, collectionRes, pickupRes, pwmuLogsRes, usersRes] = await Promise.all([
-                    fetch(`${proxyUrl}/rest/v1/pwmu_centers?select=*`, { headers }),
-                    fetch(`${proxyUrl}/rest/v1/waste_collections?select=*`, { headers }),
-                    fetch(`${proxyUrl}/rest/v1/vendor_pickups?select=*`, { headers }),
-                    fetch(`${proxyUrl}/rest/v1/pwmu_daily_logs?select=*`, { headers }),
-                    fetch(`${proxyUrl}/rest/v1/users?select=id,role,status,created_at,full_name,registration_data,district,block,gram_panchayat,village_name`, { headers })
+                    fetch(`${API_BASE}/data/pwmu_centers?select=*`, { headers }),
+                    fetch(`${API_BASE}/data/waste_collections?select=*`, { headers }),
+                    fetch(`${API_BASE}/data/vendor_pickups?select=*`, { headers }),
+                    fetch(`${API_BASE}/data/pwmu_daily_logs?select=*`, { headers }),
+                    fetch(`${API_BASE}/data/users?select=id,role,status,created_at,full_name,registration_data,district,block,gram_panchayat,village_name`, { headers })
                 ]);
 
                 const pwmuData = await safeJson(pwmuRes, 'pwmu_centers');
@@ -293,11 +301,27 @@ const Dashboard = () => {
                     users: usersData
                 });
 
-                // Load location data
-                const locRes = await fetch('/data/locationData.json');
-                if (locRes.ok) {
-                    const lData = await locRes.json();
+                // Load location data (Resilient)
+                const locPaths = [
+                    `${import.meta.env.BASE_URL}data/locationData.json`,
+                    'data/locationData.json',
+                    '/cgpwmu/data/locationData.json'
+                ];
+                let lData = null;
+                for (const p of locPaths) {
+                    try {
+                        const locRes = await fetch(p);
+                        if (locRes.ok) {
+                            lData = await locRes.json();
+                            break;
+                        }
+                    } catch (e) {}
+                }
+                
+                if (lData) {
                     setLocationData(lData);
+                } else {
+                    console.error("Failed to load location data from any path");
                 }
 
             } catch (err) {
@@ -347,15 +371,27 @@ const Dashboard = () => {
         const today = new Date().toISOString().split('T')[0];
         const activePwmus = filteredPwmu.filter(p => p.status?.toLowerCase() === 'operational').length;
         const reportsToday = filteredCollections.filter(c => c.collection_date === today).length;
-        const wasteProcessed = filteredLogs.reduce((acc, curr) => acc + (parseFloat(curr.total_intake_kg) || 0) / 1000, 0);
-        const wasteSold = filteredPickups.reduce((acc, curr) => acc + (parseFloat(curr.quantity_kg) || 0) / 1000, 0);
+        const villageSentVolumeKg = filteredCollections.reduce((acc, curr) => acc + (parseFloat(curr.shared_with_pwmu_kg) || 0), 0);
+        const wasteProcessedKg = filteredLogs.reduce((acc, curr) => acc + (parseFloat(curr.total_intake_kg) || 0), 0);
+        const wasteSoldKg = filteredPickups.reduce((acc, curr) => acc + (parseFloat(curr.quantity_kg) || 0), 0);
+        const totalWetKg = filteredCollections.reduce((acc, curr) => acc + (parseFloat(curr.wet_waste_kg) || 0), 0);
+
         const villagesLinked = filteredUsers.filter(u => u.role === 'Sarpanch').length;
         const swachhagrahis = filteredUsers.filter(u => u.role?.toLowerCase() === 'swachhagrahi').length || (villagesLinked * 4);
         const totalRevenue = filteredPickups.reduce((acc, curr) => acc + (parseFloat(curr.amount_paid) || 0), 0);
-        const totalExpense = wasteProcessed * 2500;
+        const totalExpense = (wasteProcessedKg / 1000) * 2500;
 
-        const villageSentVolume = filteredCollections.reduce((acc, curr) => acc + (parseFloat(curr.shared_with_pwmu_kg) || 0) / 1000, 0);
-        const totalWet = filteredCollections.reduce((acc, curr) => acc + (parseFloat(curr.wet_waste_kg) || 0), 0);
+        // Aggregate by District for Map
+        const districtWasteMap = {};
+        const districtRevenueMap = {};
+        rawData.collections.forEach(c => {
+            const d = c.district?.split(' (')[0];
+            if (d) districtWasteMap[d] = (districtWasteMap[d] || 0) + (parseFloat(c.shared_with_pwmu_kg) || 0);
+        });
+        rawData.pickups.forEach(p => {
+            const d = rawData.pwmu.find(pwm => pwm.name === p.pwmu_name)?.district;
+            if (d) districtRevenueMap[d] = (districtRevenueMap[d] || 0) + (parseFloat(p.amount_paid) || 0);
+        });
 
         // Waste Composition Aggregation
         const getMaterialTotal = (type) => filteredPickups
@@ -368,9 +404,9 @@ const Dashboard = () => {
         const allPickupsTotal = filteredPickups.reduce((acc, curr) => acc + (parseFloat(curr.quantity_kg) || 0), 0);
         const other = allPickupsTotal - (plastic + paper + metal);
 
-        const totalVolComp = totalWet + plastic + paper + metal + Math.max(0, other);
+        const totalVolComp = totalWetKg + plastic + paper + metal + Math.max(0, other);
         const composition = totalVolComp > 0 ? [
-            { name: t('organicWaste', dashTranslations), value: Math.round((totalWet / totalVolComp) * 100), color: '#22c55e' },
+            { name: t('organicWaste', dashTranslations), value: Math.round((totalWetKg / totalVolComp) * 100), color: '#22c55e' },
             { name: t('plastic', dashTranslations), value: Math.round((plastic / totalVolComp) * 100), color: '#3b82f6' },
             { name: t('paper', dashTranslations), value: Math.round((paper / totalVolComp) * 100), color: '#eab308' },
             { name: t('metal', dashTranslations), value: Math.round((metal / totalVolComp) * 100), color: '#a855f7' },
@@ -409,14 +445,16 @@ const Dashboard = () => {
             ...prev,
             activePwmus,
             reportsSubmitted: reportsToday,
-            wasteProcessed,
-            wasteSold,
+            wasteProcessed: wasteProcessedKg / 1000,
+            wasteSold: wasteSoldKg / 1000,
             villagesLinked,
             swachhagrahis,
             totalRevenue,
             totalExpense,
             activities,
             wasteComposition: composition,
+            districtWasteMap,
+            districtRevenueMap,
             financialChart: [
                 { month: 'Jan', revenue: totalRevenue * 0.7, spending: totalExpense * 0.8 },
                 { month: 'Feb', revenue: totalRevenue * 0.85, spending: totalExpense * 0.9 },
@@ -424,27 +462,27 @@ const Dashboard = () => {
             ],
             valueChain: {
                 villages: {
-                    volume: `${villageSentVolume.toFixed(1)} MT`,
-                    financial: `-₹${(villageSentVolume * 1200 / 100000).toFixed(1)}L`,
+                    volume: formatVolume(villageSentVolumeKg),
+                    financial: `-` + formatFinance(villageSentVolumeKg * 1.2).replace(t('revenue', dashTranslations) + ': ', ''),
                     hoverText: `Material reported by ${villagesLinked} active villages.`,
                     details: [
-                        { label: 'Dry Waste', value: `${(villageSentVolume * 0.7).toFixed(1)} MT` },
-                        { label: 'Wet Waste', value: `${(villageSentVolume * 0.3).toFixed(1)} MT` }
+                        { label: 'Dry Waste', value: formatVolume(villageSentVolumeKg * 0.7) },
+                        { label: 'Wet Waste', value: formatVolume(villageSentVolumeKg * 0.3) }
                     ]
                 },
                 pwmuCenter: {
-                    volume: `${wasteProcessed.toFixed(1)} MT`,
-                    financial: `-₹${(totalExpense / 100000).toFixed(1)}L`,
+                    volume: formatVolume(wasteProcessedKg),
+                    financial: `-` + formatFinance(totalExpense).replace(t('revenue', dashTranslations) + ': ', ''),
                     hoverText: "Processing and transport operations.",
                     details: [
-                        { label: 'Processing Loss', value: `${(wasteProcessed * 0.08).toFixed(1)} MT` },
-                        { label: 'Recovered', value: `${(wasteProcessed * 0.92).toFixed(1)} MT` }
+                        { label: 'Processing Loss', value: formatVolume(wasteProcessedKg * 0.08) },
+                        { label: 'Recovered', value: formatVolume(wasteProcessedKg * 0.92) }
                     ]
                 },
                 sinks: [
-                    { id: 'recyclers', name: 'Recyclers', volume: `${(totalRevenue > 0 ? (wasteProcessed * 0.45) : 0).toFixed(1)} MT`, financial: `+₹${(totalRevenue * 0.65 / 100000).toFixed(1)}L`, color: 'green' },
-                    { id: 'cementKiln', name: 'Cement Kiln', volume: `${(totalRevenue > 0 ? (wasteProcessed * 0.25) : 0).toFixed(1)} MT`, financial: `+₹${(totalRevenue * 0.15 / 100000).toFixed(1)}L`, color: 'red' },
-                    { id: 'roadConst', name: 'Road Const.', volume: `${(totalRevenue > 0 ? (wasteProcessed * 0.20) : 0).toFixed(1)} MT`, financial: `+₹${(totalRevenue * 0.20 / 100000).toFixed(1)}L`, color: 'yellow' }
+                    { id: 'recyclers', name: 'Recyclers', volume: formatVolume(wasteProcessedKg * 0.45), financial: `+` + formatFinance(totalRevenue > 0 ? totalRevenue * 0.65 : wasteProcessedKg * 2.5).replace(t('revenue', dashTranslations) + ': ', ''), color: 'green' },
+                    { id: 'cementKiln', name: 'Cement Kiln', volume: formatVolume(wasteProcessedKg * 0.25), financial: `+` + formatFinance(totalRevenue > 0 ? totalRevenue * 0.15 : wasteProcessedKg * 1.5).replace(t('revenue', dashTranslations) + ': ', ''), color: 'red' },
+                    { id: 'roadConst', name: 'Road Const.', volume: formatVolume(wasteProcessedKg * 0.20), financial: `+` + formatFinance(totalRevenue > 0 ? totalRevenue * 0.20 : wasteProcessedKg * 1.0).replace(t('revenue', dashTranslations) + ': ', ''), color: 'yellow' }
                 ]
             }
         }));
@@ -647,12 +685,31 @@ const Dashboard = () => {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* State Map Coverage */}
                     <div className="lg:col-span-1 bg-white rounded-xl border border-gray-100 shadow-sm flex flex-col">
-                        <div className="p-6 border-b border-gray-100">
-                            <h2 className="text-lg font-bold text-gray-800">{t('stateMap', dashTranslations)}</h2>
-                            <p className="text-sm text-gray-500 mt-1">{t('districtCoverage', dashTranslations)}</p>
+                        <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                                <h2 className="text-lg font-bold text-gray-800">{t('stateMap', dashTranslations)}</h2>
+                                <p className="text-sm text-gray-500 mt-1">{t('districtCoverage', dashTranslations)}</p>
+                            </div>
+                            <div className="flex bg-gray-100 rounded-lg p-1 shadow-inner h-fit self-end">
+                                <button 
+                                    onClick={() => setMapMetric('waste')}
+                                    className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${mapMetric === 'waste' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                                >
+                                    {t('dryWaste', dashTranslations)}
+                                </button>
+                                <button 
+                                    onClick={() => setMapMetric('revenue')}
+                                    className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${mapMetric === 'revenue' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                                >
+                                    {t('revenue', dashTranslations)}
+                                </button>
+                            </div>
                         </div>
                         <div className="p-4 flex-1 min-h-[400px]">
-                            <ChhattisgarhMap />
+                            <ChhattisgarhMap 
+                                metricData={mapMetric === 'waste' ? stats.districtWasteMap : stats.districtRevenueMap} 
+                                metricType={mapMetric}
+                            />
                         </div>
                     </div>
 

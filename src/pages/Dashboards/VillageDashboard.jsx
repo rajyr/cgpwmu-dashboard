@@ -12,8 +12,8 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 
+const API_BASE = '/cgpwmu/api';
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const getProxyUrl = () => (import.meta.env.DEV ? '/supabase' : import.meta.env.VITE_SUPABASE_URL);
 
 function VillageDashboard() {
     const navigate = useNavigate();
@@ -108,7 +108,6 @@ function VillageDashboard() {
                 const session = JSON.parse(localStorage.getItem('cgpwmu_session') || '{}');
                 const token = session.access_token;
                 if (!token) return;
-                const proxyUrl = getProxyUrl();
 
                 // Helper to safe-fetch JSON
                 const safeJson = async (res, label) => {
@@ -130,7 +129,7 @@ function VillageDashboard() {
                 if (userRole === 'Sarpanch') {
                     console.log('[VILLAGE_DASH] Fetching profile...');
                     const profileRes = await fetch(
-                        `${proxyUrl}/rest/v1/users?id=eq.${session.user?.id}&select=*`,
+                        `${API_BASE}/data/users?id=eq.${session.user?.id}&select=*`,
                         { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(8000) }
                     );
                     const data = await safeJson(profileRes, 'profile');
@@ -140,23 +139,23 @@ function VillageDashboard() {
                 // 2. Fetch all registered villages (Sarpanch users)
                 console.log('[VILLAGE_DASH] Fetching all villages...');
                 const villagesRes = await fetch(
-                    `${proxyUrl}/rest/v1/users?role=eq.Sarpanch&status=eq.approved&select=*`,
+                    `${API_BASE}/data/users?role=eq.Sarpanch&status=eq.approved&select=*`,
                     { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(8000) }
                 );
                 setAllVillages(await safeJson(villagesRes, 'villages'));
 
                 // 3. Fetch all collections
                 console.log('[VILLAGE_DASH] Fetching collections...');
-                const collectionsRes = await fetch(
-                    `${proxyUrl}/rest/v1/waste_collections?select=*&order=collection_date.asc`,
-                    { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(8000) }
-                );
-                setCollections(await safeJson(collectionsRes, 'collections'));
+                const [pwmuRes, collRes] = await Promise.all([
+                    fetch(`${API_BASE}/data/pwmu_centers?select=*`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } }),
+                    fetch(`${API_BASE}/data/waste_collections?select=*&order=collection_date.asc`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } })
+                ]);
+                setCollections(await safeJson(collRes, 'collections'));
 
                 // 4. Fetch all workers
                 console.log('[VILLAGE_DASH] Fetching workers...');
                 const workersRes = await fetch(
-                    `${proxyUrl}/rest/v1/village_workers?select=*`,
+                    `${API_BASE}/data/village_workers?select=*`,
                     { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(8000) }
                 );
                 setWorkersData(await safeJson(workersRes, 'workers'));

@@ -37,7 +37,7 @@ const Footer = () => {
                 <div className="flex flex-col md:flex-row items-center justify-between gap-8 mb-8">
                     <Link to="/" className="flex items-center gap-3 group">
                         <img
-                            src="/assets/Logo/CGPWMUlogo.webp"
+                            src="/cgpwmu/assets/Logo/CGPWMUlogo.webp"
                             alt="CG-PWMU Logo"
                             className="h-12 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
                         />

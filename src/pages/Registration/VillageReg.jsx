@@ -124,18 +124,33 @@ const VillageReg = () => {
     });
 
     React.useEffect(() => {
-        fetch('/data/locationData.json')
-            .then(res => res.json())
-            .then(data => setLocationData(data))
-            .catch(err => console.error("Error loading location data:", err));
+        const loadLocationData = async () => {
+            const paths = [
+                `${import.meta.env.BASE_URL}data/locationData.json`,
+                'data/locationData.json',
+                '/cgpwmu/data/locationData.json'
+            ];
+            for (const path of paths) {
+                try {
+                    const res = await fetch(path);
+                    if (res.ok) {
+                        const data = await res.json();
+                        setLocationData(data);
+                        return;
+                    }
+                } catch (e) {}
+            }
+            console.error("Failed to load location data from any path");
+        };
+        loadLocationData();
 
         const stripCode = (str) => str ? str.replace(/\s*\(\d+\)\s*/g, '').trim() : '';
 
         const fetchPWMUs = async () => {
             try {
-                const proxyUrl = import.meta.env.DEV ? `${window.location.origin}/supabase` : import.meta.env.VITE_SUPABASE_URL;
+                const proxyUrl = '/cgpwmu/api';
                 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-                const res = await fetch(`${proxyUrl}/rest/v1/users?role=eq.PWMUManager&status=eq.approved&select=id,registration_data`, {
+                const res = await fetch(`${proxyUrl}/data/users?role=eq.PWMUManager&status=eq.approved&select=id,registration_data`, {
                     headers: { 'apikey': ANON_KEY }
                 });
 

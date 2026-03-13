@@ -167,7 +167,6 @@ const VillageMonthlyReport = () => {
                 other_expenses: parseFloat(expensesInfo.otherExpenses) || 0,
                 total_honorarium: totalHonorarium,
                 total_expenses: totalExpenses,
-                net_balance: netBalance,
                 net_balance: netBalance
             };
 

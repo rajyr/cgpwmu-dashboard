@@ -141,8 +141,8 @@ const VillageDailyReport = () => {
                     return;
                 }
                 try {
-                    const proxyUrl = import.meta.env.DEV ? '/supabase' : import.meta.env.VITE_SUPABASE_URL;
-                    const res = await fetch(`${proxyUrl}/rest/v1/pwmu_centers?id=eq.${reg.pwmuId}&select=name`, {
+                    const proxyUrl = '/cgpwmu/api';
+                    const res = await fetch(`${proxyUrl}/data/pwmu_centers?id=eq.${reg.pwmuId}&select=name`, {
                         headers: { 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY }
                     });
                     const data = await res.json();
@@ -176,9 +176,9 @@ const VillageDailyReport = () => {
         if (!user?.id) return;
         setIsChecking(true);
         try {
-            const proxyUrl = import.meta.env.DEV ? '/supabase' : import.meta.env.VITE_SUPABASE_URL;
+            const proxyUrl = '/cgpwmu/api';
             const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-            const res = await fetch(`${proxyUrl}/rest/v1/waste_collections?village_id=eq.${user.id}&collection_date=eq.${selectedDate}&select=*`, {
+            const res = await fetch(`${proxyUrl}/data/waste_collections?village_id=eq.${user.id}&collection_date=eq.${selectedDate}&select=*`, {
                 headers: { 'apikey': ANON_KEY }
             });
             const data = await res.json();
@@ -302,7 +302,7 @@ const VillageDailyReport = () => {
                 return;
             }
 
-            const proxyUrl = import.meta.env.DEV ? '/supabase' : import.meta.env.VITE_SUPABASE_URL;
+            const proxyUrl = '/cgpwmu/api';
             const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
             const session = JSON.parse(localStorage.getItem('cgpwmu_session') || '{}');
             const token = session.access_token || ANON_KEY;
@@ -317,13 +317,13 @@ const VillageDailyReport = () => {
             // 1. DELETE any existing records for this day/village (Robust Duplication Prevention)
             // This clears multiple entries if they exist from previous bugs
             console.log('[DEBUG] Clearing existing records for:', basicInfo.date);
-            await fetch(`${proxyUrl}/rest/v1/waste_collections?village_id=eq.${user.id}&collection_date=eq.${basicInfo.date}`, {
+            await fetch(`${proxyUrl}/data/waste_collections?village_id=eq.${user.id}&collection_date=eq.${basicInfo.date}`, {
                 method: 'DELETE',
                 headers
             });
 
             // 2. POST the new single record
-            const url = `${proxyUrl}/rest/v1/waste_collections`;
+            const url = `${proxyUrl}/data/waste_collections`;
             const response = await fetch(url, {
                 method: 'POST',
                 headers,

@@ -32,7 +32,7 @@ const Navbar = () => {
                 <div className="flex justify-between h-16">
                     <Link to="/" className="flex items-center gap-3 group">
                         <img
-                            src="/assets/Logo/CGPWMUlogo.webp"
+                            src="/cgpwmu/assets/Logo/CGPWMUlogo.webp"
                             alt="CG-PWMU Logo"
                             className="h-10 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
                         />

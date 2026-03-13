@@ -48,7 +48,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 
 function App() {
     return (
-        <BrowserRouter>
+        <BrowserRouter basename="/cgpwmu">
             <Routes>
                 {/* Public Routes */}
                 <Route path="/" element={<PublicLayout />}>

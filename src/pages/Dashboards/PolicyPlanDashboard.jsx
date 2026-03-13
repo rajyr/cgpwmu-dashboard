@@ -9,12 +9,8 @@ import {
 } from 'recharts';
 
 const API_URL = import.meta.env.VITE_SUPABASE_URL;
+const API_BASE = '/cgpwmu/api';
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-const getProxyUrl = () => {
-    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    return isLocal ? '' : '/api/supabase';
-};
 
 function PolicyPlanDashboard() {
     const [loading, setLoading] = useState(true);
@@ -29,16 +25,13 @@ function PolicyPlanDashboard() {
         const fetchPolicyData = async () => {
             setLoading(true);
             try {
-                const proxyUrl = getProxyUrl();
                 const session = JSON.parse(localStorage.getItem('cgpwmu_session') || '{}');
-                const headers = {
-                    'apikey': ANON_KEY,
-                    'Authorization': `Bearer ${session.access_token}`,
-                };
+                const token = session.access_token;
+                if (!token) return;
 
                 const [pwmuRes, collRes] = await Promise.all([
-                    fetch(`${proxyUrl}/rest/v1/pwmu_centers?select=*`, { headers }),
-                    fetch(`${proxyUrl}/rest/v1/waste_collections?select=*`, { headers })
+                    fetch(`${API_BASE}/data/pwmu_centers?select=*`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } }),
+                    fetch(`${API_BASE}/data/waste_collections?select=*`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } })
                 ]);
 
                 const centers = await pwmuRes.json();

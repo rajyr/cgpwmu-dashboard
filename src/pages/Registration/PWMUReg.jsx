@@ -135,10 +135,25 @@ const PWMUReg = () => {
     const [locationData, setLocationData] = useState({});
 
     React.useEffect(() => {
-        fetch('/data/locationData.json')
-            .then(res => res.json())
-            .then(data => setLocationData(data))
-            .catch(err => console.error("Error loading location data:", err));
+        const loadLocationData = async () => {
+            const paths = [
+                `${import.meta.env.BASE_URL}data/locationData.json`,
+                'data/locationData.json',
+                '/cgpwmu/data/locationData.json'
+            ];
+            for (const path of paths) {
+                try {
+                    const res = await fetch(path);
+                    if (res.ok) {
+                        const data = await res.json();
+                        setLocationData(data);
+                        return;
+                    }
+                } catch (e) {}
+            }
+            console.error("Failed to load location data from any path");
+        };
+        loadLocationData();
     }, []);
 
     const [formData, setFormData] = useState({

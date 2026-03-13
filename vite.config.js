@@ -8,15 +8,14 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
 
   return {
+    base: '/cgpwmu/',
     plugins: [react()],
     server: {
       proxy: {
-        // BYPASS FIREWALL: Route all /supabase requests through Node.js (Vite Dev Server)
-        '/supabase': {
-          target: env.VITE_SUPABASE_URL,
+        '/cgpwmu/api': {
+          target: 'http://127.0.0.1:5000',
           changeOrigin: true,
-          secure: false, // In case of local ssl issues
-          rewrite: (path) => path.replace(/^\/supabase/, '')
+          secure: false,
         }
       }
     }

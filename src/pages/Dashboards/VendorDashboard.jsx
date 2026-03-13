@@ -10,8 +10,8 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 
+const API_BASE = '/cgpwmu/api';
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const getProxyUrl = () => (import.meta.env.DEV ? '/supabase' : import.meta.env.VITE_SUPABASE_URL);
 
 function VendorDashboard() {
     const { userRole: authRole, userName } = useAuth();
@@ -101,12 +101,12 @@ function VendorDashboard() {
                 const session = JSON.parse(localStorage.getItem('cgpwmu_session') || '{}');
                 const token = session.access_token;
                 if (!token) return;
-                const proxyUrl = getProxyUrl();
+                const headers = { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` };
 
                 // 1. Fetch own profile
                 const profileRes = await fetch(
-                    `${proxyUrl}/rest/v1/users?id=eq.${session.user?.id}&select=id,full_name,role,district,registration_data`,
-                    { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(8000) }
+                    `${API_BASE}/data/users?id=eq.${session.user?.id}&select=id,full_name,role,district,registration_data`,
+                    { headers: { ...headers, 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(8000) }
                 );
                 if (profileRes.ok) {
                     const data = await profileRes.json();
@@ -115,8 +115,8 @@ function VendorDashboard() {
 
                 // 2. Fetch all approved vendors (for admin directory)
                 const vendorsRes = await fetch(
-                    `${proxyUrl}/rest/v1/users?role=eq.Vendor&status=eq.approved&select=id,full_name,district,registration_data,created_at`,
-                    { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(8000) }
+                    `${API_BASE}/data/users?role=eq.Vendor&status=eq.approved&select=id,full_name,district,registration_data,created_at`,
+                    { headers: { ...headers, 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(8000) }
                 );
                 if (vendorsRes.ok) {
                     setAllVendors(await vendorsRes.json());
@@ -124,8 +124,8 @@ function VendorDashboard() {
 
                 // 3. Fetch market availability
                 const marketRes = await fetch(
-                    `${proxyUrl}/rest/v1/market_availability?select=*&order=is_hot.desc,created_at.desc`,
-                    { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(8000) }
+                    `${API_BASE}/data/market_availability?select=*&order=is_hot.desc,created_at.desc`,
+                    { headers: { ...headers, 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(8000) }
                 );
                 if (marketRes.ok) {
                     setMarketData(await marketRes.json());
@@ -133,8 +133,8 @@ function VendorDashboard() {
 
                 // 4. Fetch vendor pickups
                 const pickupsRes = await fetch(
-                    `${proxyUrl}/rest/v1/vendor_pickups?select=*&order=pickup_date.asc`,
-                    { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(8000) }
+                    `${API_BASE}/data/vendor_pickups?select=*&order=pickup_date.asc`,
+                    { headers: { ...headers, 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(8000) }
                 );
                 if (pickupsRes.ok) {
                     setPickupData(await pickupsRes.json());

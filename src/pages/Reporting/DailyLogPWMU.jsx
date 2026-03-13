@@ -5,9 +5,8 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabaseClient';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const API_BASE = '/cgpwmu/api';
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const getProxyUrl = () => (import.meta.env.DEV ? '/supabase' : SUPABASE_URL);
 
 const DailyLogPWMU = () => {
     const navigate = useNavigate();
@@ -163,11 +162,10 @@ const DailyLogPWMU = () => {
             try {
                 const session = JSON.parse(localStorage.getItem('cgpwmu_session') || '{}');
                 const token = session.access_token;
-                const proxyUrl = getProxyUrl();
 
                 if (token) {
                     const profileRes = await fetch(
-                        `${proxyUrl}/rest/v1/users?id=eq.${user.id}&select=registration_data`,
+                        `${API_BASE}/data/users?id=eq.${user.id}&select=registration_data`,
                         {
                             headers: {
                                 'apikey': ANON_KEY,
@@ -205,8 +203,11 @@ const DailyLogPWMU = () => {
         return match ? match[1] : null;
     };
 
-    const getGPCodeForVillageCode = (vCode) => {
-        if (!locationData || !vCode) return null;
+    const getGPCodeForVillageCode = (vString) => {
+        if (!locationData || !vString) return null;
+        const vCode = extractCode(vString);
+        if (!vCode) return null;
+
         // Optimize search if district is known
         const dNames = center?.district ? [center.district] : Object.keys(locationData);
         for (const dName of dNames) {
@@ -214,10 +215,9 @@ const DailyLogPWMU = () => {
             for (const bName in blocks) {
                 const gps = blocks[bName] || {};
                 for (const gpName in gps) {
-                    const gpCode = extractCode(gpName);
                     const villages = gps[gpName] || [];
                     if (villages.some(v => extractCode(v) === vCode)) {
-                        return gpCode;
+                        return extractCode(gpName);
                     }
                 }
             }
@@ -226,7 +226,7 @@ const DailyLogPWMU = () => {
     };
 
     useEffect(() => {
-        fetch('/data/locationData.json')
+        fetch(`${import.meta.env.BASE_URL}data/locationData.json`)
             .then(res => res.json())
             .then(data => setLocationData(data))
             .catch(err => console.error("Error loading location data:", err));
@@ -245,15 +245,15 @@ const DailyLogPWMU = () => {
     useEffect(() => {
         const fetchLinkedVillages = async () => {
             if (!center?.id) {
-                // If there's no center, we shouldn't be indefinitely loading
+                console.warn("[FetchVillages] Skipping - NO CENTER ID", center);
                 setIsLoading(false);
                 return;
             }
+            console.log("[FetchVillages] Starting for center:", center.id);
             setIsLoading(true);
             try {
                 const session = JSON.parse(localStorage.getItem('cgpwmu_session') || '{}');
                 const token = session.access_token;
-                const proxyUrl = getProxyUrl();
 
                 if (!token) {
                     console.error("No auth token available");
@@ -262,8 +262,9 @@ const DailyLogPWMU = () => {
                 }
 
                 // 1. Fetch Sarpanch users linked to this center
+                console.log("[FetchVillages] Querying Sarpanch users...");
                 const sarpanchRes = await fetch(
-                    `${proxyUrl}/rest/v1/users?role=eq.Sarpanch&select=id,full_name,registration_data`,
+                    `${API_BASE}/data/users?role=eq.Sarpanch&select=id,full_name,registration_data`,
                     {
                         headers: {
                             'apikey': ANON_KEY,
@@ -275,19 +276,27 @@ const DailyLogPWMU = () => {
                 let fetchedVillages = [];
                 if (sarpanchRes.ok) {
                     const sarpanchUsers = await sarpanchRes.json();
-                    const filtered = sarpanchUsers.filter(u => u.registration_data?.pwmuId === center.id);
+                    console.log("[FetchVillages] Found total Sarpanches:", sarpanchUsers.length);
+                    const filtered = sarpanchUsers.filter(u => {
+                        const reg = u.registration_data || {};
+                        return String(reg.pwmuId) === String(center.id);
+                    });
+                    console.log("[FetchVillages] Filtered Sarpanches:", filtered.length);
+                    
                     fetchedVillages = filtered.map(v => ({
                         id: v.id,
                         name: v.registration_data?.villageName || v.registration_data?.primaryVillage || v.registration_data?.gramPanchayat || v.full_name || 'Village',
                         type: 'Village',
                         autoFilled: false,
+                        manualEntry: true, // Show "Manual" label
                         value: ''
                     }));
                 }
 
                 // 2. Fetch manager's profile to get service villages (selected during registration)
+                console.log("[FetchVillages] Querying Manager profile (ID:", user.id, ") for serviceVillages...");
                 const profileRes = await fetch(
-                    `${proxyUrl}/rest/v1/users?id=eq.${user.id}&select=registration_data`,
+                    `${API_BASE}/data/users?id=eq.${user.id}&select=registration_data`,
                     {
                         headers: {
                             'apikey': ANON_KEY,
@@ -298,10 +307,13 @@ const DailyLogPWMU = () => {
 
                 if (profileRes.ok) {
                     const profileData = await profileRes.json();
+                    console.log("[FetchVillages] Profile Result:", profileData);
                     if (profileData && profileData.length > 0) {
                         const managerProfile = profileData[0];
-                        if (managerProfile?.registration_data?.serviceVillages) {
-                            const profileVillages = managerProfile.registration_data.serviceVillages;
+                        const reg = managerProfile?.registration_data || {};
+                        if (reg.serviceVillages) {
+                            const profileVillages = reg.serviceVillages;
+                            console.log("[FetchVillages] Found serviceVillages in profile:", profileVillages);
                             profileVillages.forEach(vName => {
                                 // Smart Deduplication:
                                 // 1. Check for exact name match
@@ -440,7 +452,7 @@ const DailyLogPWMU = () => {
                                 const match = matches.find(m => Number(m.shared_with_pwmu_kg) > 0) || matches[0];
                                 const newValue = (match.shared_with_pwmu_kg || 0).toString();
 
-                                if (v.value !== newValue) {
+                                if (v.value !== newValue && Number(newValue) > 0) {
                                     hasChanges = true;
                                     console.log(`✅ Matched ${v.name}: ${newValue}kg (from ${matches.length} records)`);
                                     return { ...v, value: newValue, autoFilled: true, manualEntry: false };
@@ -549,7 +561,7 @@ const DailyLogPWMU = () => {
             if (center?.id) {
                 const manualVillages = villages.filter(v => (v.id.startsWith('manual-') || v.id.startsWith('profile-')) && v.value !== '' && Number(v.value) > 0);
                 if (manualVillages.length > 0) {
-                    const proxyUrl = import.meta.env.DEV ? `${window.location.origin}/supabase` : import.meta.env.VITE_SUPABASE_URL;
+                    const proxyUrl = '/cgpwmu/api';
                     const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
                     const session = JSON.parse(localStorage.getItem('cgpwmu_session') || '{}');
                     const token = session.access_token || ANON_KEY;
@@ -572,7 +584,7 @@ const DailyLogPWMU = () => {
                         }
                     }));
 
-                    fetch(`${proxyUrl}/rest/v1/users`, {
+                    fetch(`${API_BASE}/data/users`, {
                         method: 'POST',
                         headers,
                         body: JSON.stringify(registerPayload)

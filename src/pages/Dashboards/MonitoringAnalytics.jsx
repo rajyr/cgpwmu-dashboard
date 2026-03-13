@@ -6,8 +6,8 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 
+const API_BASE = '/cgpwmu/api';
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const getProxyUrl = () => (import.meta.env.DEV ? '/supabase' : import.meta.env.VITE_SUPABASE_URL);
 
 const MonitoringAnalytics = () => {
     const { userRole } = useAuth();
@@ -96,11 +96,10 @@ const MonitoringAnalytics = () => {
                 const session = JSON.parse(localStorage.getItem('cgpwmu_session') || '{}');
                 const token = session.access_token;
                 if (!token) return;
-                const proxyUrl = getProxyUrl();
 
                 const [pwmuRes, collRes] = await Promise.all([
-                    fetch(`${proxyUrl}/rest/v1/pwmu_centers?select=*`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } }),
-                    fetch(`${proxyUrl}/rest/v1/waste_collections?select=*`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } })
+                    fetch(`${API_BASE}/data/pwmu_centers?select=*`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } }),
+                    fetch(`${API_BASE}/data/waste_collections?select=*`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } })
                 ]);
 
                 if (pwmuRes.ok) setPwmus(await pwmuRes.json());

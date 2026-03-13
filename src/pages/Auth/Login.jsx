@@ -125,7 +125,7 @@ const Login = () => {
                     <div className="absolute bottom-0 left-0 translate-y-1/3 -translate-x-1/3 w-48 h-48 bg-[#FF9933]/20 rounded-full blur-xl"></div>
 
                     <div className="relative z-10">
-                        <img src="/assets/Logo/CGPWMUlogo.webp" alt="CG-PWMU Logo" className="h-16 w-auto object-contain bg-white rounded-lg p-2 mb-8 shadow-md" />
+                        <img src="/cgpwmu/assets/Logo/CGPWMUlogo.webp" alt="CG-PWMU Logo" className="h-16 w-auto object-contain bg-white rounded-lg p-2 mb-8 shadow-md" />
                         <h2 className="text-3xl font-bold mb-4">{t('welcome', loginTranslations)}</h2>
                         <p className="text-blue-100 text-sm leading-relaxed mb-6">
                             {t('brandingDesc', loginTranslations)}

@@ -137,7 +137,7 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
             {/* Header/Logo Area */}
             <div className={`flex items-center pt-6 pb-4 px-4 border-b border-gray-100 min-h-[80px] ${isActuallyCollapsed ? 'justify-center' : 'justify-between'}`}>
                 <div className={`flex items-center gap-2 ${isActuallyCollapsed ? 'hidden' : 'flex'}`}>
-                    <img src="/assets/Logo/CGPWMUlogosm.webp" alt="CG-PWMU Logo" className="h-10 w-auto object-contain" />
+                    <img src="/cgpwmu/assets/Logo/CGPWMUlogosm.webp" alt="CG-PWMU Logo" className="h-10 w-auto object-contain" />
                     <div className="flex flex-col">
                         <span className="font-bold text-gray-800 text-[15px] leading-tight text-blue-800 tracking-wide">CG-PWMU</span>
                         <span className="text-[10px] text-gray-500 font-medium uppercase tracking-wider">Dashboard</span>
@@ -145,7 +145,7 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
                 </div>
                 {/* Collapsed Logo */}
                 {isActuallyCollapsed && (
-                    <img src="/assets/Logo/CGPWMUlogosm.webp" alt="CG-PWMU Logo" className="h-8 w-auto object-contain" />
+                    <img src="/cgpwmu/assets/Logo/CGPWMUlogosm.webp" alt="CG-PWMU Logo" className="h-8 w-auto object-contain" />
                 )}
 
                 {/* Collapse Toggle Button - Desktop Only */}

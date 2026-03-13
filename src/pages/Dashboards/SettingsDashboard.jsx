@@ -7,8 +7,8 @@ import { useAuth } from '../../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const API_BASE = '/cgpwmu/api';
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const getProxyUrl = () => (import.meta.env.DEV ? '/supabase' : SUPABASE_URL);
 
 const SettingsDashboard = () => {
     const { userRole } = useAuth();
@@ -55,16 +55,14 @@ const SettingsDashboard = () => {
             const token = session.access_token;
             if (!token) return;
 
-            const proxyUrl = getProxyUrl();
             const res = await fetch(
-                `${proxyUrl}/rest/v1/users?select=id,full_name,role,status,district,phone_number,created_at&order=created_at.desc`,
+                `${API_BASE}/data/users?select=id,full_name,role,status,district,phone_number,created_at&order=created_at.desc`,
                 {
                     headers: {
                         'apikey': ANON_KEY,
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json',
-                    },
-                    signal: AbortSignal.timeout(8000),
+                    }
                 }
             );
             if (res.ok) {
@@ -89,25 +87,23 @@ const SettingsDashboard = () => {
             const token = session.access_token;
             if (!token) return;
 
-            const proxyUrl = getProxyUrl();
             const res = await fetch(
-                `${proxyUrl}/rest/v1/system_settings?key=eq.auto_approve_users`,
+                `${API_BASE}/data/system_settings?key=eq.auto_approve_users`,
                 {
                     headers: {
                         'apikey': ANON_KEY,
                         'Authorization': `Bearer ${token}`,
-                    },
-                    signal: AbortSignal.timeout(5000),
+                    }
                 }
             );
             if (res.ok) {
                 const data = await res.json();
                 if (data.length > 0) {
-                    setAutoApprove(data[0].value === true);
+                    setAutoApprove(data[0].value === true || data[0].value === 'true');
                 }
             }
         } catch (err) {
-            console.warn('System settings table might not exist yet:', err);
+            console.warn('System settings look up failed:', err);
         } finally {
             setSettingsLoading(false);
         }
@@ -124,19 +120,15 @@ const SettingsDashboard = () => {
         setSettingsLoading(true);
         try {
             const session = JSON.parse(localStorage.getItem('cgpwmu_session') || '{}');
-            const proxyUrl = getProxyUrl();
-            await fetch(`${proxyUrl}/rest/v1/system_settings?key=eq.auto_approve_users`, {
+            await fetch(`${API_BASE}/data/system_settings?key=eq.auto_approve_users`, {
                 method: 'PATCH',
                 headers: {
                     'apikey': ANON_KEY,
                     'Authorization': `Bearer ${session.access_token}`,
-                    'Content-Type': 'application/json',
-                    'Prefer': 'resolution=merge-duplicates'
+                    'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ value: newValue }),
-                signal: AbortSignal.timeout(5000),
+                body: JSON.stringify({ value: newValue })
             });
-            // If PATCH fails (table missing), we still keep the local state for now
         } catch (err) {
             console.warn('Failed to save auto-approve setting:', err);
         } finally {
@@ -149,17 +141,14 @@ const SettingsDashboard = () => {
         setActionLoading(userId);
         try {
             const session = JSON.parse(localStorage.getItem('cgpwmu_session') || '{}');
-            const proxyUrl = getProxyUrl();
-            await fetch(`${proxyUrl}/rest/v1/users?id=eq.${userId}`, {
-                method: 'PATCH',
+            await fetch(`${API_BASE}/data/users?id=eq.${userId}`, {
+                method: 'PUT',
                 headers: {
                     'apikey': ANON_KEY,
                     'Authorization': `Bearer ${session.access_token}`,
-                    'Content-Type': 'application/json',
-                    'Prefer': 'return=minimal',
+                    'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ status: 'approved' }),
-                signal: AbortSignal.timeout(8000),
+                body: JSON.stringify({ id: userId, status: 'approved' })
             });
             setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: 'approved' } : u));
         } catch (err) {
@@ -174,17 +163,14 @@ const SettingsDashboard = () => {
         setActionLoading(userId);
         try {
             const session = JSON.parse(localStorage.getItem('cgpwmu_session') || '{}');
-            const proxyUrl = getProxyUrl();
-            await fetch(`${proxyUrl}/rest/v1/users?id=eq.${userId}`, {
-                method: 'PATCH',
+            await fetch(`${API_BASE}/data/users?id=eq.${userId}`, {
+                method: 'PUT',
                 headers: {
                     'apikey': ANON_KEY,
                     'Authorization': `Bearer ${session.access_token}`,
-                    'Content-Type': 'application/json',
-                    'Prefer': 'return=minimal',
+                    'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ status: 'rejected' }),
-                signal: AbortSignal.timeout(8000),
+                body: JSON.stringify({ id: userId, status: 'rejected' })
             });
             setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: 'rejected' } : u));
         } catch (err) {
@@ -199,15 +185,13 @@ const SettingsDashboard = () => {
         setActionLoading(userId);
         try {
             const session = JSON.parse(localStorage.getItem('cgpwmu_session') || '{}');
-            const proxyUrl = getProxyUrl();
-            const res = await fetch(`${proxyUrl}/rest/v1/users?id=eq.${userId}`, {
+            const res = await fetch(`${API_BASE}/data/users?id=eq.${userId}`, {
                 method: 'DELETE',
                 headers: {
                     'apikey': ANON_KEY,
                     'Authorization': `Bearer ${session.access_token}`,
                     'Content-Type': 'application/json',
-                },
-                signal: AbortSignal.timeout(8000),
+                }
             });
             if (res.ok) {
                 setUsers(prev => prev.filter(u => u.id !== userId));
@@ -226,22 +210,20 @@ const SettingsDashboard = () => {
         setLoadingUsers(true);
         try {
             const session = JSON.parse(localStorage.getItem('cgpwmu_session') || '{}');
-            const proxyUrl = getProxyUrl();
-            const res = await fetch(`${proxyUrl}/rest/v1/users?id=eq.${editingUser.id}`, {
-                method: 'PATCH',
+            const res = await fetch(`${API_BASE}/data/users?id=eq.${editingUser.id}`, {
+                method: 'PUT',
                 headers: {
                     'apikey': ANON_KEY,
                     'Authorization': `Bearer ${session.access_token}`,
-                    'Content-Type': 'application/json',
-                    'Prefer': 'return=minimal',
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
+                    id: editingUser.id,
                     full_name: updatedData.full_name,
                     role: updatedData.role,
                     district: updatedData.district,
                     phone_number: updatedData.phone_number
-                }),
-                signal: AbortSignal.timeout(8000),
+                })
             });
             if (res.ok) {
                 setUsers(prev => prev.map(u => u.id === editingUser.id ? { ...u, ...updatedData, name: updatedData.full_name } : u));
@@ -278,40 +260,22 @@ const SettingsDashboard = () => {
                 if (!newUser.email || !newUser.password) throw new Error('Email and password are required.');
                 if (newUser.password.length < 6) throw new Error('Password must be at least 6 characters.');
 
-                const proxyUrl = getProxyUrl();
-                // 1. Create auth user
-                const authRes = await fetch(`${proxyUrl}/auth/v1/signup`, {
+                // 1. SIGNUP using our custom auth endpoint
+                const authRes = await fetch(`${API_BASE}/auth/signup`, {
                     method: 'POST',
-                    headers: { 'apikey': ANON_KEY, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: newUser.email, password: newUser.password }),
-                    signal: AbortSignal.timeout(12000),
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        email: newUser.email, 
+                        password: newUser.password,
+                        full_name: newUser.full_name,
+                        role: newUser.role,
+                        district: newUser.district,
+                        phone_number: newUser.phone_number,
+                        registration_data: { source: 'admin-created' }
+                    })
                 });
                 const authData = await authRes.json();
-                if (!authRes.ok) throw new Error(authData.msg || authData.error_description || 'Failed to create user');
-
-                // 2. Insert into users table as auto-approved
-                const token = JSON.parse(localStorage.getItem('cgpwmu_session') || '{}').access_token;
-                const userId = authData.user?.id;
-                if (userId) {
-                    await fetch(`${proxyUrl}/rest/v1/users`, {
-                        method: 'POST',
-                        headers: {
-                            'apikey': ANON_KEY,
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json',
-                            'Prefer': 'return=minimal',
-                        },
-                        body: JSON.stringify({
-                            id: userId,
-                            full_name: newUser.full_name,
-                            role: newUser.role,
-                            status: 'approved',
-                            district: newUser.district || null,
-                            phone_number: newUser.phone_number || null,
-                        }),
-                        signal: AbortSignal.timeout(8000),
-                    });
-                }
+                if (!authRes.ok) throw new Error(authData.error || 'Failed to create user');
                 setAddSuccess(true);
                 setTimeout(() => { setShowAddModal(false); fetchUsers(); }, 1500);
             } catch (err) {
