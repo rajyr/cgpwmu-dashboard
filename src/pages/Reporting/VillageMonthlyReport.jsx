@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
@@ -109,15 +109,49 @@ const VillageMonthlyReport = () => {
         }
     };
 
+    const currentMonth = new Date().getMonth() + 1; // 1-12
     const currentYearNum = new Date().getFullYear();
-    const years = [(currentYearNum - 1).toString(), currentYearNum.toString(), (currentYearNum + 1).toString()];
 
-    const months = [
-        { val: '01', label: t('jan', villageMonthlyTranslations) }, { val: '02', label: t('feb', villageMonthlyTranslations) }, { val: '03', label: t('mar', villageMonthlyTranslations) },
-        { val: '04', label: t('apr', villageMonthlyTranslations) }, { val: '05', label: t('may', villageMonthlyTranslations) }, { val: '06', label: t('jun', villageMonthlyTranslations) },
-        { val: '07', label: t('jul', villageMonthlyTranslations) }, { val: '08', label: t('aug', villageMonthlyTranslations) }, { val: '09', label: t('sep', villageMonthlyTranslations) },
-        { val: '10', label: t('oct', villageMonthlyTranslations) }, { val: '11', label: t('nov', villageMonthlyTranslations) }, { val: '12', label: t('dec', villageMonthlyTranslations) }
-    ];
+    // Get allowed months (current and previous)
+    const allowedPeriod = useMemo(() => {
+        const months = [
+            { val: '01', label: t('jan', villageMonthlyTranslations), sort: 1 },
+            { val: '02', label: t('feb', villageMonthlyTranslations), sort: 2 },
+            { val: '03', label: t('mar', villageMonthlyTranslations), sort: 3 },
+            { val: '04', label: t('apr', villageMonthlyTranslations), sort: 4 },
+            { val: '05', label: t('may', villageMonthlyTranslations), sort: 5 },
+            { val: '06', label: t('jun', villageMonthlyTranslations), sort: 6 },
+            { val: '07', label: t('jul', villageMonthlyTranslations), sort: 7 },
+            { val: '08', label: t('aug', villageMonthlyTranslations), sort: 8 },
+            { val: '09', label: t('sep', villageMonthlyTranslations), sort: 9 },
+            { val: '10', label: t('oct', villageMonthlyTranslations), sort: 10 },
+            { val: '11', label: t('nov', villageMonthlyTranslations), sort: 11 },
+            { val: '12', label: t('dec', villageMonthlyTranslations), sort: 12 }
+        ];
+
+        let prevMonth = currentMonth - 1;
+        let prevYear = currentYearNum;
+        if (prevMonth === 0) {
+            prevMonth = 12;
+            prevYear = currentYearNum - 1;
+        }
+
+        const allowed = [];
+        // Previous month
+        allowed.push({
+            month: prevMonth.toString().padStart(2, '0'),
+            year: prevYear.toString(),
+            label: `${months[prevMonth - 1].label} ${prevYear}`
+        });
+        // Current month
+        allowed.push({
+            month: currentMonth.toString().padStart(2, '0'),
+            year: currentYearNum.toString(),
+            label: `${months[currentMonth - 1].label} ${currentYearNum}`
+        });
+
+        return allowed;
+    }, [t]);
 
     const recyclerOptions = t('recyclers', villageMonthlyTranslations);
 
@@ -137,7 +171,12 @@ const VillageMonthlyReport = () => {
         e.preventDefault();
         if (!user) return;
 
-        // Strict Blocking Check
+        // Date Range Validation
+        const isAllowed = allowedPeriod.some(p => p.month === basicInfo.month && p.year === basicInfo.year);
+        if (!isAllowed) {
+            alert("Reporting is restricted to the last one month only.");
+            return;
+        }
         const reg = user?.registration_data || {};
         if (!reg.pwmuId) {
             console.error('[MONTHLY_REPORT] ❌ Blocked submission due to missing pwmuId:', {
@@ -351,16 +390,19 @@ const VillageMonthlyReport = () => {
                         <div className="flex items-center gap-3 bg-gray-50 p-2 rounded-xl border border-gray-200">
                             <Calendar className="w-5 h-5 text-gray-400" />
                             <select
-                                name="month" value={basicInfo.month} onChange={handleBasicChange}
+                                name="period" 
+                                value={`${basicInfo.month}-${basicInfo.year}`} 
+                                onChange={(e) => {
+                                    const [m, y] = e.target.value.split('-');
+                                    setBasicInfo(prev => ({ ...prev, month: m, year: y }));
+                                }}
                                 className="bg-transparent border-none text-gray-700 font-semibold focus:ring-0 p-1 text-right cursor-pointer outline-none text-sm"
                             >
-                                {months.map(m => <option key={m.val} value={m.val}>{m.label}</option>)}
-                            </select>
-                            <select
-                                name="year" value={basicInfo.year} onChange={handleBasicChange}
-                                className="bg-transparent border-none text-gray-700 font-semibold focus:ring-0 p-1 md:pl-2 cursor-pointer outline-none md:border-l md:border-gray-300 text-sm"
-                            >
-                                {years.map(y => <option key={y} value={y}>{y}</option>)}
+                                {allowedPeriod.map(p => (
+                                    <option key={`${p.month}-${p.year}`} value={`${p.month}-${p.year}`}>
+                                        {p.label}
+                                    </option>
+                                ))}
                             </select>
                         </div>
                     </div>

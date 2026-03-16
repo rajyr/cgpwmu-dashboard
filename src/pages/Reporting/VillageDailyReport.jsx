@@ -87,11 +87,21 @@ const VillageDailyReport = () => {
 
     const location = useLocation();
 
+    const today = new Date().toISOString().split('T')[0];
+    const minDateObj = new Date();
+    minDateObj.setDate(minDateObj.getDate() - 30);
+    const minDate = minDateObj.toISOString().split('T')[0];
+
     // Get date from URL or default to today
     const getInitialDate = () => {
         const params = new URLSearchParams(location.search);
         const urlDate = params.get('date');
-        return urlDate || new Date().toISOString().split('T')[0];
+        const initialDate = urlDate || today;
+        
+        // Enforce range even for initial date
+        if (initialDate < minDate) return minDate;
+        if (initialDate > today) return today;
+        return initialDate;
     };
 
     const [isSaving, setIsSaving] = useState(false);
@@ -264,6 +274,12 @@ const VillageDailyReport = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!user) return;
+
+        // Date Range Validation
+        if (basicInfo.date < minDate || basicInfo.date > today) {
+            alert(`Reporting is restricted to the last 30 days (${minDate} to ${today}).`);
+            return;
+        }
 
         // Diagnostic Check: If metadata is missing, warn the user before they try to submit
         const reg = user?.registration_data || {};
@@ -481,6 +497,8 @@ const VillageDailyReport = () => {
                                 type="date"
                                 name="date"
                                 value={basicInfo.date}
+                                min={minDate}
+                                max={today}
                                 onChange={handleBasicInfoChange}
                                 disabled={isLocked}
                                 className="bg-transparent border-none text-gray-700 font-semibold focus:ring-0 p-0 text-sm cursor-pointer outline-none disabled:cursor-not-allowed"

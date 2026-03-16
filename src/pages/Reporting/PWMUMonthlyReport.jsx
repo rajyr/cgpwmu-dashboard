@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
     FileBarChart, 
@@ -224,8 +224,49 @@ const PWMUMonthlyReport = () => {
     const [showSuccess, setShowSuccess] = useState(false);
 
     const { user } = useAuth();
-    const currentYear = new Date().getFullYear();
-    const years = [currentYear.toString(), (currentYear - 1).toString(), (currentYear - 2).toString()];
+    const currentYearNum = new Date().getFullYear();
+    const currentMonthNum = new Date().getMonth() + 1;
+
+    // Get allowed months (current and previous)
+    const allowedPeriod = useMemo(() => {
+        const monthsData = [
+            { val: '01', label: t('jan', pwmuMonthlyTranslations) },
+            { val: '02', label: t('feb', pwmuMonthlyTranslations) },
+            { val: '03', label: t('mar', pwmuMonthlyTranslations) },
+            { val: '04', label: t('apr', pwmuMonthlyTranslations) },
+            { val: '05', label: t('may', pwmuMonthlyTranslations) },
+            { val: '06', label: t('jun', pwmuMonthlyTranslations) },
+            { val: '07', label: t('jul', pwmuMonthlyTranslations) },
+            { val: '08', label: t('aug', pwmuMonthlyTranslations) },
+            { val: '09', label: t('sep', pwmuMonthlyTranslations) },
+            { val: '10', label: t('oct', pwmuMonthlyTranslations) },
+            { val: '11', label: t('nov', pwmuMonthlyTranslations) },
+            { val: '12', label: t('dec', pwmuMonthlyTranslations) }
+        ];
+
+        let prevMonth = currentMonthNum - 1;
+        let prevYear = currentYearNum;
+        if (prevMonth === 0) {
+            prevMonth = 12;
+            prevYear = currentYearNum - 1;
+        }
+
+        const allowed = [];
+        // Previous month
+        allowed.push({
+            month: prevMonth.toString().padStart(2, '0'),
+            year: prevYear.toString(),
+            label: `${monthsData[prevMonth - 1].label} ${prevYear}`
+        });
+        // Current month
+        allowed.push({
+            month: currentMonthNum.toString().padStart(2, '0'),
+            year: currentYearNum.toString(),
+            label: `${monthsData[currentMonthNum - 1].label} ${currentYearNum}`
+        });
+
+        return allowed;
+    }, [t]);
 
     useEffect(() => {
         const fetchCenter = async () => {
@@ -399,6 +440,14 @@ const PWMUMonthlyReport = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (!user) return;
+
+        // Date Range Validation
+        const isAllowed = allowedPeriod.some(p => p.month === basicInfo.month && p.year === basicInfo.year);
+        if (!isAllowed) {
+            alert("Reporting is restricted to the last one month only.");
+            return;
+        }
         if (!basicInfo.pwmuId) {
             alert("No PWMU center assigned to your account.");
             return;
@@ -528,7 +577,11 @@ const PWMUMonthlyReport = () => {
                         <CheckCircle2 className="w-10 h-10 text-green-600" />
                     </div>
                     <h2 className="text-2xl font-bold text-gray-800 mb-2">{t('submitted', monthlyTranslations)}</h2>
-                    <p className="text-gray-500 mb-6">{t('submittedDesc', monthlyTranslations).replace('{month}', months.find(m => m.val === basicInfo.month)?.label).replace('{year}', basicInfo.year)}</p>
+                    <p className="text-gray-500 mb-6">
+                        {t('submittedDesc', monthlyTranslations)
+                            .replace('{month}', allowedPeriod.find(p => p.month === basicInfo.month)?.label.split(' ')[0] || '')
+                            .replace('{year}', basicInfo.year)}
+                    </p>
                     <div className="flex gap-2">
                         <div className="w-2 h-2 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
                         <div className="w-2 h-2 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
@@ -561,16 +614,19 @@ const PWMUMonthlyReport = () => {
                     <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-200">
                         <Calendar className="w-5 h-5 text-gray-400" />
                         <select
-                            name="month" value={basicInfo.month} onChange={handleBasicInfoChange}
+                            name="period"
+                            value={`${basicInfo.month}-${basicInfo.year}`}
+                            onChange={(e) => {
+                                const [m, y] = e.target.value.split('-');
+                                setBasicInfo(prev => ({ ...prev, month: m, year: y }));
+                            }}
                             className="bg-transparent border-none text-gray-700 font-semibold focus:ring-0 p-0 text-right cursor-pointer"
                         >
-                            {months.map(m => <option key={m.val} value={m.val}>{m.label}</option>)}
-                        </select>
-                        <select
-                            name="year" value={basicInfo.year} onChange={handleBasicInfoChange}
-                            className="bg-transparent border-none text-gray-700 font-semibold focus:ring-0 p-0 cursor-pointer"
-                        >
-                            {years.map(y => <option key={y} value={y}>{y}</option>)}
+                            {allowedPeriod.map(p => (
+                                <option key={`${p.month}-${p.year}`} value={`${p.month}-${p.year}`}>
+                                    {p.label}
+                                </option>
+                            ))}
                         </select>
                     </div>
                 </div>

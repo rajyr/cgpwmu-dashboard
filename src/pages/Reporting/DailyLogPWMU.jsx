@@ -100,14 +100,12 @@ const DailyLogPWMU = () => {
     const todayObj = new Date();
     const today = todayObj.toISOString().split('T')[0];
 
-    // Calculate min and max dates (+/- 30 days)
+    // Calculate min and max dates (last 30 days)
     const minDateObj = new Date();
     minDateObj.setDate(todayObj.getDate() - 30);
     const minDate = minDateObj.toISOString().split('T')[0];
 
-    const maxDateObj = new Date();
-    maxDateObj.setDate(todayObj.getDate() + 30);
-    const maxDate = maxDateObj.toISOString().split('T')[0];
+    const maxDate = today; // Restricted to today
 
     const [selectedDate, setSelectedDate] = useState(dateParam || today);
     const [searchTerm, setSearchTerm] = useState('');
@@ -546,7 +544,7 @@ const DailyLogPWMU = () => {
 
         // Validate date range
         if (selectedDate < minDate || selectedDate > maxDate) {
-            alert(`Date must be between ${minDate} and ${maxDate}`);
+            alert(`Reporting is restricted to the last 30 days (${minDate} to ${maxDate}).`);
             return;
         }
 
