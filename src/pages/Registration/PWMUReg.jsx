@@ -70,7 +70,11 @@ const PWMUReg = () => {
             selectedVillages: "Selected Villages:",
             noVillages: "No villages selected yet.",
             selectAllGP: "Select All in GP",
-            villageReview: "Service Villages:"
+            villageReview: "Service Villages:",
+            detectLocation: "Detect Facility Location",
+            locationDetected: "Location Detected",
+            detecting: "Detecting...",
+            locationReq: "Please allow location access to find coordinates."
         },
         hi: {
             title: "PWMU केंद्र पंजीकरण",
@@ -128,7 +132,11 @@ const PWMUReg = () => {
             selectedVillages: "चयनित गांव:",
             noVillages: "अभी तक कोई गांव नहीं चुना गया है।",
             selectAllGP: "जीपी में सभी चुनें",
-            villageReview: "सेवा गांव:"
+            villageReview: "सेवा गांव:",
+            detectLocation: "सुविधा स्थान का पता लगाएं",
+            locationDetected: "स्थान का पता चला",
+            detecting: "पता लगाया जा रहा है...",
+            locationReq: "निर्देशांक खोजने के लिए कृपया स्थान पहुंच की अनुमति दें।"
         }
     };
 
@@ -171,6 +179,8 @@ const PWMUReg = () => {
         email: '',
         password: '',
         serviceVillages: [], // Array of strings or objects
+        latitude: null,
+        longitude: null
     });
 
     const [serviceDistrict, setServiceDistrict] = useState('');
@@ -233,6 +243,31 @@ const PWMUReg = () => {
 
     const nextStep = () => setStep(prev => Math.min(prev + 1, 4));
     const prevStep = () => setStep(prev => Math.max(prev - 1, 1));
+ 
+    const handleDetectLocation = () => {
+        if (!navigator.geolocation) {
+            alert(t('locationReq', pwmuTranslations));
+            return;
+        }
+        
+        setSubmitting(true); // Re-using submitting state or use a local one? Let's use a local detecting state
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                setFormData(prev => ({
+                    ...prev,
+                    latitude: pos.coords.latitude,
+                    longitude: pos.coords.longitude
+                }));
+                setSubmitting(false);
+            },
+            (err) => {
+                console.error("Location error:", err);
+                alert("Failed to get location. Please ensure GPS is on and permissions granted.");
+                setSubmitting(false);
+            },
+            { enableHighAccuracy: true }
+        );
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -261,9 +296,14 @@ const PWMUReg = () => {
                     hasShredder: formData.hasShredder,
                     block: formData.block,
                     gramPanchayat: formData.gramPanchayat,
+                    village: formData.village,
                     district: formData.district,
                     serviceVillages: formData.serviceVillages,
+                    latitude: formData.latitude,
+                    longitude: formData.longitude
                 },
+                latitude: formData.latitude,
+                longitude: formData.longitude
             });
 
             setSubmitSuccess(true);
@@ -387,6 +427,19 @@ const PWMUReg = () => {
                                         type="date" name="setupDate" value={formData.setupDate} onChange={handleInputChange}
                                         className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#005DAA]/20 focus:border-[#005DAA]"
                                     />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <button
+                                        type="button"
+                                        onClick={handleDetectLocation}
+                                        className={`w-full flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${formData.latitude ? 'bg-green-50 border-green-200 text-green-700' : 'bg-blue-50 border-blue-100 text-[#005DAA] hover:bg-blue-100'}`}
+                                    >
+                                        <MapPin className={`w-5 h-5 ${formData.latitude ? 'text-green-600' : 'text-[#005DAA]'}`} />
+                                        <span className="font-bold">
+                                            {formData.latitude ? `${t('locationDetected', pwmuTranslations)} (${formData.latitude.toFixed(4)}, ${formData.longitude.toFixed(4)})` : t('detectLocation', pwmuTranslations)}
+                                        </span>
+                                        {formData.latitude && <CheckCircle2 className="w-4 h-4 ml-2" />}
+                                    </button>
                                 </div>
                             </div>
 

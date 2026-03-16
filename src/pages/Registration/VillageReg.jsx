@@ -58,7 +58,11 @@ const VillageReg = () => {
             submitRegistration: "Submit GP Registration",
             pwmuUnit: "Linked PWMU Unit",
             selectPWMU: "Select PWMU Center",
-            pwmuReview: "Linked PWMU:"
+            pwmuReview: "Linked PWMU:",
+            detectLocation: "Detect Village Location",
+            locationDetected: "Location Detected",
+            detecting: "Detecting...",
+            locationReq: "Please allow location access to find coordinates."
         },
         hi: {
             title: "ग्राम पंचायत पंजीकरण",
@@ -103,7 +107,11 @@ const VillageReg = () => {
             submitRegistration: "जीपी पंजीकरण सबमिट करें",
             pwmuUnit: "लिंक की गई PWMU इकाई",
             selectPWMU: "PWMU केंद्र चुनें",
-            pwmuReview: "लिंक किया गया PWMU:"
+            pwmuReview: "लिंक किया गया PWMU:",
+            detectLocation: "गांव के स्थान का पता लगाएं",
+            locationDetected: "स्थान का पता चला",
+            detecting: "पता लगाया जा रहा है...",
+            locationReq: "निर्देशांक खोजने के लिए कृपया स्थान पहुंच की अनुमति दें।"
         }
     };
 
@@ -121,6 +129,8 @@ const VillageReg = () => {
         email: '',
         password: '',
         pwmuId: '',
+        latitude: null,
+        longitude: null
     });
 
     React.useEffect(() => {
@@ -150,31 +160,31 @@ const VillageReg = () => {
             try {
                 const proxyUrl = '/cgpwmu/api';
                 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-                const res = await fetch(`${proxyUrl}/data/users?role=eq.PWMUManager&status=eq.approved&select=id,registration_data`, {
+                const res = await fetch(`${proxyUrl}/data/pwmu_centers?select=id,name,district,block,gram_panchayat,village`, {
                     headers: { 'apikey': ANON_KEY }
                 });
-
+                
                 if (res.ok) {
                     const data = await res.json();
-                    const formatted = data.map(u => {
-                        const reg = u.registration_data || {};
+                    const formatted = data.map(center => {
                         const locString = [
-                            stripCode(reg.district),
-                            stripCode(reg.block),
-                            stripCode(reg.gramPanchayat),
-                            stripCode(reg.village)
+                            stripCode(center.district),
+                            stripCode(center.block),
+                            stripCode(center.gram_panchayat),
+                            stripCode(center.village)
                         ].filter(Boolean).join(', ');
 
                         return {
-                            id: u.id,
-                            name: reg.pwmuName || 'PWMU Center',
+                            id: center.id,
+                            name: center.name || 'PWMU Center',
                             location: locString,
-                            serviceVillages: reg.serviceVillages || []
+                            serviceVillages: [] // Note: serviceVillages are currently stored in user manager profile, 
+                                              // but for linking we primarily need the center ID.
                         };
                     });
                     setPwmuCenters(formatted);
                 } else {
-                    console.error("Failed to fetch PWMUs from users table.");
+                    console.error("Failed to fetch PWMUs from pwmu_centers table.");
                 }
             } catch (err) {
                 console.error("Error fetching PWMUs:", err);
@@ -225,6 +235,31 @@ const VillageReg = () => {
 
     const nextStep = () => setStep(prev => Math.min(prev + 1, 3));
     const prevStep = () => setStep(prev => Math.max(prev - 1, 1));
+ 
+    const handleDetectLocation = () => {
+        if (!navigator.geolocation) {
+            alert(t('locationReq', villageTranslations));
+            return;
+        }
+        
+        setSubmitting(true);
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                setFormData(prev => ({
+                    ...prev,
+                    latitude: pos.coords.latitude,
+                    longitude: pos.coords.longitude
+                }));
+                setSubmitting(false);
+            },
+            (err) => {
+                console.error("Location error:", err);
+                alert("Failed to get location. Please ensure GPS is on and permissions granted.");
+                setSubmitting(false);
+            },
+            { enableHighAccuracy: true }
+        );
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -252,7 +287,11 @@ const VillageReg = () => {
                     block: formData.block,
                     district: formData.district,
                     pwmuId: formData.pwmuId,
+                    latitude: formData.latitude,
+                    longitude: formData.longitude
                 },
+                latitude: formData.latitude,
+                longitude: formData.longitude
             });
 
             setSubmitSuccess(true);
@@ -367,6 +406,19 @@ const VillageReg = () => {
                                         type="number" name="totalHouseholds" value={formData.totalHouseholds} onChange={handleInputChange} placeholder={t('hhPlaceholder', villageTranslations)}
                                         className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500/20 focus:border-green-600"
                                     />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <button
+                                        type="button"
+                                        onClick={handleDetectLocation}
+                                        className={`w-full flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${formData.latitude ? 'bg-green-50 border-green-200 text-green-700' : 'bg-green-50/50 border-green-100 text-green-700 hover:bg-green-100'}`}
+                                    >
+                                        <MapPin className={`w-5 h-5 ${formData.latitude ? 'text-green-600' : 'text-green-600'}`} />
+                                        <span className="font-bold">
+                                            {formData.latitude ? `${t('locationDetected', villageTranslations)} (${formData.latitude.toFixed(4)}, ${formData.longitude.toFixed(4)})` : t('detectLocation', villageTranslations)}
+                                        </span>
+                                        {formData.latitude && <CheckCircle2 className="w-4 h-4 ml-2" />}
+                                    </button>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">

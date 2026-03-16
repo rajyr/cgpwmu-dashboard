@@ -29,7 +29,7 @@ const DistrictView = () => {
 
                 const [pwmuRes, collRes, pickRes] = await Promise.all([
                     fetch(`${API_BASE}/data/pwmu_centers?select=*`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } }),
-                    fetch(`${API_BASE}/data/waste_collections?select=*`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } }),
+                    fetch(`${API_BASE}/data/village_waste_reports?select=*`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } }),
                     fetch(`${API_BASE}/data/vendor_pickups?select=*`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } })
                 ]);
 
@@ -223,6 +223,7 @@ const DistrictView = () => {
                             <thead>
                                 <tr>
                                     <th className="pb-4 text-xs font-bold text-gray-500 w-1/4">PWMU</th>
+                                    <th className="pb-4 text-xs font-bold text-gray-500 w-1/8">Village</th>
                                     {machineTypes.map((type, i) => (
                                         <th key={i} className="pb-4 text-[10px] font-bold text-gray-400 text-center tracking-wider">{type}</th>
                                     ))}
@@ -232,6 +233,7 @@ const DistrictView = () => {
                                 {filteredPwmus.map((p, i) => (
                                     <tr key={i} className="border-t border-gray-50 hover:bg-gray-50/50 transition-colors">
                                         <td className="py-4 text-sm font-semibold text-gray-700">{p.name}</td>
+                                        <td className="py-4 text-xs text-gray-500">{p.village || '-'}</td>
                                         {machineTypes.map((_, j) => {
                                             const isOperational = p.status?.toLowerCase() === 'operational';
                                             return (
@@ -273,6 +275,7 @@ const DistrictView = () => {
                                     <div className="flex justify-between items-center mb-1.5">
                                         <div className="flex items-center gap-2">
                                             <span className="text-sm font-semibold text-gray-700">{p.name}</span>
+                                            <span className="text-[10px] text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded uppercase">{p.village}</span>
                                             {isDelayed && <AlertCircle className="w-3.5 h-3.5 text-red-500" />}
                                         </div>
                                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isDelayed ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>

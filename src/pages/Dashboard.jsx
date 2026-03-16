@@ -279,25 +279,28 @@ const Dashboard = () => {
 
                 // 1. Fetch PWMU Centers for KPIs and Financials
                 console.log('[DASH] Fetching raw data for filters...');
-                const [pwmuRes, collectionRes, pickupRes, pwmuLogsRes, usersRes] = await Promise.all([
+                const [pwmuRes, villageReportRes, intakeRes, pickupRes, opLogsRes, usersRes] = await Promise.all([
                     fetch(`${API_BASE}/data/pwmu_centers?select=*`, { headers }),
-                    fetch(`${API_BASE}/data/waste_collections?select=*`, { headers }),
+                    fetch(`${API_BASE}/data/village_waste_reports?select=*`, { headers }),
+                    fetch(`${API_BASE}/data/pwmu_village_intake?select=*`, { headers }),
                     fetch(`${API_BASE}/data/vendor_pickups?select=*`, { headers }),
-                    fetch(`${API_BASE}/data/pwmu_daily_logs?select=*`, { headers }),
+                    fetch(`${API_BASE}/data/pwmu_operational_logs?select=*`, { headers }),
                     fetch(`${API_BASE}/data/users?select=id,role,status,created_at,full_name,registration_data,district,block,gram_panchayat,village_name`, { headers })
                 ]);
 
                 const pwmuData = await safeJson(pwmuRes, 'pwmu_centers');
-                const collectionData = await safeJson(collectionRes, 'collections');
+                const villageReports = await safeJson(villageReportRes, 'village_reports');
+                const intakeData = await safeJson(intakeRes, 'intake');
                 const pickupData = await safeJson(pickupRes, 'pickups');
-                const pwmuLogsData = await safeJson(pwmuLogsRes, 'pwmu_logs');
+                const opLogsData = await safeJson(opLogsRes, 'op_logs');
                 const usersData = await safeJson(usersRes, 'users');
 
                 setRawData({
                     pwmu: pwmuData,
-                    collections: collectionData,
+                    villageReports: villageReports,
+                    collections: intakeData, // Mapping intake to 'collections' for downstream compatibility
                     pickups: pickupData,
-                    pwmuLogs: pwmuLogsData,
+                    pwmuLogs: opLogsData,
                     users: usersData
                 });
 
@@ -356,12 +359,13 @@ const Dashboard = () => {
             if (district && !((item.district || '').includes(district.split(' (')[0]))) return false;
             if (block && !((item.block || '').includes(block.split(' (')[0]))) return false;
             if (gp && !((item.gram_panchayat || '').includes(gp.split(' (')[0]))) return false;
-            if (village && !((item.village_name || '').includes(village.split(' (')[0]))) return false;
+            if (village && !((item.village_name || item.village || '').includes(village.split(' (')[0]))) return false;
 
             return true;
         };
 
         const filteredPwmu = rawData.pwmu.filter(p => applyLocationFilter(p));
+        const filteredVillageReports = (rawData.villageReports || []).filter(v => applyLocationFilter(v));
         const filteredCollections = rawData.collections.filter(c => applyLocationFilter(c));
         const filteredLogs = rawData.pwmuLogs.filter(l => applyLocationFilter(l));
         const filteredPickups = rawData.pickups.filter(p => applyLocationFilter(p));
@@ -370,9 +374,9 @@ const Dashboard = () => {
         // Aggregate results
         const today = new Date().toISOString().split('T')[0];
         const activePwmus = filteredPwmu.filter(p => p.status?.toLowerCase() === 'operational').length;
-        const reportsToday = filteredCollections.filter(c => c.collection_date === today).length;
-        const villageSentVolumeKg = filteredCollections.reduce((acc, curr) => acc + (parseFloat(curr.shared_with_pwmu_kg) || 0), 0);
-        const wasteProcessedKg = filteredLogs.reduce((acc, curr) => acc + (parseFloat(curr.total_intake_kg) || 0), 0);
+        const reportsToday = filteredVillageReports.filter(c => c.collection_date === today).length;
+        const villageSentVolumeKg = filteredVillageReports.reduce((acc, curr) => acc + (parseFloat(curr.shared_with_pwmu_kg) || 0), 0);
+        const wasteProcessedKg = filteredLogs.reduce((acc, curr) => acc + (parseFloat(curr.processed_kg || curr.total_intake_kg) || 0), 0);
         const wasteSoldKg = filteredPickups.reduce((acc, curr) => acc + (parseFloat(curr.quantity_kg) || 0), 0);
         const totalWetKg = filteredCollections.reduce((acc, curr) => acc + (parseFloat(curr.wet_waste_kg) || 0), 0);
 
@@ -384,7 +388,7 @@ const Dashboard = () => {
         // Aggregate by District for Map
         const districtWasteMap = {};
         const districtRevenueMap = {};
-        rawData.collections.forEach(c => {
+        (rawData.villageReports || []).forEach(c => {
             const d = c.district?.split(' (')[0];
             if (d) districtWasteMap[d] = (districtWasteMap[d] || 0) + (parseFloat(c.shared_with_pwmu_kg) || 0);
         });
@@ -510,7 +514,7 @@ const Dashboard = () => {
         { label: t('registerNew', dashTranslations), icon: PlusCircle, route: "/register/pwmu" },
         { label: t('submitReport', dashTranslations), icon: FileText, route: "/dashboard/pwmu" },
         { label: t('viewAnalytics', dashTranslations), icon: PieChart, route: "/dashboard/monitoring" },
-        { label: t('downloadReports', dashTranslations), icon: Download, route: "#" },
+        { label: t('downloadReports', dashTranslations), icon: Download, route: "/dashboard/reports" },
     ];
 
     if (loading) return (

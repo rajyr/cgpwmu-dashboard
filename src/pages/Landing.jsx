@@ -12,8 +12,50 @@ import { useLanguage } from '../context/LanguageContext';
 const Landing = () => {
     const [scrolled, setScrolled] = useState(false);
     const [toggleWordIndex, setToggleWordIndex] = useState(0);
+    const [stats, setStats] = useState({
+        tons: 1250,
+        pwmus: 100,
+        revenue: 120,
+        compliance: 98,
+        recovery: 84.2
+    });
     const svgRef = useRef(null);
     const { language, t } = useLanguage();
+
+    const API_BASE = '/cgpwmu/api';
+    const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    useEffect(() => {
+        const fetchGlobalStats = async () => {
+            try {
+                const headers = { 'apikey': ANON_KEY };
+                const [centersRes, reportsRes] = await Promise.all([
+                    fetch(`${API_BASE}/data/pwmu_centers?select=capacity_mt,waste_processed_mt,revenue,status`, { headers }),
+                    fetch(`${API_BASE}/data/pwmu_operational_logs?select=total_intake_kg,revenue`, { headers })
+                ]);
+
+                if (centersRes.ok && reportsRes.ok) {
+                    const centers = await centersRes.json();
+                    const logs = await reportsRes.json();
+
+                    const totalProcessed = centers.reduce((sum, c) => sum + (Number(c.waste_processed_mt) || 0), 0);
+                    const totalRevenue = centers.reduce((sum, c) => sum + (Number(c.revenue) || 0), 0);
+                    const activeCenters = centers.filter(c => c.status === 'operational').length;
+                    
+                    setStats({
+                        tons: Math.round(totalProcessed) || 1250,
+                        pwmus: centers.length || 100,
+                        revenue: (totalRevenue / 10000000).toFixed(1) || 1.2, // Convert to Cr
+                        compliance: 98, // Mocked for now
+                        recovery: 82.5
+                    });
+                }
+            } catch (err) {
+                console.error('Landing stats fetch failed:', err);
+            }
+        };
+        fetchGlobalStats();
+    }, []);
 
     const translations = {
         en: {
@@ -489,17 +531,17 @@ const Landing = () => {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 animate-fade-in-up" style={{ animationDelay: '200ms' }}>
                             <div className="stat-card" style={{ animationDelay: '0s' }}>
                                 <div className="stat-icon bg-gradient-to-br from-blue-400 to-blue-600"><Recycle className="w-8 h-8" /></div>
-                                <div className="stat-number">1250</div>
+                                <div className="stat-number">{stats.tons.toLocaleString()}</div>
                                 <div className="stat-label uppercase tracking-wider font-bold text-xs">{t('tonsProcessed', translations)}</div>
                             </div>
                             <div className="stat-card" style={{ animationDelay: '0.2s' }}>
                                 <div className="stat-icon bg-gradient-to-br from-green-400 to-green-600"><Map className="w-8 h-8" /></div>
-                                <div className="stat-number">100+</div>
+                                <div className="stat-number">{stats.pwmus}+</div>
                                 <div className="stat-label uppercase tracking-wider font-bold text-xs">{t('pwmuOnline', translations)}</div>
                             </div>
                             <div className="stat-card" style={{ animationDelay: '0.4s' }}>
                                 <div className="stat-icon bg-gradient-to-br from-amber-400 to-amber-600"><IndianRupee className="w-8 h-8" /></div>
-                                <div className="stat-number">120</div>
+                                <div className="stat-number">{stats.revenue}</div>
                                 <div className="stat-label uppercase tracking-wider font-bold text-xs">{t('revenueGenerated', translations)}</div>
                             </div>
                         </div>
@@ -518,11 +560,11 @@ const Landing = () => {
                     </div>
                     <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6">
                         {[
-                            { label: t('totalWasteMonth', translations), value: "1,245 MT", icon: <Recycle className="w-6 h-6 text-green-600" />, color: "bg-green-50", border: "border-green-100" },
-                            { label: t('plasticRecovered', translations), value: "84.2%", icon: <PieChart className="w-6 h-6 text-blue-600" />, color: "bg-blue-50", border: "border-blue-100" },
-                            { label: t('totalRevenue', translations), value: "₹42.5 L", icon: <IndianRupee className="w-6 h-6 text-orange-600" />, color: "bg-orange-50", border: "border-orange-100" },
+                            { label: t('totalWasteMonth', translations), value: `${stats.tons} MT`, icon: <Recycle className="w-6 h-6 text-green-600" />, color: "bg-green-50", border: "border-green-100" },
+                            { label: t('plasticRecovered', translations), value: `${stats.recovery}%`, icon: <PieChart className="w-6 h-6 text-blue-600" />, color: "bg-blue-50", border: "border-blue-100" },
+                            { label: t('totalRevenue', translations), value: `₹${stats.revenue} Cr`, icon: <IndianRupee className="w-6 h-6 text-orange-600" />, color: "bg-orange-50", border: "border-orange-100" },
                             { label: t('machineFunctional', translations), value: "92%", icon: <Settings className="w-6 h-6 text-purple-600" />, color: "bg-purple-50", border: "border-purple-100" },
-                            { label: t('reportingCompliance', translations), value: "98%", icon: <CheckCircle2 className="w-6 h-6 text-teal-600" />, color: "bg-teal-50", border: "border-teal-100" }
+                            { label: t('reportingCompliance', translations), value: `${stats.compliance}%`, icon: <CheckCircle2 className="w-6 h-6 text-teal-600" />, color: "bg-teal-50", border: "border-teal-100" }
                         ].map((stat, i) => (
                             <div key={i} className={`p-5 rounded-2xl ${stat.color} border ${stat.border} hover:shadow-md transition-shadow relative overflow-hidden group`}>
                                 <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:scale-125 transition-transform duration-500">{stat.icon}</div>

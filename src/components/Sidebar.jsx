@@ -5,7 +5,7 @@ import { useLanguage } from '../context/LanguageContext';
 import {
     LayoutDashboard, Map, DollarSign, Activity,
     ShieldAlert, ScrollText, LineChart, PieChart, Settings, LogOut,
-    ChevronLeft, ChevronRight, Menu, X, Home, Store, Factory
+    ChevronLeft, ChevronRight, Menu, X, Home, Store, Factory, FileBarChart
 } from 'lucide-react';
 
 const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
@@ -49,7 +49,8 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
             vendorHub: "Vendor Hub",
             settings: "Settings",
             dailyLog: "Daily Log",
-            monthlyReport: "Monthly Report"
+            monthlyReport: "Monthly Report",
+            masterReports: "Master Reports"
         },
         hi: {
             overview: "राज्य अवलोकन",
@@ -64,7 +65,8 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
             vendorHub: "विक्रेता हब",
             settings: "सेटिंग्स",
             dailyLog: "दैनिक लॉग",
-            monthlyReport: "मासिक रिपोर्ट"
+            monthlyReport: "मासिक रिपोर्ट",
+            masterReports: "मास्टर रिपोर्ट्स"
         }
     };
 
@@ -74,6 +76,7 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
         // Main
         { name: t('overview', sidebarTranslations), icon: LayoutDashboard, path: '/dashboard', roles: ['Admin', 'Nodal', 'PWMU', 'Village'] },
         { name: t('pwmuHub', sidebarTranslations), icon: Factory, path: '/dashboard/pwmu', roles: ['Admin', 'Nodal', 'PWMU'] },
+        { name: t('masterReports', sidebarTranslations), icon: FileBarChart, path: '/dashboard/reports', roles: ['Admin', 'Nodal', 'PWMU', 'Village'] },
 
         // Advanced Analytics
         { name: t('directory', sidebarTranslations), icon: Map, path: '/dashboard/district', roles: ['Admin', 'Nodal', 'PWMU'] },

@@ -1,0 +1,46 @@
+﻿node : node:fs:2368
+At line:1 char:1
++ node tmp/diagnose_inventory.cjs 
+2>&1 | Out-File -FilePath 
+tmp/diag_ou ...
++ 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSp 
+   ecified: (node:fs:2368:String)   
+  [], RemoteException
+    + FullyQualifiedErrorId : Nativ 
+   eCommandError
+ 
+    return binding.writeFileUtf8(
+                   ^
+
+Error: EBUSY: resource busy or 
+locked, open 'F:\UNICEF-AILSG\PWMU 
+report\PWMUapp2\tmp\diag_output.txt'
+    at Object.writeFileSync 
+(node:fs:2368:20)
+    at Object.<anonymous> 
+(F:\UNICEF-AILSG\PWMU report\PWMUapp
+2\tmp\diagnose_inventory.cjs:43:4)
+    at Module._compile (node:interna
+l/modules/cjs/loader:1529:14)
+    at Module._extensions..js (node:
+internal/modules/cjs/loader:1613:10)
+    at Module.load (node:internal/mo
+dules/cjs/loader:1275:32)
+    at Module._load (node:internal/m
+odules/cjs/loader:1096:12)
+    at 
+Function.executeUserEntryPoint [as 
+runMain] (node:internal/modules/run_
+main:164:12)
+    at node:internal/main/run_main_m
+odule:28:49 {
+  errno: -4082,
+  code: 'EBUSY',
+  syscall: 'open',
+  path: 'F:\\UNICEF-AILSG\\PWMU repo
+rt\\PWMUapp2\\tmp\\diag_output.txt'
+}
+
+Node.js v20.19.4

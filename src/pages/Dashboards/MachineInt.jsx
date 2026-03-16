@@ -26,7 +26,7 @@ function MachineInt() {
 
                 const [pwmuRes, collRes] = await Promise.all([
                     fetch(`${API_BASE}/data/pwmu_centers?select=*`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } }),
-                    fetch(`${API_BASE}/data/waste_collections?select=*`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } })
+                    fetch(`${API_BASE}/data/pwmu_operational_logs?select=*`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } })
                 ]);
 
                 if (pwmuRes.ok) setPwmus(await pwmuRes.json());

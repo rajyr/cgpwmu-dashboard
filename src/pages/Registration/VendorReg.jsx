@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Truck, MapPin, User, CheckCircle2, ArrowRight, ArrowLeft, Check, ShieldAlert, Loader2, DollarSign } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -55,7 +55,13 @@ const VendorReg = () => {
             back: "Back",
             continue: "Continue",
             submitting: "Submitting...",
-            submitRegistration: "Submit Registration"
+            submitRegistration: "Submit Registration",
+            block: "Operating Block",
+            selectBlock: "Select Block",
+            detectLocation: "Detect Firm Location",
+            locationDetected: "Location Detected",
+            detecting: "Detecting...",
+            locationReq: "Please allow location access to find coordinates."
         },
         hi: {
             title: "रीसाइक्लर / वेंडर पंजीकरण",
@@ -98,7 +104,13 @@ const VendorReg = () => {
             back: "पीछे",
             continue: "जारी रखें",
             submitting: "सबमिट हो रहा है...",
-            submitRegistration: "पंजीकरण सबमिट करें"
+            submitRegistration: "पंजीकरण सबमिट करें",
+            block: "परिचालन ब्लॉक",
+            selectBlock: "ब्लॉक चुनें",
+            detectLocation: "फर्म के स्थान का पता लगाएं",
+            locationDetected: "स्थान का पता चला",
+            detecting: "पता लगाया जा रहा है...",
+            locationReq: "निर्देशांक खोजने के लिए कृपया स्थान पहुंच की अनुमति दें।"
         }
     };
 
@@ -111,13 +123,57 @@ const VendorReg = () => {
         phone: '',
         email: '',
         password: '',
+        latitude: null,
+        longitude: null
     });
 
-    const districts = ["Raipur", "Durg", "Bilaspur", "Bastar", "Korba", "Rajnandgaon"];
+    const [locationData, setLocationData] = useState({});
+    const [districts, setDistricts] = useState([]);
+    const [blocks, setBlocks] = useState([]);
+
+    useEffect(() => {
+        const fetchLocationData = async () => {
+            const paths = [
+                `${import.meta.env.BASE_URL}data/locationData.json`,
+                './data/locationData.json',
+                '/data/locationData.json'
+            ];
+            
+            for (const path of paths) {
+                try {
+                    const res = await fetch(path);
+                    if (res.ok) {
+                        const data = await res.json();
+                        setLocationData(data);
+                        setDistricts(Object.keys(data));
+                        console.log("[DEBUG] Loaded districts:", Object.keys(data).length);
+                        return;
+                    }
+                } catch (e) {
+                    // console.warn(`Failed to load from ${path}`);
+                }
+            }
+        };
+        fetchLocationData();
+    }, []);
+
+    useEffect(() => {
+        if (formData.district && locationData[formData.district]) {
+            setBlocks(Object.keys(locationData[formData.district]));
+        } else {
+            setBlocks([]);
+        }
+    }, [formData.district, locationData]);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
+        setFormData(prev => {
+            const newData = { ...prev, [name]: value };
+            if (name === 'district') {
+                newData.block = ''; // Reset block when district changes
+            }
+            return newData;
+        });
     };
 
     const handleTypeToggle = (type) => {
@@ -131,6 +187,31 @@ const VendorReg = () => {
 
     const nextStep = () => setStep(prev => Math.min(prev + 1, 3));
     const prevStep = () => setStep(prev => Math.max(prev - 1, 1));
+ 
+    const handleDetectLocation = () => {
+        if (!navigator.geolocation) {
+            alert(t('locationReq', vendorTranslations));
+            return;
+        }
+        
+        setSubmitting(true);
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                setFormData(prev => ({
+                    ...prev,
+                    latitude: pos.coords.latitude,
+                    longitude: pos.coords.longitude
+                }));
+                setSubmitting(false);
+            },
+            (err) => {
+                console.error("Location error:", err);
+                alert("Failed to get location. Please ensure GPS is on and permissions granted.");
+                setSubmitting(false);
+            },
+            { enableHighAccuracy: true }
+        );
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -142,13 +223,19 @@ const VendorReg = () => {
                 full_name: formData.ownerName,
                 role: 'Vendor',
                 district: formData.district,
+                block: formData.block,
                 phone_number: formData.phone,
                 registration_data: {
                     firmName: formData.firmName,
                     gstNumber: formData.gstNumber,
                     wasteTypes: formData.wasteTypes,
+                    block: formData.block,
                     type: 'Vendor',
+                    latitude: formData.latitude,
+                    longitude: formData.longitude
                 },
+                latitude: formData.latitude,
+                longitude: formData.longitude
             });
             setSubmitSuccess(true);
         } catch (error) {
@@ -232,6 +319,30 @@ const VendorReg = () => {
                                         <option value="">{t('selectDistrict', vendorTranslations)}</option>
                                         {districts.map(d => <option key={d} value={d}>{d}</option>)}
                                     </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('block', vendorTranslations)}</label>
+                                    <select
+                                        name="block" value={formData.block || ''} onChange={handleInputChange}
+                                        disabled={!formData.district}
+                                        className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                    >
+                                        <option value="">{t('selectBlock', vendorTranslations)}</option>
+                                        {blocks.map(b => <option key={b} value={b}>{b}</option>)}
+                                    </select>
+                                </div>
+                                <div className="md:col-span-2">
+                                    <button
+                                        type="button"
+                                        onClick={handleDetectLocation}
+                                        className={`w-full flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${formData.latitude ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-blue-50/50 border-blue-100 text-blue-700 hover:bg-blue-100'}`}
+                                    >
+                                        <MapPin className={`w-5 h-5 ${formData.latitude ? 'text-blue-600' : 'text-blue-600'}`} />
+                                        <span className="font-bold">
+                                            {formData.latitude ? `${t('locationDetected', vendorTranslations)} (${formData.latitude.toFixed(4)}, ${formData.longitude.toFixed(4)})` : t('detectLocation', vendorTranslations)}
+                                        </span>
+                                        {formData.latitude && <CheckCircle2 className="w-4 h-4 ml-2" />}
+                                    </button>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">{t('gst', vendorTranslations)}</label>
@@ -321,6 +432,13 @@ const VendorReg = () => {
 
                                     <div className="text-gray-500">{t('gstReview', vendorTranslations)}</div>
                                     <div className="font-semibold text-gray-800 text-right">{formData.gstNumber || 'N/A'}</div>
+                                    
+                                    {formData.latitude && (
+                                        <>
+                                            <div className="text-gray-500">Location:</div>
+                                            <div className="font-semibold text-gray-800 text-right">{formData.latitude.toFixed(4)}, {formData.longitude.toFixed(4)}</div>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                             <div className="bg-blue-50 text-blue-800 p-4 rounded-lg flex items-start gap-3 text-sm mt-4 border border-blue-100">

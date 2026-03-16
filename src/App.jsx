@@ -24,6 +24,7 @@ import VendorDashboard from './pages/Dashboards/VendorDashboard';
 import DistrictView from './pages/Dashboards/DistrictView';
 import FinancialView from './pages/Dashboards/FinancialView';
 import MonitoringAnalytics from './pages/Dashboards/MonitoringAnalytics';
+import MasterReports from './pages/Dashboards/MasterReports';
 import SettingsDashboard from './pages/Dashboards/SettingsDashboard';
 import { useAuth } from './context/AuthContext';
 
@@ -82,6 +83,7 @@ function App() {
                     {/* Role-based Hubs (Demoing inside Main Layout) */}
                     <Route path="village-hub" element={<VillageDashboard />} />
                     <Route path="vendor-hub" element={<VendorDashboard />} />
+                    <Route path="reports" element={<MasterReports />} />
                     <Route
                         path="settings"
                         element={

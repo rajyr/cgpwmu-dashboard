@@ -21,6 +21,7 @@ const PWMUHub = () => {
     const [recentActivity, setRecentActivity] = useState([]);
     const [notifications, setNotifications] = useState([]);
     const [logDetails, setLogDetails] = useState({});
+    const [linkedVillages, setLinkedVillages] = useState({ total: 0, submittedToday: 0 });
 
     const currentDateObj = new Date();
     const today = currentDateObj.toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -28,7 +29,7 @@ const PWMUHub = () => {
     const hubTranslations = {
         en: {
             welcome: "Welcome, Nodal Officer",
-            activeStatus: "BALOD CENTRAL PWMU ACTIVE",
+            activeStatus: "PWMU ACTIVE",
             submitDailyLog: "Submit Daily Log",
             dailyDesc: "Record daily plastic waste collection from your linked Gram Panchayats and Villages. Ensure all connected bodies are accounted for.",
             submitMonthly: "Submit Monthly Report",
@@ -56,14 +57,14 @@ const PWMUHub = () => {
             monthlyReportTitle: "Monthly Report (Previous Month)",
             statusSubmitted: "Submitted",
             statusApproved: "Approved",
-            unsubmittedLogs: "3 linked villages have not submitted daily logs today.",
+            unsubmittedLogs: "{count} linked villages have not submitted daily logs today.",
             monthlyDue: "Monthly Performance Report is due in 4 days.",
             logApproved: "Yesterday's daily log approved.",
             kg: "kg"
         },
         hi: {
             welcome: "स्वागत है, नोडल अधिकारी",
-            activeStatus: "बालोद केंद्रीय PWMU सक्रिय",
+            activeStatus: "PWMU सक्रिय",
             submitDailyLog: "दैनिक लॉग सबमिट करें",
             dailyDesc: "अपनी लिंक की गई ग्राम पंचायतों और गांवों से दैनिक प्लास्टिक कचरा संग्रह रिकॉर्ड करें। सुनिश्चित करें कि सभी निकाय शामिल हैं।",
             submitMonthly: "मासिक रिपोर्ट सबमिट करें",
@@ -85,13 +86,13 @@ const PWMUHub = () => {
             viewAllHistory: "पूरा इतिहास देखें",
             dataFilled: "100% डेटा भरा गया",
             dataMissing: "डेटा गायब - लॉग करने के लिए क्लिक करें",
-            linkedBodies: "35 / 35 लिंक किए गए निकाय",
-            missedBodies: "0 / 35 लिंक किए गए निकाय",
+            linkedBodies: "{count} / {total} लिंक किए गए निकाय",
+            missedBodies: "0 / {total} लिंक किए गए निकाय",
             dailyLogTitle: "दैनिक अपशिष्ट लॉग",
             monthlyReportTitle: "मासिक रिपोर्ट (पिछला महीना)",
             statusSubmitted: "सबमिट किया गया",
             statusApproved: "अनुमोदित",
-            unsubmittedLogs: "3 लिंक किए गए गांवों ने आज दैनिक लॉग सबमिट नहीं किए हैं।",
+            unsubmittedLogs: "{count} लिंक किए गए गांवों ने आज दैनिक लॉग सबमिट नहीं किए हैं।",
             monthlyDue: "मासिक प्रदर्शन रिपोर्ट 4 दिनों में देय है।",
             logApproved: "कल का दैनिक लॉग स्वीकृत हो गया।",
             kg: "किलो"
@@ -123,7 +124,7 @@ const PWMUHub = () => {
 
                 if (isManager) {
                     centerData = {
-                        id: user.id, // Primary ID for Managers
+                        id: reg.pwmuId || user.id, // Prioritize standardized pwmuId
                         name: reg.pwmuName || reg.centerName || 'PWMU Center',
                         district: reg.district,
                         block: reg.block,
@@ -145,17 +146,48 @@ const PWMUHub = () => {
                 if (centerData) {
                     setPwmuData(centerData);
 
+                    // 2. Fetch Linked Villages
+                    const { data: villages } = await supabase
+                        .from('users')
+                        .select('id, registration_data')
+                        .eq('role', 'Village');
+                    
+                    const linked = villages?.filter(v => {
+                        const rd = v.registration_data || {};
+                        return rd.pwmuId === centerData.id || rd.centerName === centerData.name;
+                    }) || [];
+
                     // Local-time safe date range (YYYY-MM-DD)
                     const formatLocal = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+                    const todayStr = formatLocal(realToday);
                     const startStr = formatLocal(new Date(currentYear, currentMonth, 1));
                     const endStr = formatLocal(new Date(currentYear, currentMonth + 1, 0));
 
-                    const { data: pwmuLogs } = await supabase
-                        .from('pwmu_daily_logs')
-                        .select('log_date, total_intake_kg')
-                        .eq('pwmu_id', centerData.id)
-                        .gte('log_date', startStr)
-                        .lte('log_date', endStr);
+                    // 3. Fetch PWMU Logs & Village Reports
+                    const [logsRes, villageReportsRes] = await Promise.all([
+                        supabase
+                            .from('pwmu_operational_logs')
+                            .select('log_date, total_intake_kg')
+                            .eq('pwmu_id', centerData.id)
+                            .gte('log_date', startStr)
+                            .lte('log_date', endStr),
+                        supabase
+                            .from('village_waste_reports')
+                            .select('village_id, collection_date')
+                            .eq('collection_date', todayStr)
+                    ]);
+
+                    const pwmuLogs = logsRes.data || [];
+                    const todayReports = villageReportsRes.data || [];
+
+                    const submittedTodayCount = linked.filter(v => 
+                        todayReports.some(r => r.village_id === v.id)
+                    ).length;
+
+                    setLinkedVillages({
+                        total: linked.length,
+                        submittedToday: submittedTodayCount
+                    });
 
                     if (pwmuLogs) {
                         const days = [...new Set(pwmuLogs.map(l => parseInt(l.log_date.split('-')[2])))];
@@ -192,10 +224,17 @@ const PWMUHub = () => {
                         })));
 
                         // Alerts
-                        const todayStr = formatLocal(realToday);
                         const alerts = [];
                         if (!pwmuLogs.some(l => l.log_date === todayStr)) {
-                            alerts.push({ id: 1, type: 'warning', text: t('unsubmittedLogs', hubTranslations), unread: true });
+                            const unsubmittedCount = linked.length - submittedTodayCount;
+                            if (unsubmittedCount > 0) {
+                                alerts.push({ 
+                                    id: 1, 
+                                    type: 'warning', 
+                                    text: t('unsubmittedLogs', hubTranslations).replace('{count}', unsubmittedCount), 
+                                    unread: true 
+                                });
+                            }
                         }
                         if (realToday.getDate() <= 5) {
                             alerts.push({ id: 2, type: 'info', text: t('monthlyDue', hubTranslations), unread: true });
@@ -306,10 +345,12 @@ const PWMUHub = () => {
                             </div>
                             <div className="flex items-center gap-4 text-xs font-semibold">
                                 <div className="flex items-center gap-1.5 text-green-700">
-                                    <div className="w-3 h-3 rounded-full bg-green-500"></div> {t('submitted', hubTranslations)}
+                                    <div className="w-3 h-3 rounded-full bg-green-500"></div> 
+                                    {t('linkedBodies', hubTranslations).replace('{count}', linkedVillages.submittedToday).replace('{total}', linkedVillages.total)}
                                 </div>
                                 <div className="flex items-center gap-1.5 text-red-700">
-                                    <div className="w-3 h-3 rounded-full bg-red-500"></div> {t('missed', hubTranslations)}
+                                    <div className="w-3 h-3 rounded-full bg-red-500"></div> 
+                                    {t('missedBodies', hubTranslations).replace('{total}', linkedVillages.total)}
                                 </div>
                                 <div className="flex items-center gap-1.5 text-gray-500">
                                     <div className="w-3 h-3 rounded-full bg-gray-100 border border-gray-200"></div> {t('pending', hubTranslations)}

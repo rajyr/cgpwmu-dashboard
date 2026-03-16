@@ -11,6 +11,11 @@ dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const slugify = (text) => text?.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '_').replace(/^-+|-+$/g, '') || '';
+const generateId = (prefix, name) => {
+  const baseId = name ? `${prefix}_${slugify(name)}` : prefix;
+  return `${baseId}_${Math.random().toString(36).substring(2, 6)}`;
+};
 
 const app = express();
 const PORT = process.env.BACKEND_PORT || 5000;
@@ -52,7 +57,13 @@ authRouter.post('/login', async (req, res) => {
       expires_in: 86400
     });
   } catch (error) {
-    res.status(500).json({ error: 'Server error' });
+    if (error.message && error.message.includes('NOT_FOUND')) {
+        return res.status(401).json({ error: 'Invalid email or password' });
+    }
+    // Log error to file for debugging
+    const fs = await import('fs');
+    fs.appendFileSync('server_error.log', `[${new Date().toISOString()}] LOGIN ERROR: ${error.message}\n${error.stack}\n`);
+    res.status(500).json({ error: 'Server error', details: error.message });
   }
 });
 
@@ -63,7 +74,14 @@ authRouter.post('/signup', async (req, res) => {
     if (existingUser) return res.status(400).json({ error: 'User already exists' });
 
     const passwordHash = await bcrypt.hash(password, 10);
-    const id = Math.random().toString(36).substring(2, 15);
+    let id;
+    if (role === 'PWMUManager') {
+      id = generateId('pwmu', registration_data?.pwmuName || full_name);
+    } else if (role === 'VillageUser') {
+      id = generateId('village', full_name);
+    } else {
+      id = Math.random().toString(36).substring(2, 15);
+    }
     const autoApprove = db.prepare('SELECT value FROM system_settings WHERE key = ?').get('auto_approve_users');
     const status = autoApprove?.value === 'true' ? 'approved' : 'pending';
 
@@ -72,9 +90,34 @@ authRouter.post('/signup', async (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(id, email, passwordHash, full_name, role, status, district, phone_number, JSON.stringify(registration_data));
 
+    // Auto-create pwmu_centers entry for PWMU Managers
+    // This is critical for inventory sync — both DailyLog and MonthlyReport
+    // look up the center by nodal_officer_id = user.id
+    if (role === 'PWMUManager') {
+      const centerName = registration_data?.pwmuName || full_name || 'Unknown PWMU';
+      const centerId = id; // Use the same ID as the user for direct lookup consistency
+      const existingCenter = db.prepare('SELECT id FROM pwmu_centers WHERE nodal_officer_id = ?').get(id);
+      if (!existingCenter) {
+        db.prepare(`
+          INSERT OR IGNORE INTO pwmu_centers (id, name, district, block, gram_panchayat, village, nodal_officer_id, status)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 'operational')
+        `).run(
+          centerId,
+          centerName,
+          registration_data?.district || district || '',
+          registration_data?.block || '',
+          registration_data?.gramPanchayat || '',
+          registration_data?.villageName || '',
+          id
+        );
+        console.log(`[SIGNUP] Auto-created pwmu_centers entry for ${centerName} (id: ${centerId})`);
+      }
+    }
+
     res.json({ message: 'User registered successfully', status });
   } catch (error) {
-    res.status(500).json({ error: 'Server error' });
+    console.error('[SIGNUP ERROR]', error);
+    res.status(500).json({ error: 'Server error', details: error.message });
   }
 });
 
@@ -130,57 +173,61 @@ dataRouter.get('/:table', authenticateToken, (req, res) => {
 
     // --- Filter Parsing ---
     Object.entries(filters).forEach(([key, value]) => {
-      if (typeof value !== 'string') return;
+      const values = Array.isArray(value) ? value : [value];
+      
+      values.forEach(v => {
+        if (typeof v !== 'string') return;
 
-      const processValue = (k, v) => {
-        const firstDot = v.indexOf('.');
-        if (firstDot === -1) return null;
-        
-        const op = v.substring(0, firstDot);
-        const val = v.substring(firstDot + 1);
+        const processValue = (k, filterVal) => {
+          const firstDot = filterVal.indexOf('.');
+          if (firstDot === -1) return null;
+          
+          const op = filterVal.substring(0, firstDot);
+          const val = filterVal.substring(firstDot + 1);
 
-        switch (op) {
-          case 'eq': return { sql: `${k} = ?`, p: val };
-          case 'neq': return { sql: `${k} != ?`, p: val };
-          case 'gt': return { sql: `${k} > ?`, p: val };
-          case 'gte': return { sql: `${k} >= ?`, p: val };
-          case 'lt': return { sql: `${k} < ?`, p: val };
-          case 'lte': return { sql: `${k} <= ?`, p: val };
-          case 'like': return { sql: `${k} LIKE ?`, p: val.replace(/\*/g, '%') };
-          case 'ilike': return { sql: `LOWER(${k}) LIKE ?`, p: val.toLowerCase().replace(/\*/g, '%') };
-          case 'is': return { sql: `${k} IS ${val === 'null' ? 'NULL' : val}`, p: null };
-          case 'in': 
-            const inValues = val.replace(/[()]/g, '').split(',');
-            return { sql: `${k} IN (${inValues.map(() => '?').join(',')})`, p: inValues };
-          default: return null;
-        }
-      };
+          switch (op) {
+            case 'eq': return { sql: `${k} = ?`, p: val };
+            case 'neq': return { sql: `${k} != ?`, p: val };
+            case 'gt': return { sql: `${k} > ?`, p: val };
+            case 'gte': return { sql: `${k} >= ?`, p: val };
+            case 'lt': return { sql: `${k} < ?`, p: val };
+            case 'lte': return { sql: `${k} <= ?`, p: val };
+            case 'like': return { sql: `${k} LIKE ?`, p: val.replace(/\*/g, '%') };
+            case 'ilike': return { sql: `LOWER(${k}) LIKE ?`, p: val.toLowerCase().replace(/\*/g, '%') };
+            case 'is': return { sql: `${k} IS ${val === 'null' ? 'NULL' : val}`, p: null };
+            case 'in': 
+              const inValues = val.replace(/[()]/g, '').split(',');
+              return { sql: `${k} IN (${inValues.map(() => '?').join(',')})`, p: inValues };
+            default: return null;
+          }
+        };
 
-      if (key === 'or' && value.startsWith('(') && value.endsWith(')')) {
-        const content = value.substring(1, value.length - 1);
-        const orParts = content.split(',');
-        const subClauses = [];
-        orParts.forEach(part => {
-          const firstDot = part.indexOf('.');
-          if (firstDot === -1) return;
-          const k = part.substring(0, firstDot);
-          const v = part.substring(firstDot + 1);
-          const result = processValue(k, v);
+        if (key === 'or' && v.startsWith('(') && v.endsWith(')')) {
+          const content = v.substring(1, v.length - 1);
+          const orParts = content.split(',');
+          const subClauses = [];
+          orParts.forEach(part => {
+            const firstDot = part.indexOf('.');
+            if (firstDot === -1) return;
+            const k = part.substring(0, firstDot);
+            const val = part.substring(firstDot + 1);
+            const result = processValue(k, val);
+            if (result) {
+              subClauses.push(result.sql);
+              if (Array.isArray(result.p)) params.push(...result.p);
+              else if (result.p !== null) params.push(result.p);
+            }
+          });
+          if (subClauses.length > 0) whereClauses.push(`(${subClauses.join(' OR ')})`);
+        } else {
+          const result = processValue(key, v);
           if (result) {
-            subClauses.push(result.sql);
+            whereClauses.push(result.sql);
             if (Array.isArray(result.p)) params.push(...result.p);
             else if (result.p !== null) params.push(result.p);
           }
-        });
-        if (subClauses.length > 0) whereClauses.push(`(${subClauses.join(' OR ')})`);
-      } else {
-        const result = processValue(key, value);
-        if (result) {
-          whereClauses.push(result.sql);
-          if (Array.isArray(result.p)) params.push(...result.p);
-          else if (result.p !== null) params.push(result.p);
         }
-      }
+      });
     });
 
     if (table === 'users' && req.user && req.user.role === 'VillageUser') {
@@ -228,7 +275,11 @@ dataRouter.post('/:table', authenticateToken, (req, res) => {
     const records = Array.isArray(data) ? data : [data];
     const results = [];
     for (const record of records) {
-      if (!record.id) record.id = Math.random().toString(36).substring(2, 15);
+      if (!record.id) {
+        if (table === 'pwmu_centers') record.id = generateId('pwmu', record.name);
+        else if (table === 'waste_collections') record.id = generateId('waste', record.village_name);
+        else record.id = Math.random().toString(36).substring(2, 15);
+      }
       
       // Sanitize data for SQLite
       const sanitized = {};
@@ -260,7 +311,11 @@ dataRouter.put('/:table', authenticateToken, (req, res) => {
     const records = Array.isArray(data) ? data : [data];
     const results = [];
     for (const record of records) {
-      if (!record.id) record.id = Math.random().toString(36).substring(2, 15);
+      if (!record.id) {
+        if (table === 'pwmu_centers') record.id = generateId('pwmu', record.name);
+        else if (table === 'waste_collections') record.id = generateId('waste', record.village_name);
+        else record.id = Math.random().toString(36).substring(2, 15);
+      }
 
       // Sanitize data for SQLite
       const sanitized = {};

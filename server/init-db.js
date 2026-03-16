@@ -16,6 +16,15 @@ console.log('Initializing database at:', dbPath);
 
 // Create Tables
 db.exec(`
+  DROP TABLE IF EXISTS waste_collections;
+  DROP TABLE IF EXISTS pwmu_daily_logs;
+  DROP TABLE IF EXISTS village_waste_reports;
+  DROP TABLE IF EXISTS pwmu_village_intake;
+  DROP TABLE IF EXISTS pwmu_operational_logs;
+  DROP TABLE IF EXISTS pwmu_monthly_reports;
+  DROP TABLE IF EXISTS market_availability;
+  DROP TABLE IF EXISTS vendor_pickups;
+
   CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     email TEXT UNIQUE NOT NULL,
@@ -35,6 +44,7 @@ db.exec(`
     district TEXT,
     block TEXT,
     gram_panchayat TEXT,
+    village TEXT,
     nodal_officer_id TEXT REFERENCES users(id) ON DELETE SET NULL,
     capacity_mt REAL DEFAULT 0,
     waste_processed_mt REAL DEFAULT 0,
@@ -43,10 +53,13 @@ db.exec(`
     expenditure REAL DEFAULT 0,
     recovery_rate REAL DEFAULT 75,
     status TEXT DEFAULT 'operational',
+    latitude REAL,
+    longitude REAL,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
   );
 
-  CREATE TABLE IF NOT EXISTS waste_collections (
+  -- 1. Village Waste Reports (Sarpanch Submissions)
+  CREATE TABLE IF NOT EXISTS village_waste_reports (
     id TEXT PRIMARY KEY,
     village_id TEXT REFERENCES users(id) ON DELETE SET NULL,
     village_name TEXT NOT NULL,
@@ -54,33 +67,64 @@ db.exec(`
     district TEXT,
     block TEXT,
     gram_panchayat TEXT,
-    village TEXT,
     collection_date TEXT NOT NULL,
     wet_waste_kg REAL DEFAULT 0,
     dry_waste_kg REAL DEFAULT 0,
+    shared_with_pwmu_kg REAL DEFAULT 0,
     metal_waste_kg REAL DEFAULT 0,
     glass_waste_kg REAL DEFAULT 0,
     ewaste_kg REAL DEFAULT 0,
     other_waste_kg REAL DEFAULT 0,
-    shared_with_pwmu_kg REAL DEFAULT 0,
     user_charge_collected REAL DEFAULT 0,
-    submitted INTEGER DEFAULT 1,
+    submitted INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'pending', -- pending, confirmed
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(village_id, collection_date)
+  );
+
+  -- 2. PWMU Village Intake (Confirmed received from village)
+  CREATE TABLE IF NOT EXISTS pwmu_village_intake (
+    id TEXT PRIMARY KEY,
+    pwmu_id TEXT REFERENCES pwmu_centers(id) ON DELETE CASCADE,
+    village_name TEXT NOT NULL,
+    collection_date TEXT NOT NULL,
+    received_kg REAL DEFAULT 0,
+    village_report_id TEXT REFERENCES village_waste_reports(id) ON DELETE SET NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(pwmu_id, collection_date, village_name)
   );
 
-  CREATE TABLE IF NOT EXISTS pwmu_daily_logs (
+  -- 3. PWMU Operational Logs (Daily center stats)
+  CREATE TABLE IF NOT EXISTS pwmu_operational_logs (
     id TEXT PRIMARY KEY,
     pwmu_id TEXT REFERENCES pwmu_centers(id) ON DELETE CASCADE,
     log_date TEXT NOT NULL,
-    status TEXT DEFAULT 'pending',
     total_intake_kg REAL DEFAULT 0,
+    processed_kg REAL DEFAULT 0,
+    sold_kg REAL DEFAULT 0,
+    revenue REAL DEFAULT 0,
+    expenditure REAL DEFAULT 0,
+    status TEXT DEFAULT 'operational',
     reporting_count INTEGER DEFAULT 0,
-    total_villages INTEGER DEFAULT 0,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(pwmu_id, log_date)
+  );
+
+  -- 4. PWMU Monthly Reports (aggregated data)
+  CREATE TABLE IF NOT EXISTS pwmu_monthly_reports (
+    id TEXT PRIMARY KEY,
+    pwmu_id TEXT REFERENCES pwmu_centers(id) ON DELETE CASCADE,
+    month_year TEXT NOT NULL, -- YYYY-MM
+    total_intake_mt REAL DEFAULT 0,
+    total_processed_mt REAL DEFAULT 0,
+    total_sold_mt REAL DEFAULT 0,
+    total_revenue REAL DEFAULT 0,
+    total_expenditure REAL DEFAULT 0,
+    village_participation_count INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(pwmu_id, month_year)
   );
 
   CREATE TABLE IF NOT EXISTS vendor_pickups (
@@ -97,6 +141,7 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS market_availability (
     id TEXT PRIMARY KEY,
+    pwmu_id TEXT REFERENCES pwmu_centers(id) ON DELETE CASCADE,
     pwmu_name TEXT NOT NULL,
     material TEXT NOT NULL,
     stock_kg REAL DEFAULT 0,
@@ -104,7 +149,9 @@ db.exec(`
     distance_km REAL DEFAULT 0,
     is_hot INTEGER DEFAULT 0,
     rate_per_kg REAL DEFAULT 0,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(pwmu_id, material)
   );
 
   CREATE TABLE IF NOT EXISTS village_workers (
@@ -131,6 +178,7 @@ db.exec(`
 // Migration: Add columns to existing tables if they don't exist
 const migrations = [
   { table: 'pwmu_centers', column: 'nodal_officer_id', type: 'TEXT' },
+  { table: 'pwmu_centers', column: 'village', type: 'TEXT' },
   { table: 'pwmu_centers', column: 'recovery_rate', type: 'REAL DEFAULT 75' },
   { table: 'waste_collections', column: 'pwmu_id', type: 'TEXT' },
   { table: 'waste_collections', column: 'village', type: 'TEXT' },
@@ -139,7 +187,11 @@ const migrations = [
   { table: 'waste_collections', column: 'glass_waste_kg', type: 'REAL DEFAULT 0' },
   { table: 'waste_collections', column: 'ewaste_kg', type: 'REAL DEFAULT 0' },
   { table: 'waste_collections', column: 'other_waste_kg', type: 'REAL DEFAULT 0' },
-  { table: 'waste_collections', column: 'updated_at', type: 'TEXT DEFAULT CURRENT_TIMESTAMP' }
+  { table: 'waste_collections', column: 'updated_at', type: 'TEXT DEFAULT CURRENT_TIMESTAMP' },
+  { table: 'users', column: 'latitude', type: 'REAL' },
+  { table: 'users', column: 'longitude', type: 'REAL' },
+  { table: 'pwmu_centers', column: 'latitude', type: 'REAL' },
+  { table: 'pwmu_centers', column: 'longitude', type: 'REAL' }
 ];
 
 migrations.forEach(m => {
@@ -162,7 +214,7 @@ const passwordHash = bcrypt.hashSync('Password123!', 10);
 
 // Admin user
 const adminId = 'admin_user_id';
-const primaryPwmuId = 'ok5bj41tnb'; // Use the ID the user already has in their session (with a 5)
+const primaryPwmuId = 'pwmu_balod'; // Standardized ID for Balod Center
 const adminRegData = JSON.stringify({
   pwmuId: primaryPwmuId,
   district: 'Balod',
@@ -179,29 +231,23 @@ insertUser.run(adminId, 'admin@cgpwmu.com', passwordHash, 'State Administrator',
 
 // Seed PWMUs with stable IDs
 const pwmuData = [
-  [primaryPwmuId, 'Balod Central PWMU', 'Balod', 'Gunderdehi', 'Gunderdehi', 50, 42.5, 38.2, 425000, 180000, 'operational', adminId],
-  ['pwmu_durg', 'Durg Central PWMU', 'Durg', 'Durg', 'Durg', 80, 68.3, 55.1, 680000, 310000, 'operational', null],
-  ['pwmu_bemetara', 'Bemetara PWMU', 'Bemetara', 'Bemetara', 'Bemetara', 35, 28.7, 24.5, 287000, 125000, 'operational', null],
-  ['pwmu_raipur', 'Raipur East PWMU', 'Raipur', 'Arang', 'Arang', 100, 85.2, 72.8, 852000, 400000, 'operational', null],
-  ['pwmu_korba', 'Korba PWMU', 'Korba', 'Korba', 'Korba', 45, 32.1, 28.9, 321000, 155000, 'maintenance', null],
-  ['pwmu_bilaspur', 'Bilaspur PWMU', 'Bilaspur', 'Bilaspur', 'Bilaspur', 60, 51.8, 45.3, 518000, 240000, 'operational', null]
+  [primaryPwmuId, 'Balod Central PWMU', 'Balod', 'Gunderdehi', 'Gunderdehi', 'Gunderdehi', 50, 42.5, 38.2, 425000, 180000, 'operational', adminId],
+  ['pwmu_durg', 'Durg Central PWMU', 'Durg', 'Durg', 'Durg', 'Durg', 80, 68.3, 55.1, 680000, 310000, 'operational', null],
+  ['pwmu_bemetara', 'Bemetara PWMU', 'Bemetara', 'Bemetara', 'Bemetara', 'Bemetara', 35, 28.7, 24.5, 287000, 125000, 'operational', null],
+  ['pwmu_raipur', 'Raipur East PWMU', 'Raipur', 'Arang', 'Arang', 'Arang', 100, 85.2, 72.8, 852000, 400000, 'operational', null],
+  ['pwmu_korba', 'Korba PWMU', 'Korba', 'Korba', 'Korba', 'Korba', 45, 32.1, 28.9, 321000, 155000, 'maintenance', null],
+  ['pwmu_bilaspur', 'Bilaspur PWMU', 'Bilaspur', 'Bilaspur', 'Bilaspur', 'Bilaspur', 60, 51.8, 45.3, 518000, 240000, 'operational', null]
 ];
 
 const insertPWMU = db.prepare(`
-  INSERT OR REPLACE INTO pwmu_centers (id, name, district, block, gram_panchayat, capacity_mt, waste_processed_mt, waste_sold_mt, revenue, expenditure, status, nodal_officer_id)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  INSERT OR REPLACE INTO pwmu_centers (id, name, district, block, gram_panchayat, village, capacity_mt, waste_processed_mt, waste_sold_mt, revenue, expenditure, status, nodal_officer_id)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
 
 for (const row of pwmuData) insertPWMU.run(...row);
 
-// CLEAN UP: Forcefully remove any PWMU center that is NOT in our stable list
-const stableIds = pwmuData.map(d => `'${d[0]}'`).join(',');
-console.log('Force cleaning PWMU centers...');
-db.exec(`
-  DELETE FROM pwmu_centers WHERE id NOT IN (${stableIds});
-  DELETE FROM waste_collections WHERE pwmu_id NOT IN (SELECT id FROM pwmu_centers) AND pwmu_id != 'pwmu_balod';
-  DELETE FROM pwmu_daily_logs WHERE pwmu_id NOT IN (SELECT id FROM pwmu_centers) AND pwmu_id != 'pwmu_balod';
-`);
+// Market availability will be populated via PWMU Daily Logs
+db.exec('DELETE FROM market_availability');
 
 console.log('Database initialized successfully.');
 db.close();

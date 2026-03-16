@@ -59,6 +59,15 @@ export const AuthProvider = ({ children }) => {
                 const profile = await response.json();
                 setUser(profile);
                 setUserRole(profile.role);
+                
+                // Persist updated profile to session
+                const savedSession = localStorage.getItem('cgpwmu_session');
+                if (savedSession) {
+                    const session = JSON.parse(savedSession);
+                    session.user = profile;
+                    localStorage.setItem('cgpwmu_session', JSON.stringify(session));
+                }
+                
                 return { ...profile, status: 'approved' };
             } else {
                 const errorData = await response.json().catch(() => ({ error: 'Failed to fetch profile' }));

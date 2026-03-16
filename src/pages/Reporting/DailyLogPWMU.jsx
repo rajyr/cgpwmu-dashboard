@@ -45,7 +45,14 @@ const DailyLogPWMU = () => {
             autoFillTip: "Data auto-filled from Sarpanch submissions",
             existingLog: "Log Already Submitted",
             editLog: "Edit Log",
-            updateBtn: "Update Daily Log"
+            updateBtn: "Update Daily Log",
+            processedStockTitle: "Daily Waste Categorization",
+            processedStockDesc: "Distribute the total waste ({total} kg) into correct categories. Sum must equal the daily total....",
+            totalCategorized: "Total Categorized",
+            matching: "Perfect Match",
+            mismatch: "Check figures: Needs to be exactly {total} kg",
+            materialCol: "Material Type",
+            stockCol: "Current Stock"
         },
         hi: {
             title: "दैनिक अपशिष्ट अंतर्ग्रहण लॉग",
@@ -77,7 +84,14 @@ const DailyLogPWMU = () => {
             autoFillTip: "सरपंच सबमिशन से डेटा ऑटो-फिल किया गया",
             existingLog: "लॉग पहले ही जमा किया जा चुका है",
             editLog: "लॉग संपादित करें",
-            updateBtn: "दैनिक लॉग अपडेट करें"
+            updateBtn: "दैनिक लॉग अपडेट करें",
+            processedStockTitle: "दैनिक अपशिष्ट वर्गीकरण",
+            processedStockDesc: "कुल कचरे ({total} किलो) को सही श्रेणियों में विभाजित करें। योग दैनिक कुल के बराबर होना चाहिए....",
+            totalCategorized: "कुल वर्गीकृत",
+            matching: "सटीक मिलान",
+            mismatch: "आंकड़ों की जाँच करें: ठीक {total} किलो होना चाहिए",
+            materialCol: "सामग्री का प्रकार",
+            stockCol: "वर्तमान स्टॉक"
         }
     };
 
@@ -111,38 +125,31 @@ const DailyLogPWMU = () => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [isLocked, setIsLocked] = useState(false);
     const [existingRecord, setExistingRecord] = useState(null);
+    const [processedStock, setProcessedStock] = useState({
+        'PET': '',
+        'HDPE': '',
+        'LDPE': '',
+        'PP': '',
+        'MLP': '',
+        'RDF': '',
+        'Mixed': ''
+    });
+
+    const materialLabels = {
+        'PET': 'PET (Bottles, Jars, Food Trays....)',
+        'HDPE': 'HDPE (Milk Jugs, Cleaning Bottles, Crates....)',
+        'LDPE': 'LDPE (Shopping Bags, Wraps, Thin Films....)',
+        'PP': 'PP (Containers, Caps, Straws, Toys....)',
+        'MLP': 'MLP (Chips Bags, Foil Wraps, Sachets....)',
+        'RDF': 'Processed RDF (Fuel pellets, Textile waste....)',
+        'Mixed': 'Mixed Plastic (Non-recyclable scraps, Shreds....)'
+    };
 
     useEffect(() => {
         const fetchCenter = async () => {
             if (!user) return;
             try {
-                // Prioritize user's own registration_data (Session based)
-                const reg = user.registration_data || {};
-                if (reg.type === 'PWMU' || reg.role === 'PWMUManager') {
-                    console.log("[DEBUG] Identified Center from Session:", reg.pwmuName || reg.centerName);
-                    setCenter({
-                        id: user.id, // Using user ID as primary identifier for Manager-led centers
-                        name: reg.pwmuName || reg.centerName || 'PWMU Center',
-                        district: reg.district
-                    });
-                    setIsLoading(false);
-                    return;
-                }
-
-                // If not in session, query the database explicitly
-                const { data, error } = await supabase
-                    .from('pwmu_centers')
-                    .select('id, name, district')
-                    .eq('id', user.id)
-                    .maybeSingle();
-
-                if (data) {
-                    setCenter(data);
-                    setIsLoading(false);
-                    return;
-                }
-
-                // Try as Nodal Officer link
+                // PRIORITY 1: Query pwmu_centers by nodal_officer_id (same as MonthlyReport)
                 const { data: nodalData } = await supabase
                     .from('pwmu_centers')
                     .select('id, name, district')
@@ -150,49 +157,43 @@ const DailyLogPWMU = () => {
                     .maybeSingle();
 
                 if (nodalData) {
+                    console.log("[DEBUG] Center found by nodal_officer_id:", nodalData.id);
                     setCenter(nodalData);
                     setIsLoading(false);
                     return;
                 }
-            } catch (err) {
-                console.warn("Center lookup failed, falling back to profile:", err.message);
-            }
 
-            // Fallback: Use the user's own profile as the center if they are a new PWMU Manager
-            try {
-                const session = JSON.parse(localStorage.getItem('cgpwmu_session') || '{}');
-                const token = session.access_token;
+                // PRIORITY 2: Try matching by center ID directly
+                const { data: centerById } = await supabase
+                    .from('pwmu_centers')
+                    .select('id, name, district')
+                    .eq('id', user.id)
+                    .maybeSingle();
 
-                if (token) {
-                    const profileRes = await fetch(
-                        `${API_BASE}/data/users?id=eq.${user.id}&select=registration_data`,
-                        {
-                            headers: {
-                                'apikey': ANON_KEY,
-                                'Authorization': `Bearer ${token}`
-                            }
-                        }
-                    );
-                    if (profileRes.ok) {
-                        const profileData = await profileRes.json();
-                        if (profileData && profileData.length > 0) {
-                            const managerProfile = profileData[0];
-                            if (managerProfile?.registration_data?.type === 'PWMU') {
-                                setCenter({
-                                    id: user.id, // Using the user ID as the center ID for linking
-                                    name: managerProfile.registration_data.pwmuName || 'PWMU Center',
-                                    district: managerProfile.registration_data.district
-                                });
-                                return;
-                            }
-                        }
-                    }
+                if (centerById) {
+                    console.log("[DEBUG] Center found by user.id:", centerById.id);
+                    setCenter(centerById);
+                    setIsLoading(false);
+                    return;
+                }
+
+                // PRIORITY 3: Use session registration_data as fallback
+                const reg = user.registration_data || {};
+                if (reg.type === 'PWMU' || reg.role === 'PWMUManager' || reg.pwmuId) {
+                    console.log("[DEBUG] Center from registration_data:", reg.pwmuId || user.id);
+                    setCenter({
+                        id: reg.pwmuId || user.id,
+                        name: reg.pwmuName || reg.centerName || 'PWMU Center',
+                        district: reg.district
+                    });
+                    setIsLoading(false);
+                    return;
                 }
             } catch (err) {
-                console.error("Failed to fetch profile fallback for center:", err);
+                console.warn("Center lookup failed:", err.message);
             }
 
-            setIsLoading(false); // Stop loading if all methods fail
+            setIsLoading(false);
         };
         fetchCenter();
     }, [user]);
@@ -289,7 +290,8 @@ const DailyLogPWMU = () => {
                         type: 'Village',
                         autoFilled: false,
                         manualEntry: true, // Show "Manual" label
-                        value: ''
+                        value: '',
+                        reportId: null
                     }));
                 }
 
@@ -343,7 +345,8 @@ const DailyLogPWMU = () => {
                                         type: 'Village',
                                         autoFilled: false,
                                         manualEntry: true,
-                                        value: ''
+                                        value: '',
+                                        reportId: null
                                     });
                                 }
                             });
@@ -368,7 +371,7 @@ const DailyLogPWMU = () => {
             if (!center?.id || !selectedDate) return;
             try {
                 const { data, error } = await supabase
-                    .from('pwmu_daily_logs')
+                    .from('pwmu_operational_logs')
                     .select('*')
                     .eq('pwmu_id', center.id)
                     .eq('log_date', selectedDate)
@@ -381,6 +384,38 @@ const DailyLogPWMU = () => {
                     setIsLocked(false);
                     setExistingRecord(null);
                     setIsSaved(false);
+                }
+
+                // Also fetch current market availability for this PWMU to pre-fill
+                if (center?.name) {
+                    const { data: stockData, error: sErr } = await supabase
+                        .from('market_availability')
+                        .select('material, stock_kg')
+                        .eq('pwmu_name', center.name);
+                    
+                    if (sErr) console.error("Fetch Stock Error:", sErr);
+
+                    if (stockData && stockData.length > 0) {
+                        setProcessedStock(prev => {
+                            const newStock = { ...prev };
+                            stockData.forEach(s => {
+                                const m = s.material.toUpperCase();
+                                if (newStock.hasOwnProperty(m)) {
+                                    newStock[m] = (s.stock_kg || 0).toString();
+                                } else {
+                                    // Robust migration check
+                                    if (m.startsWith('PET')) newStock['PET'] = s.stock_kg.toString();
+                                    else if (m.startsWith('HDPE')) newStock['HDPE'] = s.stock_kg.toString();
+                                    else if (m.startsWith('LDPE')) newStock['LDPE'] = s.stock_kg.toString();
+                                    else if (m.startsWith('PP')) newStock['PP'] = s.stock_kg.toString();
+                                    else if (m.startsWith('MLP')) newStock['MLP'] = s.stock_kg.toString();
+                                    else if (m.includes('RDF')) newStock['RDF'] = s.stock_kg.toString();
+                                    else if (m.includes('MIXED')) newStock['Mixed'] = s.stock_kg.toString();
+                                }
+                            });
+                            return newStock;
+                        });
+                    }
                 }
             } catch (err) {
                 // No record found or other error
@@ -399,85 +434,80 @@ const DailyLogPWMU = () => {
 
             try {
                 console.group(`[PWMU_AUTOFETCH] Checking data for ${selectedDate}`);
-                console.log('Center ID:', center.id);
-
-                // Fetch all records for this date and PWMU
-                const { data, error } = await supabase
-                    .from('waste_collections')
-                    .select('village_id, village_name, gram_panchayat, shared_with_pwmu_kg, pwmu_id, collection_date, updated_at, created_at')
+                
+                // 1. Fetch Sarpanch reports (Suggestions/Auto-fill)
+                const { data: sarpanchData, error: sErr } = await supabase
+                    .from('village_waste_reports')
+                    .select('id, village_id, village_name, gram_panchayat, shared_with_pwmu_kg, updated_at, created_at')
                     .eq('collection_date', selectedDate)
                     .eq('pwmu_id', center.id);
 
-                if (error) {
-                    console.error('Fetch error:', error);
+                // 2. Fetch Confirmed Intake (Authoritative - includes manual entries)
+                const { data: confirmedData, error: cErr } = await supabase
+                    .from('pwmu_village_intake')
+                    .select('id, village_name, received_kg, village_report_id')
+                    .eq('collection_date', selectedDate)
+                    .eq('pwmu_id', center.id);
+
+                if (sErr || cErr) {
+                    console.error('Fetch error:', sErr || cErr);
                     console.groupEnd();
                     return;
                 }
 
-                console.log('Database Records Found:', data?.length || 0);
+                console.log('Sarpanch Reports:', sarpanchData?.length || 0);
+                console.log('Confirmed Intake:', confirmedData?.length || 0);
 
-                if (data && data.length > 0) {
-                    // Latest Record Priority: Sort by most recent update to handle historical duplicates
-                    const sortedData = [...data].sort((a, b) =>
-                        new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0)
-                    );
-
-                    console.log('Authoritative Records (Sorted):', sortedData);
-
-                    setVillages(prev => {
-                        let hasChanges = false;
-                        const updated = prev.map(v => {
-                            const vCode = extractCode(v.name);
-
-                            // 1. Filter ALL records for this specific village using multiple criteria
-                            const matches = sortedData.filter(d => {
-                                // 1a. Match by UUID (Most Reliable)
-                                if (d.village_id && d.village_id === v.id) return true;
-
-                                // 1b. Match by Unique Code in name
-                                const dVillageCode = extractCode(d.village_name);
-                                const dGPCode = extractCode(d.gram_panchayat);
-                                if (vCode && (vCode === dVillageCode || vCode === dGPCode)) return true;
-
-                                // 1c. Match by Normalized Name
-                                const normalize = (str) => str ? str.split('(')[0].trim().toLowerCase() : '';
-                                const vNorm = normalize(v.name);
-                                if (vNorm && (normalize(d.village_name) === vNorm || normalize(d.gram_panchayat) === vNorm)) return true;
-
-                                return false;
-                            });
-
-                            if (matches.length > 0) {
-                                // Pick the latest one that has a value > 0
-                                const match = matches.find(m => Number(m.shared_with_pwmu_kg) > 0) || matches[0];
-                                const newValue = (match.shared_with_pwmu_kg || 0).toString();
-
-                                if (v.value !== newValue && Number(newValue) > 0) {
-                                    hasChanges = true;
-                                    console.log(`✅ Matched ${v.name}: ${newValue}kg (from ${matches.length} records)`);
-                                    return { ...v, value: newValue, autoFilled: true, manualEntry: false };
-                                }
-                                return v;
-                            } else {
-                                // console.log(`❌ No match for village: ${v.name}`);
-                                return v;
-                            }
+                setVillages(prev => {
+                    let hasChanges = false;
+                    const updated = prev.map(v => {
+                        const vCode = extractCode(v.name);
+                        
+                        // A. Check for Confirmed Intake (Saved by Manager)
+                        const confirmedMatch = confirmedData?.find(d => {
+                            if (d.village_name === v.name) return true;
+                            const dCode = extractCode(d.village_name);
+                            return vCode && dCode && vCode === dCode;
                         });
-                        return hasChanges ? updated : prev;
+
+                        if (confirmedMatch) {
+                            const val = confirmedMatch.received_kg.toString();
+                            if (v.value !== val) {
+                                hasChanges = true;
+                                return { ...v, value: val, autoFilled: false, manualEntry: true, reportId: confirmedMatch.village_report_id };
+                            }
+                            return v;
+                        }
+
+                        // B. Check for Sarpanch Reports (Auto-fill Suggestions)
+                        const sarpanchMatches = sarpanchData?.filter(d => {
+                            if (d.village_id && d.village_id === v.id) return true;
+                            const dCode = extractCode(d.village_name);
+                            if (vCode && dCode && vCode === dCode) return true;
+                            const normalize = (str) => str ? str.split('(')[0].trim().toLowerCase() : '';
+                            return normalize(v.name) === normalize(d.village_name);
+                        });
+
+                        if (sarpanchMatches && sarpanchMatches.length > 0) {
+                            const match = sarpanchMatches.sort((a,b) => new Date(b.updated_at) - new Date(a.updated_at))[0];
+                            const val = (match.shared_with_pwmu_kg || 0).toString();
+                            if (v.value !== val && Number(val) > 0) {
+                                hasChanges = true;
+                                return { ...v, value: val, autoFilled: true, manualEntry: false, reportId: match.id };
+                            }
+                        }
+                        return v;
                     });
-                } else {
-                    console.log('No records found in database for this center on this date.');
-                }
+                    return hasChanges ? updated : prev;
+                });
                 console.groupEnd();
             } catch (err) {
                 console.error('Auto-fill error:', err);
                 console.groupEnd();
             }
         };
-
         autoFillData();
-    }, [selectedDate, center, locationData, villages]); // Re-added villages to ensure trigger after list load
-
+    }, [selectedDate, center, villages.length]); // Focus on length to avoid infinite loops
     const handleValueChange = (id, newValue) => {
         setVillages(prev => prev.map(v =>
             v.id === id ? { ...v, value: newValue, autoFilled: false, manualEntry: true } : v
@@ -491,12 +521,15 @@ const DailyLogPWMU = () => {
             name: vName,
             type: 'Manual Entry',
             autoFilled: false,
-            value: ''
+            value: '',
+            reportId: null
         }]);
         setShowAddModal(false);
     };
 
     const totalIntake = villages.reduce((sum, v) => sum + (Number(v.value) || 0), 0);
+    const totalCategorized = Object.values(processedStock).reduce((sum, v) => sum + (Number(v) || 0), 0);
+    const isMatch = Math.abs(totalIntake - totalCategorized) < 0.01;
 
     const filteredVillages = villages.filter(v =>
         v.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -504,6 +537,12 @@ const DailyLogPWMU = () => {
 
     const handleSave = async (e) => {
         e.preventDefault();
+
+        // Validate Total Matching
+        if (!isMatch && totalIntake > 0) {
+            alert(`Validation Error: The sum of categorized waste (${totalCategorized.toFixed(1)} kg) must exactly match the Daily Total (${totalIntake.toFixed(1)} kg).`);
+            return;
+        }
 
         // Validate date range
         if (selectedDate < minDate || selectedDate > maxDate) {
@@ -513,49 +552,105 @@ const DailyLogPWMU = () => {
 
         setIsSaving(true);
         try {
-            // Prepare submissions for all villages with values
-            const submissions = villages
+            // 1. Upsert Village Intake Confirmations
+            const confirmations = villages
                 .filter(v => v.value !== '' && Number(v.value) > 0)
                 .map(v => ({
-                    village_id: (v.id.startsWith('manual-') || v.id.startsWith('profile-')) ? null : v.id,
+                    // Use a more stable ID: center-village-date
+                    id: `vintake-${center?.id}-${(extractCode(v.name) || v.name).replace(/\s+/g, '_')}-${selectedDate}`,
+                    pwmu_id: center?.id,
                     village_name: v.name,
-                    pwmu_id: center?.id, // Link to the center
-                    district: center?.district || null,
-                    block: null, // Depending on if we have block context inside village
-                    gram_panchayat: center?.district ? null : null, // Set to null if unavailable
                     collection_date: selectedDate,
-                    wet_waste_kg: 0,
-                    dry_waste_kg: parseFloat(v.value),
-                    shared_with_pwmu_kg: parseFloat(v.value),
-                    user_charge_collected: 0,
-                    submitted: true
+                    received_kg: parseFloat(v.value),
+                    village_report_id: v.autoFilled ? v.reportId : null
                 }));
 
-            if (submissions.length === 0) {
+            if (confirmations.length === 0) {
                 setIsSaving(false);
                 return;
             }
 
-            // 1. Upsert Waste Collections
-            const { error: collectErr } = await supabase
-                .from('waste_collections')
-                .upsert(submissions, { onConflict: 'pwmu_id,collection_date,village_name' });
+            const { error: intakeErr } = await supabase
+                .from('pwmu_village_intake')
+                .upsert(confirmations, { onConflict: 'pwmu_id,collection_date,village_name' });
 
-            if (collectErr) throw collectErr;
+            if (intakeErr) throw intakeErr;
 
-            // 2. Mark day as Processed
-            const intakeTotal = submissions.reduce((sum, s) => sum + (s.shared_with_pwmu_kg || 0), 0);
+            // 2. Upsert Daily Operational Log
+            const intakeTotal = confirmations.reduce((sum, s) => sum + (s.received_kg || 0), 0);
             const { error: logErr } = await supabase
-                .from('pwmu_daily_logs')
+                .from('pwmu_operational_logs')
                 .upsert({
+                    id: `log-${center?.id}-${selectedDate}`,
                     pwmu_id: center?.id,
                     log_date: selectedDate,
-                    status: 'completed',
                     total_intake_kg: intakeTotal,
+                    processed_kg: totalCategorized, // Sum tracking
+                    reporting_count: confirmations.length,
                     updated_at: new Date().toISOString()
                 }, { onConflict: 'pwmu_id,log_date' });
 
             if (logErr) throw logErr;
+
+            // 3. Update Monthly Report Aggregation
+            const monthYear = selectedDate.substring(0, 7); // YYYY-MM
+            try {
+                // Simplified aggregation: In a real app, this should be a backend function
+                // Fetch all daily intakes for this month
+                const { data: monthData } = await supabase
+                    .from('pwmu_operational_logs')
+                    .select('total_intake_kg')
+                    .eq('pwmu_id', center?.id)
+                    .like('log_date', `${monthYear}%`);
+                
+                const monthTotalKg = monthData?.reduce((s, d) => s + (d.total_intake_kg || 0), 0) || 0;
+
+                await supabase
+                    .from('pwmu_monthly_reports')
+                    .upsert({
+                        id: `mrep-${center?.id}-${monthYear}`,
+                        pwmu_id: center?.id,
+                        month_year: monthYear,
+                        total_intake_mt: monthTotalKg / 1000,
+                        village_participation_count: confirmations.length // simplified
+                    }, { onConflict: 'pwmu_id,month_year' });
+            } catch (mErr) {
+                console.warn("Failed to update monthly summary:", mErr);
+            }
+
+            // 4. Update Market Availability (CUMULATIVE: add to existing stock)
+            // First, fetch current stock for this PWMU
+            const { data: existingStock } = await supabase
+                .from('market_availability')
+                .select('material, stock_kg')
+                .eq('pwmu_id', center?.id);
+            
+            const existingMap = {};
+            (existingStock || []).forEach(row => {
+                existingMap[row.material] = row.stock_kg || 0;
+            });
+
+            const marketUpserts = Object.entries(processedStock)
+                .filter(([_, qty]) => qty !== '' && Number(qty) >= 0)
+                .map(([material, qty]) => {
+                    const materialKey = material.toUpperCase();
+                    // Add today's entry to existing stock
+                    const newStock = (existingMap[materialKey] || 0) + parseFloat(qty);
+                    return {
+                        id: `market-${center?.id}-${materialKey}`.toLowerCase().replace(/\s+/g, '_'),
+                        pwmu_id: center?.id,
+                        pwmu_name: center?.name,
+                        material: materialKey,
+                        stock_kg: newStock
+                    };
+                });
+
+            if (marketUpserts.length > 0) {
+                const { error: marketErr } = await supabase
+                    .from('market_availability')
+                    .upsert(marketUpserts, { onConflict: 'pwmu_id,material' });
+                if (marketErr) throw marketErr;
+            }
 
             // Optional: Register manual/profile villages to persist for the next day
             if (center?.id) {
@@ -809,6 +904,57 @@ const DailyLogPWMU = () => {
                             </tfoot>
                         </table>
                     )}
+                </div>
+            </div>
+
+            {/* Processed Material Stock Section */}
+            <div className="mt-12 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+                <div className="p-6 border-b border-gray-100 bg-blue-50/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-blue-100 text-[#005DAA] rounded-lg">
+                            <Activity className="w-6 h-6" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-bold text-gray-800">{t('processedStockTitle', dailyLogTranslations)}</h2>
+                            <p className="text-xs text-gray-500">{t('processedStockDesc', dailyLogTranslations).replace('{total}', totalIntake.toFixed(1))}</p>
+                        </div>
+                    </div>
+                    
+                    {totalIntake > 0 && (
+                        <div className={`px-4 py-2 rounded-xl border flex items-center gap-3 transition-all ${isMatch ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
+                            {isMatch ? <CheckCircle2 className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5 animate-pulse" />}
+                            <div className="text-right">
+                                <p className="text-xs font-bold uppercase tracking-wider">
+                                    {isMatch ? t('matching', dailyLogTranslations) : t('mismatch', dailyLogTranslations).replace('{total}', totalIntake.toFixed(1))}
+                                </p>
+                                <p className="text-lg font-black">{totalCategorized.toFixed(1)} / {totalIntake.toFixed(1)} <span className="text-xs font-medium">kg</span></p>
+                            </div>
+                        </div>
+                    )}
+                </div>
+                <div className="p-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {Object.entries(processedStock).map(([materialKey, value]) => (
+                            <div key={materialKey} className="bg-gray-50/50 p-4 rounded-xl border border-gray-100 hover:border-blue-200 transition-all flex flex-col justify-between">
+                                <label className="text-sm font-semibold text-gray-700 mb-3 block">
+                                    {materialLabels[materialKey]}
+                                </label>
+                                <div className="relative">
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="0.1"
+                                        value={value}
+                                        onChange={(e) => setProcessedStock(prev => ({ ...prev, [materialKey]: e.target.value }))}
+                                        disabled={isLocked}
+                                        placeholder="0.0"
+                                        className="w-full bg-white border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-[#005DAA] focus:border-[#005DAA] block p-2.5 pr-10 shadow-sm"
+                                    />
+                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400 uppercase">{t('kg', dailyLogTranslations)}</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </div>
 

@@ -25,7 +25,7 @@ const FinancialView = () => {
 
                 const [pwmuRes, collRes, pickRes] = await Promise.all([
                     fetch(`${API_BASE}/data/pwmu_centers?select=*`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } }),
-                    fetch(`${API_BASE}/data/waste_collections?select=*`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } }),
+                    fetch(`${API_BASE}/data/village_waste_reports?select=*`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } }),
                     fetch(`${API_BASE}/data/vendor_pickups?select=*`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } })
                 ]);
 

@@ -91,8 +91,23 @@ function VendorDashboard() {
     const [vendorProfile, setVendorProfile] = useState(null);
     const [allVendors, setAllVendors] = useState([]);
     const [marketData, setMarketData] = useState([]);
+    const [pwmuCoords, setPwmuCoords] = useState({});
     const [pickupData, setPickupData] = useState([]);
     const [loadingProfile, setLoadingProfile] = useState(true);
+
+    // Calculate distance helper
+    const calculateDistance = (lat1, lon1, lat2, lon2) => {
+        if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
+        const R = 6371; // Radius of the earth in km
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = 
+            Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return parseFloat((R * c).toFixed(1));
+    };
 
     // Fetch vendor profile and all vendors from DB
     useEffect(() => {
@@ -105,7 +120,7 @@ function VendorDashboard() {
 
                 // 1. Fetch own profile
                 const profileRes = await fetch(
-                    `${API_BASE}/data/users?id=eq.${session.user?.id}&select=id,full_name,role,district,registration_data`,
+                    `${API_BASE}/data/users?id=eq.${session.user?.id}&select=id,full_name,role,district,latitude,longitude,registration_data`,
                     { headers: { ...headers, 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(8000) }
                 );
                 if (profileRes.ok) {
@@ -120,6 +135,20 @@ function VendorDashboard() {
                 );
                 if (vendorsRes.ok) {
                     setAllVendors(await vendorsRes.json());
+                }
+
+                // 2b. Fetch PWMU coordinates
+                const pwmuRes = await fetch(
+                    `${API_BASE}/data/pwmu_centers?select=name,latitude,longitude`,
+                    { headers: { ...headers, 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(8000) }
+                );
+                if (pwmuRes.ok) {
+                    const coords = await pwmuRes.json();
+                    const coordMap = {};
+                    coords.forEach(c => {
+                        coordMap[c.name] = { lat: c.latitude, lon: c.longitude };
+                    });
+                    setPwmuCoords(coordMap);
                 }
 
                 // 3. Fetch market availability
@@ -199,7 +228,10 @@ function VendorDashboard() {
 
     const getSubtitle = () => {
         if (selectedVendor === 'All Vendors') return t('overview', venTrans).replace('{count}', allVendors.length);
-        if (selectedVendor === 'self') return `${t('category', venTrans)}: ${vendorCategory} • ${t('gstin', venTrans)}: ${vendorGstin} • ${t('district', venTrans)}: ${vendorDistrict}`;
+        if (selectedVendor === 'self') {
+            const base = `${t('category', venTrans)}: ${vendorCategory} • ${t('gstin', venTrans)}: ${vendorGstin} • ${t('district', venTrans)}: ${vendorDistrict}`;
+            return vendorProfile?.latitude ? `${base} • (${vendorProfile.latitude.toFixed(4)}, ${vendorProfile.longitude.toFixed(4)})` : base;
+        }
         if (selectedVendorObj) return `${t('district', venTrans)}: ${selectedVendorObj.district || '—'}`;
         return `${t('category', venTrans)}: ${vendorCategory}`;
     };
@@ -338,41 +370,76 @@ function VendorDashboard() {
                                     <Flame className="w-3 h-3" /> {t('hotItems', venTrans)}
                                 </span>
                             </div>
-                            <div className="p-4 space-y-3">
-                                {marketData.length === 0 ? (
-                                    <p className="text-center py-8 text-gray-400">{t('noMarket', venTrans)}</p>
-                                ) : marketData.map((item) => (
-                                    <div key={item.id} className="group border border-gray-100 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between hover:border-orange-200 hover:bg-orange-50/30 transition-all cursor-pointer">
-                                        <div className="flex items-start sm:items-center gap-4 mb-4 sm:mb-0">
-                                            <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${item.is_hot ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-500'}`}>
-                                                {item.is_hot ? <Flame className="w-6 h-6 animate-pulse" /> : <PackageSearch className="w-6 h-6" />}
+                        {/* Aggregated State Stock Summary by Type */}
+                        {marketData.length > 0 && (() => {
+                            const totalByType = {};
+                            marketData.forEach(item => {
+                                if (!totalByType[item.material]) totalByType[item.material] = 0;
+                                totalByType[item.material] += Number(item.stock_kg || 0);
+                            });
+                            const colors = {
+                                PET: 'bg-blue-50 border-blue-200 text-blue-700',
+                                HDPE: 'bg-green-50 border-green-200 text-green-700',
+                                LDPE: 'bg-yellow-50 border-yellow-200 text-yellow-700',
+                                PP: 'bg-purple-50 border-purple-200 text-purple-700',
+                                MLP: 'bg-orange-50 border-orange-200 text-orange-700',
+                                RDF: 'bg-red-50 border-red-200 text-red-700',
+                                MIXED: 'bg-gray-50 border-gray-200 text-gray-700',
+                            };
+                            return (
+                                <div className="mx-4 mb-3">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Total Available State-wide</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {Object.entries(totalByType).map(([material, total]) => (
+                                            <div key={material} className={`px-3 py-1.5 rounded-full border text-xs font-bold flex items-center gap-1.5 ${colors[material] || 'bg-gray-50 border-gray-200 text-gray-700'}`}>
+                                                <span>{material}</span>
+                                                <span className="opacity-60">·</span>
+                                                <span>{total.toFixed(0)} kg</span>
                                             </div>
-                                            <div>
-                                                <div className="flex items-center gap-2">
-                                                    <h4 className="font-bold text-gray-800">{item.material}</h4>
-                                                    {item.is_hot && (
-                                                        <span className="bg-red-100 text-red-600 text-[10px] uppercase font-bold px-2 py-0.5 rounded border border-red-200">{t('highDemand', venTrans)}</span>
-                                                    )}
-                                                </div>
-                                                <p className="text-sm text-gray-500 font-medium flex items-center gap-1 mt-1">
-                                                    <MapPin className="w-3 h-3" /> {item.pwmu_name}
-                                                    <span className="mx-1 text-gray-300">|</span>
-                                                    <Truck className="w-3 h-3 ml-1" /> {item.distance_km} km
-                                                </p>
-                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            );
+                        })()}
+                        <div className="p-4 space-y-3">
+                            {marketData.length === 0 ? (
+                                <p className="text-center py-8 text-gray-400">{t('noMarket', venTrans)}</p>
+                            ) : marketData.map((item) => (
+                                <div key={item.id} className="group border border-gray-100 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between hover:border-orange-200 hover:bg-orange-50/30 transition-all cursor-pointer">
+                                    <div className="flex items-start sm:items-center gap-4 mb-4 sm:mb-0">
+                                        <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${item.is_hot ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-500'}`}>
+                                            {item.is_hot ? <Flame className="w-6 h-6 animate-pulse" /> : <PackageSearch className="w-6 h-6" />}
                                         </div>
-                                        <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-6 sm:pl-4 sm:border-l border-gray-100">
-                                            <div className="text-left sm:text-right">
-                                                <p className="text-xs text-gray-500 font-medium mb-0.5">{t('availableStock', venTrans)}</p>
-                                                <p className="text-xl font-bold text-[#005DAA]">{item.stock_kg.toLocaleString()} <span className="text-sm font-medium text-gray-500">{item.unit || t('kg', venTrans)}</span></p>
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <h4 className="font-bold text-gray-800">{item.material}</h4>
+                                                {item.is_hot && (
+                                                    <span className="bg-red-100 text-red-600 text-[10px] uppercase font-bold px-2 py-0.5 rounded border border-red-200">{t('highDemand', venTrans)}</span>
+                                                )}
                                             </div>
-                                            <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center group-hover:bg-white group-hover:shadow-sm group-hover:text-orange-600 transition-colors">
-                                                <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-orange-500" />
-                                            </div>
+                                            <p className="text-sm text-gray-500 font-medium flex items-center gap-1 mt-1">
+                                                <MapPin className="w-3 h-3" /> {item.pwmu_name}
+                                                <span className="mx-1 text-gray-300">|</span>
+                                                <Truck className="w-3 h-3 ml-1" /> {
+                                                    (vendorProfile?.latitude && pwmuCoords[item.pwmu_name])
+                                                        ? `${calculateDistance(vendorProfile.latitude, vendorProfile.longitude, pwmuCoords[item.pwmu_name].lat, pwmuCoords[item.pwmu_name].lon)} km`
+                                                        : `${item.distance_km || '—'} km`
+                                                }
+                                            </p>
                                         </div>
                                     </div>
-                                ))}
-                            </div>
+                                    <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-6 sm:pl-4 sm:border-l border-gray-100">
+                                        <div className="text-left sm:text-right">
+                                            <p className="text-xs text-gray-500 font-medium mb-0.5">{t('availableStock', venTrans)}</p>
+                                            <p className="text-xl font-bold text-[#005DAA]">{item.stock_kg.toLocaleString()} <span className="text-sm font-medium text-gray-500">{item.unit || t('kg', venTrans)}</span></p>
+                                        </div>
+                                        <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center group-hover:bg-white group-hover:shadow-sm group-hover:text-orange-600 transition-colors">
+                                            <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-orange-500" />
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                             <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 text-center">
                                 <button className="text-sm font-bold text-[#005DAA] hover:underline">{t('viewAllState', venTrans)}</button>
                             </div>

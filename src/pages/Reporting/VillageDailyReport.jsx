@@ -171,21 +171,44 @@ const VillageDailyReport = () => {
 
     const [existingRecordId, setExistingRecordId] = useState(null);
     const [isChecking, setIsChecking] = useState(false);
+    const [pwmuFilledEntry, setPwmuFilledEntry] = useState(null); // PWMU manually filled this date for village
 
     const checkExistingLog = async (selectedDate) => {
         if (!user?.id) return;
         setIsChecking(true);
+        setPwmuFilledEntry(null);
         try {
             const proxyUrl = '/cgpwmu/api';
             const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-            const res = await fetch(`${proxyUrl}/data/waste_collections?village_id=eq.${user.id}&collection_date=eq.${selectedDate}&select=*`, {
+            const reg = user.registration_data || {};
+            const villageName = reg.villageName || reg.primaryVillage || user.full_name || 'Village';
+
+            // Check if PWMU has manually entered data for this village on this date
+            if (reg.pwmuId) {
+                const pwmuRes = await fetch(`${proxyUrl}/data/pwmu_village_intake?pwmu_id=eq.${reg.pwmuId}&collection_date=eq.${selectedDate}&village_name=eq.${encodeURIComponent(villageName)}&select=*`, {
+                    headers: { 'apikey': ANON_KEY }
+                });
+                const pwmuData = await pwmuRes.json();
+                if (pwmuData && pwmuData.length > 0) {
+                    setPwmuFilledEntry(pwmuData[0]);
+                    setIsLocked(true);
+                    setWasteData(d => ({
+                        ...d,
+                        sharedPWMU: { ...d.sharedPWMU, value: pwmuData[0].received_kg || '' }
+                    }));
+                    setIsChecking(false);
+                    return; // PWMU data takes precedence
+                }
+            }
+
+            // Check village's own submission
+            const res = await fetch(`${proxyUrl}/data/village_waste_reports?village_id=eq.${user.id}&collection_date=eq.${selectedDate}&select=*`, {
                 headers: { 'apikey': ANON_KEY }
             });
             const data = await res.json();
 
             if (data && data.length > 0) {
                 const record = data[0];
-                console.log('[DEBUG] Existing record found:', record);
                 setExistingRecordId(record.id);
                 setIsLocked(true);
                 setWasteData({
@@ -200,7 +223,6 @@ const VillageDailyReport = () => {
             } else {
                 setExistingRecordId(null);
                 setIsLocked(false);
-                // Reset to empty if no record
                 setWasteData({
                     wet: { ...wasteData.wet, value: '' },
                     plastic: { ...wasteData.plastic, value: '' },
@@ -317,13 +339,13 @@ const VillageDailyReport = () => {
             // 1. DELETE any existing records for this day/village (Robust Duplication Prevention)
             // This clears multiple entries if they exist from previous bugs
             console.log('[DEBUG] Clearing existing records for:', basicInfo.date);
-            await fetch(`${proxyUrl}/data/waste_collections?village_id=eq.${user.id}&collection_date=eq.${basicInfo.date}`, {
+            await fetch(`${proxyUrl}/data/village_waste_reports?village_id=eq.${user.id}&collection_date=eq.${basicInfo.date}`, {
                 method: 'DELETE',
                 headers
             });
 
             // 2. POST the new single record
-            const url = `${proxyUrl}/data/waste_collections`;
+            const url = `${proxyUrl}/data/village_waste_reports`;
             const response = await fetch(url, {
                 method: 'POST',
                 headers,
@@ -399,8 +421,22 @@ const VillageDailyReport = () => {
                     </div>
                 )}
 
-                {/* Edit Mode Badge */}
-                {existingRecordId && (
+                {/* PWMU-Filled Read-Only Banner */}
+                {pwmuFilledEntry && (
+                    <div className="bg-green-600 text-white px-6 py-3 rounded-2xl flex items-center justify-between shadow-lg animate-fade-in">
+                        <div className="flex items-center gap-3">
+                            <CheckCircle2 className="w-5 h-5" />
+                            <div>
+                                <span className="font-bold block">Reported by PWMU Center</span>
+                                <span className="text-xs text-green-100">Your PWMU recorded {pwmuFilledEntry.received_kg} kg for your village on {basicInfo.date}</span>
+                            </div>
+                        </div>
+                        <span className="text-xs bg-green-500 px-3 py-1 rounded-full">Read Only — You cannot edit PWMU entries</span>
+                    </div>
+                )}
+
+                {/* Own Edit Mode Badge */}
+                {existingRecordId && !pwmuFilledEntry && (
                     <div className="bg-blue-600 text-white px-6 py-3 rounded-2xl flex items-center justify-between shadow-lg animate-fade-in">
                         <div className="flex items-center gap-3">
                             <Info className="w-5 h-5" />
@@ -511,10 +547,10 @@ const VillageDailyReport = () => {
                                     .map(([key, item]) => (
                                         <div
                                             key={key}
-                                            className={`relative p - 3 rounded - xl border transition - all duration - 200 group ${item.color} ${item.value ? 'shadow-sm opacity-100 ring-2 ring-current ring-offset-1' : 'opacity-70 hover:opacity-100'} `}
+                                            className={`relative p-3 rounded-xl border transition-all duration-200 group ${item.color} ${item.value ? 'shadow-sm opacity-100 ring-2 ring-current ring-offset-1' : 'opacity-70 hover:opacity-100'}`}
                                         >
                                             <div className="flex items-center gap-3 mb-2">
-                                                <div className={`w - 8 h - 8 rounded - lg flex items - center justify - center ${item.icon} shadow - sm group - hover: scale - 110 transition - transform`}>
+                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${item.icon} shadow-sm group-hover:scale-110 transition-transform`}>
                                                     {key === 'wet' && <Leaf className="w-4 h-4" />}
                                                     {key === 'plastic' && <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 10h16v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V10z" /><path d="M14 4h-4a2 2 0 0 0-2 2v4h8V6a2 2 0 0 0-2-2z" /></svg>}
                                                     {key === 'metal' && <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" /><path d="M2 12h20" /></svg>}

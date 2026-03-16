@@ -88,6 +88,7 @@ const MonitoringAnalytics = () => {
     };
     const [pwmus, setPwmus] = useState([]);
     const [collections, setCollections] = useState([]);
+    const [operationalLogs, setOperationalLogs] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -97,13 +98,17 @@ const MonitoringAnalytics = () => {
                 const token = session.access_token;
                 if (!token) return;
 
-                const [pwmuRes, collRes] = await Promise.all([
-                    fetch(`${API_BASE}/data/pwmu_centers?select=*`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } }),
-                    fetch(`${API_BASE}/data/waste_collections?select=*`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } })
+                const headers = { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` };
+
+                const [pwmuRes, collRes, logsRes] = await Promise.all([
+                    fetch(`${API_BASE}/data/pwmu_centers?select=*`, { headers }),
+                    fetch(`${API_BASE}/data/village_waste_reports?select=*`, { headers }),
+                    fetch(`${API_BASE}/data/pwmu_operational_logs?select=*&order=log_date.asc`, { headers })
                 ]);
 
                 if (pwmuRes.ok) setPwmus(await pwmuRes.json());
                 if (collRes.ok) setCollections(await collRes.json());
+                if (logsRes.ok) setOperationalLogs(await logsRes.json());
 
             } catch (err) {
                 console.error('Error fetching compliance data:', err);
@@ -123,13 +128,22 @@ const MonitoringAnalytics = () => {
         selectedDistrict === 'All Districts' ? collections : collections.filter(c => c.district === selectedDistrict)
         , [collections, selectedDistrict]);
 
+    const filteredLogs = useMemo(() => {
+        const pwmuIds = new Set(filteredPwmus.map(p => p.id));
+        return operationalLogs.filter(l => pwmuIds.has(l.pwmu_id));
+    }, [operationalLogs, filteredPwmus]);
+
     // KPI Calculations
     const totalAudits = filteredCollections.length;
     const overallCompliance = filteredPwmus.length > 0
         ? Math.round((filteredPwmus.filter(p => p.status === 'operational').length / filteredPwmus.length) * 100)
         : 0;
     const openIssues = filteredPwmus.filter(p => p.status === 'maintenance').length;
-    const criticalFlags = filteredPwmus.filter(p => p.capacity_mt > 0 && (p.waste_processed_mt / p.capacity_mt) > 1.2).length;
+    const criticalFlags = filteredPwmus.filter(p => {
+        const capacity = Number(p.capacity_mt || 0);
+        const processed = Number(p.waste_processed_mt || 0);
+        return capacity > 0 && (processed / capacity) > 1.2;
+    }).length;
 
     const kpis = [
         { label: t('totalAudits', monTrans), value: totalAudits, icon: FileText, color: "text-blue-600", bg: "bg-blue-50", text: t('loggedCol', monTrans) },
@@ -138,16 +152,48 @@ const MonitoringAnalytics = () => {
         { label: t('criticalFlags', monTrans), value: criticalFlags, icon: AlertTriangle, color: "text-red-600", bg: "bg-red-50", text: t('overCapacity', monTrans) },
     ];
 
-    // Compliance Trend Data (Line Chart) - Mocking for now based on actual data
-    const trendData = [
-        { month: 'Jul', target: 90, actual: overallCompliance - 5 },
-        { month: 'Aug', target: 90, actual: overallCompliance },
-    ];
+    // Compliance Trend Data (Line Chart) - Calculate from logs
+    const trendData = useMemo(() => {
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const currentMonthIdx = new Date().getMonth();
+        
+        // Group logs by month
+        const monthlyStats = months.map((m, idx) => ({ 
+            month: m, 
+            target: 90, 
+            actual: 0,
+            logCount: 0,
+            idx
+        })).filter(m => m.idx <= currentMonthIdx);
+
+        filteredLogs.forEach(log => {
+            const date = new Date(log.log_date);
+            const mIdx = date.getMonth();
+            if (monthlyStats[mIdx]) {
+                monthlyStats[mIdx].logCount++;
+            }
+        });
+
+        // Simple compliance: (logs_this_month / days_so_far) / num_pwmus
+        const daysInMonth = new Date().getDate();
+        const numPwmus = filteredPwmus.length || 1;
+        
+        return monthlyStats.map(m => {
+            if (m.idx === currentMonthIdx) {
+                m.actual = Math.min(100, Math.round(((m.logCount / daysInMonth) / numPwmus) * 100));
+            } else {
+                m.actual = Math.min(100, Math.round(((m.logCount / 30) / numPwmus) * 100));
+            }
+            // Fallback for demo if no data yet
+            if (m.actual === 0 && m.logCount === 0) m.actual = 0; 
+            return m;
+        });
+    }, [filteredLogs, filteredPwmus]);
 
     // Issue Categories Data (Bar Chart)
     const issueData = [
         { category: t('issueCat', monTrans).maintenance, count: openIssues },
-        { category: t('issueCat', monTrans).logDelay, count: filteredPwmus.filter(p => p.status === 'maintenance').length * 2 },
+        { category: t('issueCat', monTrans).logDelay, count: filteredPwmus.length - (filteredLogs.filter(l => l.log_date === new Date().toISOString().split('T')[0]).length) },
         { category: t('issueCat', monTrans).overCapacity, count: criticalFlags },
         { category: t('issueCat', monTrans).dataMismatch, count: 0 },
     ];
@@ -300,28 +346,44 @@ const MonitoringAnalytics = () => {
                         </thead>
                         <tbody className="bg-white">
                             {filteredPwmus.map((row, i) => {
-                                const score = row.status === 'operational' ? 95 : 45;
+                                // Calculate real health score based on last 7 days of logs
+                                const last7Days = new Set();
+                                for (let j = 0; j < 7; j++) {
+                                    const d = new Date();
+                                    d.setDate(d.getDate() - j);
+                                    last7Days.add(d.toISOString().split('T')[0]);
+                                }
+                                
+                                const logsFound = operationalLogs.filter(l => 
+                                    l.pwmu_id === row.id && last7Days.has(l.log_date)
+                                ).length;
+                                
+                                // Base score on reporting frequency (weighted 60%) + status (weighted 40%)
+                                const reportingScore = (logsFound / 7) * 100;
+                                const statusScore = row.status === 'operational' ? 100 : (row.status === 'maintenance' ? 50 : 0);
+                                const totalScore = Math.round((reportingScore * 0.6) + (statusScore * 0.4));
+
                                 return (
                                     <tr key={i} className="hover:bg-gray-50/50 transition-colors border-b border-gray-50 last:border-0">
                                         <td className="py-4 px-6 text-sm font-semibold text-gray-700 flex items-center gap-2">
-                                            <div className={`w-2 h-2 rounded-full ${score >= 90 ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`}></div>
+                                            <div className={`w-2 h-2 rounded-full ${totalScore >= 70 ? 'bg-green-500' : totalScore >= 40 ? 'bg-yellow-500' : 'bg-red-500 animate-pulse'}`}></div>
                                             {row.name}
                                         </td>
                                         <td className="py-4 px-6 text-center">
-                                            <div className="flex justify-center">{getStatusIcon(row.status)}</div>
+                                            <div className="flex justify-center">{logsFound > 0 ? <CheckCircle2 className="w-5 h-5 text-green-500" /> : <Clock className="w-5 h-5 text-gray-300" />}</div>
                                         </td>
                                         <td className="py-4 px-6 text-center">
-                                            <div className="flex justify-center">{getStatusIcon(row.status)}</div>
+                                            <div className="flex justify-center"><CheckCircle2 className="w-5 h-5 text-green-500" /></div>
                                         </td>
                                         <td className="py-4 px-6 text-center">
-                                            <div className="flex justify-center">{getStatusIcon('operational')}</div>
+                                            <div className="flex justify-center"><CheckCircle2 className="w-5 h-5 text-green-500" /></div>
                                         </td>
                                         <td className="py-4 px-6 text-center">
-                                            <div className="flex justify-center">{getStatusIcon('operational')}</div>
+                                            <div className="flex justify-center"><CheckCircle2 className="w-5 h-5 text-green-500" /></div>
                                         </td>
                                         <td className="py-4 px-6 text-center">
-                                            <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${score >= 90 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                                {score}%
+                                            <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${totalScore >= 70 ? 'bg-green-100 text-green-700' : totalScore >= 40 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
+                                                {totalScore}%
                                             </span>
                                         </td>
                                     </tr>

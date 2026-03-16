@@ -1,9 +1,65 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileBarChart, Settings, IndianRupee, Factory, Plus, Trash2, Calendar, CheckCircle2, AlertTriangle, AlertCircle, Wrench } from 'lucide-react';
+import { 
+    FileBarChart, 
+    Settings, 
+    IndianRupee, 
+    Factory, 
+    Plus, 
+    Trash2, 
+    Calendar, 
+    CheckCircle2, 
+    AlertTriangle, 
+    AlertCircle, 
+    Wrench,
+    TrendingUp,
+    TrendingDown,
+    ArrowRight,
+    Package,
+    ArrowLeft,
+    ChevronRight,
+    Search
+} from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabaseClient';
+
+const materialMap = {
+    // English Standard
+    'PET (Bottles, Jars...)': 'PET',
+    'HDPE (Mugs, Crates...)': 'HDPE',
+    'LDPE (Bags, Wraps...)': 'LDPE',
+    'PP (Straws, Toys...)': 'PP',
+    'MLP (Chips Bags...)': 'MLP',
+    'Processed RDF': 'RDF',
+    'Mixed Plastic Scraps': 'MIXED',
+    // Hindi Standards
+    'PET (पानी की बोतलें)': 'PET',
+    'HDPE (दूध के जग)': 'HDPE',
+    'LDPE (प्लास्टिक बैग)': 'LDPE',
+    'PP (टपरवेयर)': 'PP',
+    'MLP (मल्टी-लेयर पैकेज)': 'MLP',
+    'प्रसंस्कृत RDF': 'RDF',
+    'कटा हुआ मिश्रित प्लास्टिक': 'MIXED',
+    // Legacy Fallbacks
+    'PET (Water Bottles)': 'PET',
+    'HDPE (Milk Jugs)': 'HDPE',
+    'LDPE (Plastic Bags)': 'LDPE',
+    'PP (Tupperware)': 'PP',
+    'MLP (Multi-Layer Packages)': 'MLP',
+    'Shredded Mixed Plastic': 'MIXED',
+    'Other / Mixed': 'MIXED'
+};
+
+const sidebarMaterials = [
+    { key: 'PET', label: 'PET' },
+    { key: 'HDPE', label: 'HDPE' },
+    { key: 'LDPE', label: 'LDPE' },
+    { key: 'PP', label: 'PP' },
+    { key: 'MLP', label: 'MLP' },
+    { key: 'RDF', label: 'RDF' },
+    { key: 'MIXED', label: 'MIXED' }
+];
 
 const PWMUMonthlyReport = () => {
     const navigate = useNavigate();
@@ -61,8 +117,13 @@ const PWMUMonthlyReport = () => {
                 'Other'
             ],
             wasteTypes: [
-                'PET (Water Bottles)', 'HDPE (Milk Jugs)', 'LDPE (Plastic Bags)',
-                'PP (Tupperware)', 'MLP (Multi-Layer Packages)', 'Processed RDF', 'Shredded Mixed Plastic'
+                'PET (Bottles, Jars...)', 
+                'HDPE (Mugs, Crates...)', 
+                'LDPE (Bags, Wraps...)',
+                'PP (Straws, Toys...)', 
+                'MLP (Chips Bags...)', 
+                'Processed RDF', 
+                'Mixed Plastic Scraps'
             ],
             machines: {
                 fatka: 'Fatka / Dust Cleaning Machine',
@@ -145,6 +206,9 @@ const PWMUMonthlyReport = () => {
         pwmuId: ''
     });
 
+    const [inventory, setInventory] = useState({});
+    const [isLoadingInventory, setIsLoadingInventory] = useState(false);
+
     const [machineStatus, setMachineStatus] = useState({
         fatka: { selected: false, functional: true, dateBroke: '', reason: '' },
         baling: { selected: false, functional: true, dateBroke: '', reason: '' },
@@ -167,23 +231,46 @@ const PWMUMonthlyReport = () => {
         const fetchCenter = async () => {
             if (!user) return;
             try {
-                const { data, error } = await supabase
+                // Priority 1: Find center where this user is the nodal officer (DB-linked)
+                const { data: byNodal } = await supabase
                     .from('pwmu_centers')
-                    .select('id, name, status')
+                    .select('id, name, status, village')
                     .eq('nodal_officer_id', user.id)
-                    .single();
+                    .maybeSingle();
 
-                if (data) {
-                    setBasicInfo(prev => ({ ...prev, pwmuName: data.name, pwmuId: data.id }));
-                } else if (error) {
-                    // If single fail, try any link
-                    const { data: list } = await supabase
+                if (byNodal) {
+                    setBasicInfo(prev => ({ ...prev, pwmuName: byNodal.name, pwmuId: byNodal.id, village: byNodal.village }));
+                    return;
+                }
+
+                // Priority 2: Try center where center.id == user.id (seeded data pattern)
+                const { data: byId } = await supabase
+                    .from('pwmu_centers')
+                    .select('id, name, status, village')
+                    .eq('id', user.id)
+                    .maybeSingle();
+
+                if (byId) {
+                    setBasicInfo(prev => ({ ...prev, pwmuName: byId.name, pwmuId: byId.id, village: byId.village }));
+                    return;
+                }
+
+                // Priority 3: Use reg.pwmuId from registration_data (most common for self-registered users)
+                const reg = user.registration_data || {};
+                if (reg.pwmuId) {
+                    const { data: byRegId } = await supabase
                         .from('pwmu_centers')
-                        .select('id, name')
-                        .limit(1);
-                    if (list?.[0]) {
-                        setBasicInfo(prev => ({ ...prev, pwmuName: list[0].name, pwmuId: list[0].id }));
+                        .select('id, name, status, village')
+                        .eq('id', reg.pwmuId)
+                        .maybeSingle();
+
+                    if (byRegId) {
+                        setBasicInfo(prev => ({ ...prev, pwmuName: byRegId.name, pwmuId: byRegId.id, village: byRegId.village }));
+                        return;
                     }
+
+                    // Center record not in DB yet — at minimum, use the pwmuId so fetchInventory runs
+                    setBasicInfo(prev => ({ ...prev, pwmuName: reg.pwmuName || 'PWMU Center', pwmuId: reg.pwmuId }));
                 }
             } catch (err) {
                 console.error('Error fetching center:', err);
@@ -221,20 +308,92 @@ const PWMUMonthlyReport = () => {
         }));
     };
 
+    useEffect(() => {
+        if (basicInfo.pwmuId) {
+            fetchInventory();
+        }
+    }, [basicInfo.pwmuId]);
+
+    const fetchInventory = async () => {
+        try {
+            setIsLoadingInventory(true);
+            const { data, error } = await supabase
+                .from('market_availability')
+                .select('*')
+                .eq('pwmu_id', basicInfo.pwmuId);
+
+            if (error) throw error;
+
+            const invMap = {};
+            data.forEach(item => {
+                invMap[item.material] = item.stock_kg;
+            });
+            setInventory(invMap);
+        } catch (err) {
+            console.error('Error fetching inventory:', err);
+        } finally {
+            setIsLoadingInventory(false);
+        }
+    };
+
     const addSaleRow = () => {
-        setSales(prev => [...prev, { id: Date.now(), vendor: '', wasteType: '', quantity: '', revenue: '' }]);
+        setSales(prev => [...prev, { 
+            id: Date.now(), 
+            vendor: '', 
+            materials: [{ id: `mat-${Date.now()}`, wasteType: '', quantity: '', revenue: '' }] 
+        }]);
     };
 
     const removeSaleRow = (id) => {
         setSales(prev => prev.filter(s => s.id !== id));
     };
 
+    const addMaterialRow = (vendorId) => {
+        setSales(prev => prev.map(s => 
+            s.id === vendorId 
+                ? { ...s, materials: [...s.materials, { id: `mat-${Date.now()}`, wasteType: '', quantity: '', revenue: '' }] }
+                : s
+        ));
+    };
+
+    const removeMaterialRow = (vendorId, materialId) => {
+        setSales(prev => prev.map(s => {
+            if (s.id !== vendorId) return s;
+            const updatedMaterials = s.materials.filter(m => m.id !== materialId);
+            // If it's the last material, maybe we should keep it empty or remove the vendor? 
+            // Better to keep at least one empty row or allow deleting the vendor separately.
+            return { ...s, materials: updatedMaterials };
+        }));
+    };
+
     const updateSaleRow = (id, field, value) => {
         setSales(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s));
     };
 
+    const updateMaterialRow = (vendorId, materialId, field, value) => {
+        setSales(prev => prev.map(s => {
+            if (s.id !== vendorId) return s;
+            return {
+                ...s,
+                materials: s.materials.map(m => m.id === materialId ? { ...m, [field]: value } : m)
+            };
+        }));
+    };
+
     // Calculations
-    const totalRevenue = sales.reduce((sum, sale) => sum + (Number(sale.revenue) || 0), 0);
+    const totalRevenue = sales.reduce((sum, vendorRow) => {
+        const vendorSum = vendorRow.materials.reduce((vSum, m) => vSum + (Number(m.revenue) || 0), 0);
+        return sum + vendorSum;
+    }, 0);
+
+    // Calculate sales aggregate for inventory deduction
+    const salesAggregate = {};
+    sales.forEach(vRow => {
+        vRow.materials.forEach(m => {
+            const key = materialMap[m.wasteType] || 'OTHER';
+            salesAggregate[key] = (salesAggregate[key] || 0) + (Number(m.quantity) || 0);
+        });
+    });
     const totalExpenses = (Number(expenses.electricity) || 0) + (Number(expenses.honorarium) || 0) + (Number(expenses.other) || 0);
     const netBalance = totalRevenue - totalExpenses;
 
@@ -285,22 +444,67 @@ const PWMUMonthlyReport = () => {
 
             if (updateError) console.error('Error updating center snapshot:', updateError);
 
-            // 4. Record Vendor Pickups for each sale row
-            if (sales.length > 0) {
-                const pickupRecords = sales.map(s => ({
-                    pwmu_name: basicInfo.pwmuName,
-                    vendor_name: s.vendor,
-                    material: s.wasteType,
-                    quantity_kg: parseFloat(s.quantity) || 0,
-                    amount_paid: parseFloat(s.revenue) || 0,
-                    pickup_date: `${basicInfo.year}-${basicInfo.month}-01`,
-                }));
+            // 4. Record Vendor Pickups for each sale record
+            const flattenedSales = sales.flatMap(vRow => 
+                vRow.materials.map(m => ({
+                    vendor: vRow.vendor,
+                    wasteType: m.wasteType,
+                    quantity: m.quantity,
+                    revenue: m.revenue
+                }))
+            );
 
-                const { error: pickupError } = await supabase
-                    .from('vendor_pickups')
-                    .insert(pickupRecords);
+            if (flattenedSales.length > 0) {
+                const pickupRecords = flattenedSales
+                    .filter(s => s.vendor && s.wasteType && Number(s.quantity) > 0)
+                    .map(s => ({
+                        pwmu_name: basicInfo.pwmuName,
+                        vendor_name: s.vendor,
+                        material: s.wasteType,
+                        quantity_kg: parseFloat(s.quantity) || 0,
+                        amount_paid: parseFloat(s.revenue) || 0,
+                        pickup_date: `${basicInfo.year}-${basicInfo.month}-01`,
+                    }));
 
-                if (pickupError) console.error('Error recording pickups:', pickupError);
+                if (pickupRecords.length > 0) {
+                    const { error: pickupError } = await supabase
+                        .from('vendor_pickups')
+                        .insert(pickupRecords);
+
+                    if (pickupError) console.error('Error recording pickups:', pickupError);
+                }
+            }
+
+            // 5. Deduct sold quantities from market_availability (completing the service loop)
+            // Group sold quantities by material
+            const soldByMaterial = {};
+            flattenedSales
+                .filter(s => s.wasteType && Number(s.quantity) > 0)
+                .forEach(s => {
+                    // Normalize material key (extract uppercase code from label like "PET (Bottles...)")
+                    const materialKey = s.wasteType.split(' ')[0].toUpperCase();
+                    soldByMaterial[materialKey] = (soldByMaterial[materialKey] || 0) + parseFloat(s.quantity);
+                });
+
+            if (Object.keys(soldByMaterial).length > 0) {
+                // Fetch current stock for this PWMU
+                const { data: currentStockRows } = await supabase
+                    .from('market_availability')
+                    .select('id, material, stock_kg')
+                    .eq('pwmu_id', basicInfo.pwmuId);
+
+                if (currentStockRows && currentStockRows.length > 0) {
+                    for (const row of currentStockRows) {
+                        const materialKey = row.material.toUpperCase();
+                        const soldQty = soldByMaterial[materialKey] || 0;
+                        if (soldQty > 0) {
+                            const newStock = Math.max(0, (row.stock_kg || 0) - soldQty);
+                            await supabase
+                                .from('market_availability')
+                                .upsert([{ ...row, stock_kg: newStock }], { onConflict: 'pwmu_id,material' });
+                        }
+                    }
+                }
             }
 
             setIsSaving(false);
@@ -337,7 +541,10 @@ const PWMUMonthlyReport = () => {
 
     return (
         <div className="min-h-[calc(100vh-80px)] bg-[#f4f7f6] p-4 lg:p-8 pb-32">
-            <div className="max-w-5xl mx-auto space-y-6">
+            <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                
+                {/* Main Form Content */}
+                <div className="lg:col-span-8 space-y-6">
 
                 {/* Header Section */}
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -386,7 +593,7 @@ const PWMUMonthlyReport = () => {
                                         </div>
                                         <div>
                                             <div className="font-bold text-[#005DAA] text-lg">{basicInfo.pwmuName}</div>
-                                            <div className="text-xs text-gray-500">{t('nodalOfficer', monthlyTranslations)}</div>
+                                            <div className="text-xs text-gray-500 font-medium">{[basicInfo.village, t('nodalOfficer', monthlyTranslations)].filter(Boolean).join(' | ')}</div>
                                         </div>
                                     </div>
                                 </div>
@@ -516,85 +723,140 @@ const PWMUMonthlyReport = () => {
                         </div>
                         <div className="p-6">
                             {sales.length === 0 ? (
-                                <div className="text-center py-6 text-gray-400 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-                                    <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                                    <p className="text-sm">{t('noSales', monthlyTranslations)}</p>
+                                <div className="text-center py-10 text-gray-400 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                                    <AlertCircle className="w-10 h-10 mx-auto mb-3 opacity-50" />
+                                    <p className="text-sm font-medium">{t('noSales', monthlyTranslations)}</p>
                                 </div>
                             ) : (
-                                <div className="space-y-4">
-                                    {/* Desktop Header */}
-                                    <div className="hidden md:grid grid-cols-12 gap-4 px-2 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                                        <div className="col-span-4">{t('vendorCol', monthlyTranslations)}</div>
-                                        <div className="col-span-3">{t('materialCol', monthlyTranslations)}</div>
-                                        <div className="col-span-2 text-right">{t('qtyCol', monthlyTranslations)}</div>
-                                        <div className="col-span-2 text-right">{t('revenueCol', monthlyTranslations)}</div>
-                                        <div className="col-span-1 text-center">{t('actionCol', monthlyTranslations)}</div>
-                                    </div>
+                                <div className="space-y-6">
+                                    {sales.map((sale, saleIndex) => (
+                                        <div key={sale.id} className="bg-gray-50/50 rounded-2xl border border-gray-100 p-5 space-y-4 animate-fade-in-up">
+                                            {/* Vendor Header Row */}
+                                            <div className="flex flex-col md:flex-row md:items-center gap-4 border-b border-gray-200 pb-4">
+                                                <div className="flex-1">
+                                                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">{t('vendorCol', monthlyTranslations)}</label>
+                                                    <div className="flex items-center gap-2">
+                                                        <select
+                                                            value={sale.vendor} 
+                                                            onChange={(e) => updateSaleRow(sale.id, 'vendor', e.target.value)} 
+                                                            required
+                                                            className="flex-1 p-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#005DAA]/20 font-semibold text-gray-700 shadow-sm"
+                                                        >
+                                                            <option value="">{t('selectVendor', monthlyTranslations)}</option>
+                                                            <option value="EcoPlast Recyclers Pvt Ltd">EcoPlast Recyclers Pvt Ltd</option>
+                                                            <option value="Ambuja Cement Facility">Ambuja Cement Facility</option>
+                                                            <option value="Local PWD Contractor">Local PWD Contractor</option>
+                                                            <option value="Other">Other (Register New)</option>
+                                                        </select>
+                                                        <button
+                                                            type="button" 
+                                                            onClick={() => removeSaleRow(sale.id)}
+                                                            className="p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all border border-gray-200 hover:border-red-100 bg-white shadow-sm"
+                                                            title="Remove Vendor"
+                                                        >
+                                                            <Trash2 className="w-5 h-5" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div className="hidden md:block">
+                                                    <div className="bg-blue-100 text-[#005DAA] text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider">Vendor {saleIndex + 1}</div>
+                                                </div>
+                                            </div>
 
-                                    {/* Rows */}
-                                    {sales.map((sale, index) => (
-                                        <div key={sale.id} className="relative bg-white border border-gray-200 rounded-xl p-4 md:p-2 md:bg-transparent md:border-none md:rounded-none grid grid-cols-1 md:grid-cols-12 gap-4 items-end md:items-center animate-fade-in-up">
-                                            {/* Mobile Labels */}
-                                            <div className="col-span-1 md:col-span-4">
-                                                <label className="md:hidden block text-xs font-semibold text-gray-500 mb-1">{t('vendorCol', monthlyTranslations)}</label>
-                                                <select
-                                                    value={sale.vendor} onChange={(e) => updateSaleRow(sale.id, 'vendor', e.target.value)} required
-                                                    className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#005DAA]/20"
-                                                >
-                                                    <option value="">{t('selectVendor', monthlyTranslations)}</option>
-                                                    <option value="EcoPlast Recyclers Pvt Ltd">EcoPlast Recyclers Pvt Ltd</option>
-                                                    <option value="Ambuja Cement Facility">Ambuja Cement Facility</option>
-                                                    <option value="Local PWD Contractor">Local PWD Contractor</option>
-                                                    <option value="Other">Other (Register New)</option>
-                                                </select>
-                                            </div>
-                                            <div className="col-span-1 md:col-span-3">
-                                                <label className="md:hidden block text-xs font-semibold text-gray-500 mb-1">{t('materialCol', monthlyTranslations)}</label>
-                                                <select
-                                                    value={sale.wasteType} onChange={(e) => updateSaleRow(sale.id, 'wasteType', e.target.value)} required
-                                                    className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#005DAA]/20"
-                                                >
-                                                    <option value="">{t('selectMaterial', monthlyTranslations)}</option>
-                                                    {wasteTypes.map(w => <option key={w} value={w}>{w}</option>)}
-                                                </select>
-                                            </div>
-                                            <div className="col-span-1 md:col-span-2">
-                                                <label className="md:hidden block text-xs font-semibold text-gray-500 mb-1">{t('qtyCol', monthlyTranslations)}</label>
-                                                <div className="relative">
-                                                    <input
-                                                        type="number" value={sale.quantity} onChange={(e) => updateSaleRow(sale.id, 'quantity', e.target.value)} required min="0" placeholder="0"
-                                                        className="w-full p-2 pl-3 pr-8 bg-gray-50 border border-gray-200 rounded-lg text-sm text-right focus:ring-2 focus:ring-[#005DAA]/20 font-mono"
-                                                    />
-                                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-bold">{t('kg', monthlyTranslations)}</span>
+                                            {/* Materials Table for this Vendor */}
+                                            <div className="space-y-3 pl-0 md:pl-4">
+                                                <div className="hidden md:grid grid-cols-12 gap-4 px-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                                                    <div className="col-span-5">{t('materialCol', monthlyTranslations)}</div>
+                                                    <div className="col-span-3 text-right">{t('qtyCol', monthlyTranslations)}</div>
+                                                    <div className="col-span-3 text-right">{t('revenueCol', monthlyTranslations)}</div>
+                                                    <div className="col-span-1"></div>
+                                                </div>
+
+                                                {sale.materials.map((mat, matIndex) => (
+                                                    <div key={mat.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end md:items-center bg-white p-4 md:p-0 rounded-xl md:rounded-none border border-gray-100 md:border-none shadow-sm md:shadow-none animate-fade-in-up">
+                                                        <div className="col-span-1 md:col-span-5">
+                                                            <label className="md:hidden block text-xs font-bold text-gray-400 uppercase mb-1">{t('materialCol', monthlyTranslations)}</label>
+                                                            <select
+                                                                value={mat.wasteType} 
+                                                                onChange={(e) => updateMaterialRow(sale.id, mat.id, 'wasteType', e.target.value)} 
+                                                                required
+                                                                className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#005DAA]/20"
+                                                            >
+                                                                <option value="">{t('selectMaterial', monthlyTranslations)}</option>
+                                                                {wasteTypes.map(w => <option key={w} value={w}>{w}</option>)}
+                                                            </select>
+                                                        </div>
+                                                        <div className="col-span-1 md:col-span-3">
+                                                            <label className="md:hidden block text-xs font-bold text-gray-400 uppercase mb-1">{t('qtyCol', monthlyTranslations)}</label>
+                                                            <div className="relative">
+                                                                <input
+                                                                    type="number" 
+                                                                    value={mat.quantity} 
+                                                                    onChange={(e) => updateMaterialRow(sale.id, mat.id, 'quantity', e.target.value)} 
+                                                                    required min="0" placeholder="0"
+                                                                    className="w-full p-2 pl-3 pr-8 bg-gray-50 border border-gray-200 rounded-lg text-sm text-right focus:ring-2 focus:ring-[#005DAA]/20 font-mono shadow-inner"
+                                                                />
+                                                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-bold uppercase">{t('kg', monthlyTranslations)}</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="col-span-1 md:col-span-3">
+                                                            <label className="md:hidden block text-xs font-bold text-gray-400 uppercase mb-1">{t('revenueCol', monthlyTranslations)}</label>
+                                                            <div className="relative">
+                                                                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">₹</span>
+                                                                <input
+                                                                    type="number" 
+                                                                    value={mat.revenue} 
+                                                                    onChange={(e) => updateMaterialRow(sale.id, mat.id, 'revenue', e.target.value)} 
+                                                                    required min="0" placeholder="0"
+                                                                    className="w-full p-2 pl-6 bg-gray-50 border border-gray-200 rounded-lg text-sm text-right focus:ring-2 focus:ring-[#005DAA]/20 font-mono text-green-700 font-bold shadow-inner"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <div className="col-span-1 md:col-span-1 flex justify-end">
+                                                            <button
+                                                                type="button" 
+                                                                onClick={() => removeMaterialRow(sale.id, mat.id)}
+                                                                disabled={sale.materials.length === 1}
+                                                                className="p-1.5 text-gray-300 hover:text-red-400 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-0"
+                                                                title="Remove Material"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+
+                                                {/* Add Material Row Button */}
+                                                <div className="pt-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => addMaterialRow(sale.id)}
+                                                        className="flex items-center gap-1.5 text-[11px] font-bold text-[#005DAA] hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-all border border-dashed border-blue-200"
+                                                    >
+                                                        <Plus className="w-3.5 h-3.5" /> Add Another Material for {sale.vendor || 'this Vendor'}
+                                                    </button>
                                                 </div>
                                             </div>
-                                            <div className="col-span-1 md:col-span-2">
-                                                <label className="md:hidden block text-xs font-semibold text-gray-500 mb-1">{t('revenueCol', monthlyTranslations)}</label>
-                                                <div className="relative">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">₹</span>
-                                                    <input
-                                                        type="number" value={sale.revenue} onChange={(e) => updateSaleRow(sale.id, 'revenue', e.target.value)} required min="0" placeholder="0"
-                                                        className="w-full p-2 pl-7 bg-gray-50 border border-gray-200 rounded-lg text-sm text-right focus:ring-2 focus:ring-[#005DAA]/20 font-mono text-green-700 font-bold"
-                                                    />
+
+                                            {/* Vendor Subtotal */}
+                                            <div className="pt-4 mt-2 border-t border-gray-100 flex justify-end">
+                                                <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2 pr-2">
+                                                    Vendor Subtotal: 
+                                                    <span className="text-gray-600 font-mono text-xs">₹{sale.materials.reduce((s, m) => s + (Number(m.revenue) || 0), 0).toLocaleString()}</span>
                                                 </div>
-                                            </div>
-                                            <div className="col-span-1 md:col-span-1 flex justify-end md:justify-center mt-2 md:mt-0">
-                                                <button
-                                                    type="button" onClick={() => removeSaleRow(sale.id)}
-                                                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100"
-                                                    title="Remove Row"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
                                             </div>
                                         </div>
                                     ))}
 
-                                    {/* Subtotal */}
-                                    <div className="pt-4 border-t border-gray-100 flex justify-end">
-                                        <div className="bg-green-50 px-4 py-2 rounded-lg border border-green-100 flex items-center gap-3">
-                                            <span className="text-sm font-semibold text-green-800">{t('totalRev', monthlyTranslations)}</span>
-                                            <span className="text-lg font-bold text-green-700 font-mono">₹{totalRevenue.toLocaleString()}</span>
+                                    {/* Overall Total */}
+                                    <div className="pt-6 border-t border-gray-200 flex flex-col md:flex-row items-center justify-between gap-4">
+                                        <div className="text-xs text-gray-400 font-medium bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">
+                                            Total Vendors: <span className="text-gray-700 font-bold">{sales.length}</span> | 
+                                            Total Records: <span className="text-gray-700 font-bold">{sales.reduce((s, v) => s + v.materials.length, 0)}</span>
+                                        </div>
+                                        <div className="bg-[#005DAA] px-6 py-3 rounded-2xl shadow-lg shadow-blue-500/20 flex items-center gap-4 border border-blue-400/30">
+                                            <span className="text-xs font-bold text-blue-100 uppercase tracking-widest">{t('totalRev', monthlyTranslations)}</span>
+                                            <span className="text-2xl font-black text-white font-mono leading-none">₹{totalRevenue.toLocaleString()}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -683,11 +945,100 @@ const PWMUMonthlyReport = () => {
                             </button>
                         </div>
                     </div>
-
                 </form>
             </div>
+
+            {/* Calculation Sidebar */}
+            <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-24 pb-12">
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div className="p-5 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                        <div className="flex items-center gap-2">
+                            <TrendingUp className="w-5 h-5 text-[#005DAA]" />
+                            <h3 className="font-bold text-gray-800 uppercase tracking-tight text-sm">Stock Status & Balance</h3>
+                        </div>
+                        <div className="bg-white border border-gray-200 px-2 py-1 rounded-md text-[10px] font-black text-gray-400">Current Stock</div>
+                    </div>
+                    
+                    <div className="p-5 space-y-5">
+                        {isLoadingInventory ? (
+                            <div className="flex flex-col items-center justify-center py-10 gap-3">
+                                <div className="w-8 h-8 border-4 border-[#005DAA]/10 border-t-[#005DAA] rounded-full animate-spin"></div>
+                                <p className="text-xs text-gray-400 font-medium">Loading Inventory...</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {sidebarMaterials.map(({ key, label }) => {
+                                    const currentStock = inventory[key] || 0;
+                                    const soldAmount = salesAggregate[key] || 0;
+                                    const remaining = currentStock - soldAmount;
+                                    const isOverSold = remaining < 0;
+
+                                    return (
+                                        <div key={key} className="p-3 rounded-xl border border-gray-100 bg-gray-50/30 space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">{label}</span>
+                                                <span className="text-[10px] font-bold px-2 py-0.5 bg-white border border-gray-100 rounded text-gray-400">AVAILABLE</span>
+                                            </div>
+                                            
+                                            <div className="grid grid-cols-3 gap-2">
+                                                <div>
+                                                    <div className="text-[10px] text-gray-400 font-bold uppercase mb-0.5">Stock</div>
+                                                    <div className="text-sm font-mono font-bold text-gray-700">{currentStock.toLocaleString()} <small className="text-[10px]">KG</small></div>
+                                                </div>
+                                                <div className="flex flex-col items-center">
+                                                    <div className="text-[10px] text-gray-400 font-bold uppercase mb-0.5">Sold</div>
+                                                    <div className="text-sm font-mono font-bold text-[#005DAA]">{soldAmount > 0 ? `-${soldAmount.toLocaleString()}` : '0'}</div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className="text-[10px] text-gray-400 font-bold uppercase mb-0.5">Remaining</div>
+                                                    <div className={`text-sm font-mono font-black ${isOverSold ? 'text-red-500' : 'text-green-600'}`}>
+                                                        {remaining.toLocaleString()}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Visual Bar */}
+                                            <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
+                                                <div 
+                                                    className={`h-full transition-all duration-300 ${isOverSold ? 'bg-red-500' : 'bg-green-500'}`}
+                                                    style={{ width: `${Math.min(100, (currentStock > 0 ? (remaining > 0 ? (remaining / currentStock) * 100 : 0) : 0))}%` }}
+                                                ></div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {/* Summary Footer */}
+                        <div className="pt-4 border-t border-gray-100 space-y-3">
+                            <div className="flex items-center justify-between p-3 bg-blue-50 rounded-xl border border-blue-100">
+                                <div className="flex items-center gap-2">
+                                    <TrendingDown className="w-4 h-4 text-blue-600" />
+                                    <div className="text-[11px] font-bold text-blue-800 uppercase tracking-tight">Total Sales Revenue</div>
+                                </div>
+                                <div className="text-lg font-black text-[#005DAA] font-mono leading-none">₹{totalRevenue.toLocaleString()}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Quick Tips */}
+                <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-5 text-white shadow-lg space-y-3 border border-gray-700">
+                    <div className="flex items-center gap-2 mb-1">
+                        <div className="w-6 h-6 bg-blue-500/20 rounded-lg flex items-center justify-center border border-blue-500/30">
+                            <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                        </div>
+                        <h4 className="text-xs font-bold uppercase tracking-widest text-blue-300">Live Inventory Note</h4>
+                    </div>
+                    <p className="text-[11px] text-gray-300 leading-relaxed font-medium">
+                        Stock numbers are pulled directly from your <span className="text-blue-400">Daily Logs</span>. Ensure categories are filled correctly in the log for accurate balance tracking here.
+                    </p>
+                </div>
+            </div>
         </div>
-    );
+    </div>
+);
 };
 
 export default PWMUMonthlyReport;

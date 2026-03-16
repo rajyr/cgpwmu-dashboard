@@ -32,13 +32,15 @@ function ComplianceDashboard() {
                 if (!token) return;
 
                 // 1. Fetch all collections and centers
-                const [pwmuRes, collRes] = await Promise.all([
+                const [pwmuRes, collRes, opRes] = await Promise.all([
                     fetch(`${API_BASE}/data/pwmu_centers?select=*`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } }),
-                    fetch(`${API_BASE}/data/waste_collections?select=*`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } })
+                    fetch(`${API_BASE}/data/village_waste_reports?select=*`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } }),
+                    fetch(`${API_BASE}/data/pwmu_operational_logs?select=*`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } })
                 ]);
 
                 const collections = await collRes.json();
                 const centers = await pwmuRes.json();
+                const opLogs = await opRes.json();
 
                 // 2. Generate Leakage Trend (Group by month)
                 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -49,12 +51,12 @@ function ComplianceDashboard() {
                 });
 
                 const trend = last6Months.map(m => {
-                    const mColl = collections.filter(c => months[new Date(c.date).getMonth()] === m);
-                    const mPwmu = centers.filter(p => p.last_updated && months[new Date(p.last_updated).getMonth()] === m);
+                    const mColl = collections.filter(c => months[new Date(c.collection_date).getMonth()] === m);
+                    const mOp = opLogs.filter(p => months[new Date(p.log_date).getMonth()] === m);
 
-                    const intake = mColl.reduce((acc, curr) => acc + (parseFloat(curr.quantity_kg) || 0), 0);
-                    const processed = mPwmu.reduce((acc, curr) => acc + (parseFloat(curr.waste_processed) || 0), 0);
-                    const sold = mPwmu.reduce((acc, curr) => acc + (parseFloat(curr.revenue) / 10 || 0), 0); // Mocking sold volume vs revenue
+                    const intake = mColl.reduce((acc, curr) => acc + (parseFloat(curr.shared_with_pwmu_kg) || 0), 0);
+                    const processed = mOp.reduce((acc, curr) => acc + (parseFloat(curr.processed_kg || curr.total_intake_kg) || 0), 0);
+                    const sold = mOp.reduce((acc, curr) => acc + (parseFloat(curr.revenue) / 10 || 0), 0); // Mocking sold volume vs revenue
 
                     return {
                         month: m,

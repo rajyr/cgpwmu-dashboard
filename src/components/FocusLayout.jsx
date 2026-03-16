@@ -1,9 +1,16 @@
 import React from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Factory } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 const FocusLayout = () => {
     const navigate = useNavigate();
+    const { user } = useAuth();
+    
+    // Extract location info from registration data
+    const regData = user?.registration_data || {};
+    const facilityName = regData.pwmuName || regData.centerName || 'PWMU Center';
+
     return (
         <div className="flex flex-col h-screen overflow-hidden bg-[#fafafa]">
             <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shadow-sm z-10 shrink-0">
@@ -17,7 +24,7 @@ const FocusLayout = () => {
 
                 <div className="flex items-center gap-3">
                     <div className="text-right hidden sm:block">
-                        <div className="text-sm font-bold text-[#005DAA]">Balod Central PWMU</div>
+                        <div className="text-sm font-bold text-[#005DAA] uppercase">{facilityName}</div>
                         <div className="text-xs text-gray-500">Active Session</div>
                     </div>
                     <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-[#005DAA]">

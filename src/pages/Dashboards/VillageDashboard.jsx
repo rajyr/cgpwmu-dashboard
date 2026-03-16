@@ -148,7 +148,7 @@ function VillageDashboard() {
                 console.log('[VILLAGE_DASH] Fetching collections...');
                 const [pwmuRes, collRes] = await Promise.all([
                     fetch(`${API_BASE}/data/pwmu_centers?select=*`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } }),
-                    fetch(`${API_BASE}/data/waste_collections?select=*&order=collection_date.asc`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } })
+                    fetch(`${API_BASE}/data/village_waste_reports?select=*&order=collection_date.asc`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } })
                 ]);
                 setCollections(await safeJson(collRes, 'collections'));
 
