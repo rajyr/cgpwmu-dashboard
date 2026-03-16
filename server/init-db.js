@@ -210,7 +210,7 @@ migrations.forEach(m => {
 const uuid = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
 // Seed data
-const passwordHash = bcrypt.hashSync('Password123!', 10);
+const passwordHash = bcrypt.hashSync('admin123', 10);
 
 // Admin user
 const adminId = 'admin_user_id';

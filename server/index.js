@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import db from './db.js';
 
@@ -38,6 +39,7 @@ const authRouter = express.Router();
 
 authRouter.post('/login', async (req, res) => {
   const { email, password } = req.body;
+  console.log(`[LOGIN ATTEMPT] Email: ${email}`);
   try {
     const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
     if (!user) return res.status(401).json({ error: 'Invalid email or password' });
@@ -57,12 +59,12 @@ authRouter.post('/login', async (req, res) => {
       expires_in: 86400
     });
   } catch (error) {
-    if (error.message && error.message.includes('NOT_FOUND')) {
-        return res.status(401).json({ error: 'Invalid email or password' });
+    console.error('[LOGIN ERROR]', error);
+    try {
+        fs.appendFileSync('server_error.log', `[${new Date().toISOString()}] LOGIN ERROR: ${error.message}\n${error.stack}\n`);
+    } catch (e) {
+        console.error('Failed to write to server_error.log:', e.message);
     }
-    // Log error to file for debugging
-    const fs = await import('fs');
-    fs.appendFileSync('server_error.log', `[${new Date().toISOString()}] LOGIN ERROR: ${error.message}\n${error.stack}\n`);
     res.status(500).json({ error: 'Server error', details: error.message });
   }
 });
@@ -384,6 +386,16 @@ app.use('/cgpwmu/api/data', dataRouter);
 
 app.get(/\/cgpwmu\/.*/, (req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
+});
+
+// Global Error Handler
+app.use((err, req, res, next) => {
+  console.error('[GLOBAL ERROR]', err);
+  res.status(500).json({ 
+    error: 'Internal Server Error', 
+    message: err.message,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined 
+  });
 });
 
 app.listen(PORT, () => { console.log(`Server running on port ${PORT}`); });
