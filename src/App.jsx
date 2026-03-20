@@ -26,6 +26,8 @@ import FinancialView from './pages/Dashboards/FinancialView';
 import MonitoringAnalytics from './pages/Dashboards/MonitoringAnalytics';
 import MasterReports from './pages/Dashboards/MasterReports';
 import SettingsDashboard from './pages/Dashboards/SettingsDashboard';
+import ProfileSettings from './pages/Dashboards/ProfileSettings';
+import DatabaseManager from './pages/Dashboards/DatabaseManager';
 import { useAuth } from './context/AuthContext';
 
 // Protected Route Wrapper with optional Role filtering
@@ -92,7 +94,16 @@ function App() {
                             </ProtectedRoute>
                         }
                     />
+                    <Route
+                        path="database"
+                        element={
+                            <ProtectedRoute allowedRoles={['Admin']}>
+                                <DatabaseManager />
+                            </ProtectedRoute>
+                        }
+                    />
 
+                    <Route path="profile" element={<ProfileSettings />} />
                     {/* Other protected routes will be added here */}
                 </Route>
                 {/* Focus Layout Routes (No Sidebar) */}

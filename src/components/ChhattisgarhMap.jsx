@@ -78,7 +78,8 @@ const ChhattisgarhMap = ({ metricData = {}, metricType = 'waste' }) => {
     };
 
     const style = (feature) => {
-        const districtName = feature.properties.district;
+        const rawName = feature.properties.district || '';
+        const districtName = rawName.split(' (')[0];
         const val = metricData[districtName] || 0;
         return {
             fillColor: getColor(val),
@@ -91,7 +92,8 @@ const ChhattisgarhMap = ({ metricData = {}, metricType = 'waste' }) => {
     };
 
     const onEachFeature = (feature, layer) => {
-        const districtName = feature.properties.district;
+        const rawName = feature.properties.district || '';
+        const districtName = rawName.split(' (')[0];
         const stats = locationStats[districtName];
         const metricVal = metricData[districtName] || 0;
 
@@ -133,13 +135,13 @@ const ChhattisgarhMap = ({ metricData = {}, metricType = 'waste' }) => {
     };
 
     return (
-        <div className="w-full h-[400px] z-0 rounded-xl overflow-hidden shadow-sm border border-gray-100 relative bg-gray-50">
+        <div className="w-full h-[400px] z-0 rounded-xl overflow-hidden shadow-sm border border-gray-100 relative bg-white">
             <MapContainer
                 center={[21.2787, 81.8661]}
                 zoom={6}
                 scrollWheelZoom={false}
                 zoomControl={true}
-                style={{ height: '100%', width: '100%', zIndex: 0 }}
+                style={{ height: '100%', width: '100%', zIndex: 0, background: 'white' }}
             >
                 {geoData && (
                     <GeoJSON

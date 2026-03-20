@@ -36,7 +36,7 @@ const Login = () => {
             goRegister: "Go to Registration Portal",
             roleAdmin: "Admin / Nodal",
             rolePWMU: "PWMU Center",
-            roleVillage: "Village Sarpanch",
+            roleVillage: "Village Shed",
             roleVendor: "Vendor / Market"
         },
         hi: {
@@ -59,7 +59,7 @@ const Login = () => {
             goRegister: "पंजीकरण पोर्टल पर जाएं",
             roleAdmin: "एडमिन / नोडल",
             rolePWMU: "PWMU केंद्र",
-            roleVillage: "ग्राम सरपंच",
+            roleVillage: "ग्राम शेड",
             roleVendor: "विक्रेता / बाजार"
         }
     };

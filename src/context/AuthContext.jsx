@@ -131,6 +131,7 @@ export const AuthProvider = ({ children }) => {
         user,
         userRole,
         userName,
+        token: localStorage.getItem('cgpwmu_session') ? JSON.parse(localStorage.getItem('cgpwmu_session')).access_token : null,
         loading,
         signIn,
         signUp,

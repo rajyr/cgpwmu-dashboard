@@ -5,7 +5,7 @@ import { useLanguage } from '../context/LanguageContext';
 import {
     LayoutDashboard, Map, DollarSign, Activity,
     ShieldAlert, ScrollText, LineChart, PieChart, Settings, LogOut,
-    ChevronLeft, ChevronRight, Menu, X, Home, Store, Factory, FileBarChart
+    ChevronLeft, ChevronRight, Menu, X, Home, Store, Factory, FileBarChart, Database
 } from 'lucide-react';
 
 const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
@@ -50,7 +50,8 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
             settings: "Settings",
             dailyLog: "Daily Log",
             monthlyReport: "Monthly Report",
-            masterReports: "Master Reports"
+            masterReports: "Master Reports",
+            profile: "Profile Setting"
         },
         hi: {
             overview: "राज्य अवलोकन",
@@ -66,7 +67,8 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
             settings: "सेटिंग्स",
             dailyLog: "दैनिक लॉग",
             monthlyReport: "मासिक रिपोर्ट",
-            masterReports: "मास्टर रिपोर्ट्स"
+            masterReports: "मास्टर रिपोर्ट्स",
+            profile: "प्रोफ़ाइल सेटिंग"
         }
     };
 
@@ -93,7 +95,9 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
         { name: t('vendorHub', sidebarTranslations), icon: Store, path: '/dashboard/vendor-hub', roles: ['Admin', 'Nodal', 'PWMU', 'Vendor'] },
 
         // System
+        { name: t('profile', sidebarTranslations), icon: Settings, path: '/dashboard/profile', roles: ['Admin', 'Nodal', 'PWMU', 'Village', 'Vendor'] },
         { name: t('settings', sidebarTranslations), icon: Settings, path: '/dashboard/settings', roles: ['Admin'] },
+        { name: 'Database Manager', icon: Database, path: '/dashboard/database', roles: ['Admin'] },
     ];
 
     const navItems = allNavItems.filter(item => item.roles.includes(effectiveRole));
@@ -130,7 +134,7 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
         'StateAdmin': 'State Admin',
         'DistrictNodal': 'Nodal Officer',
         'PWMUManager': 'PWMU Manager',
-        'Sarpanch': 'Village Admin',
+        'Sarpanch': 'Village Shed',
         'Vendor': 'Vendor',
     };
     const friendlyRole = roleLabelMap[userRole] || displayRole;

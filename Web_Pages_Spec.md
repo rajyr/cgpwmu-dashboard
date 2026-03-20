@@ -34,7 +34,7 @@ Here is the detailed Sitemap & Page Specification Document (`Web_Pages_Spec.md`)
 
 | Section | Content Details | Illustration & Animation |
 | :--- | :--- | :--- |
-| **Role Selection** | Tabbed view: "Official", "PWMU Nodal", "Village Sarpanch", "Vendor". | **Animation:** Active tab slides (highlighter effect). |
+| **Role Selection** | Tabbed view: "Official", "PWMU Nodal", "Village Shed", "Vendor". | **Animation:** Active tab slides (highlighter effect). |
 | **Input Form** | Mobile Number / Email ID. Password / OTP field. | **Icon:** Lock icon shakes if wrong password is entered. |
 | **Action Button** | "Secure Login" / "Send OTP". | **Animation:** Button loading spinner (truck moving). |
 | **Help** | "Forgot Password?", "Register New Unit". | Text links. |
@@ -71,13 +71,13 @@ Here is the detailed Sitemap & Page Specification Document (`Web_Pages_Spec.md`)
 | **Waste Types** | MCQ: Plastic (PET, HDPE...), Cement Factory, Road Construction. | **Interaction:** Clicking a category shows a tooltip explaining it (e.g., "PET: Water bottles"). |
 | **Preferred PWMU** | Dropdown to select which PWMU they supply to. | **Icon:** Link chain icon. |
 
-### 3.3 Village Self-Registration
-**Purpose:** Sarpanch registering their village.
+### 3.3 Village Shed Registration
+**Purpose:** Village Shed registration.
 
 | Section | Content Details | Illustration & Animation |
 | :--- | :--- | :--- |
 | **Search PWMU** | Dropdown to find their parent PWMU. | **Animation:** Search bar expands. |
-| **Sarpanch Details** | Name, Mobile, Voter ID (optional). | **Illustration:** User icon. |
+| **Village Shed Details** | Name, Mobile, Voter ID (optional). | **Illustration:** User icon. |
 | **Verification** | "Requesting approval from [PWMU Name]". | **Animation:** Hourglass/Clock timer animation. |
 
 ---
@@ -95,7 +95,7 @@ Here is the detailed Sitemap & Page Specification Document (`Web_Pages_Spec.md`)
 | **Alerts Bar** | "Shredder Machine Non-Functional since 2 days". | **Visual:** Red flashing warning icon. |
 | **Linked Villages Map** | Mini-map showing all connected villages. | **Interaction:** Hover shows village name. |
 
-### 4.2 Village Dashboard (Sarpanch)
+### 4.2 Village Dashboard (Village Shed)
 **Purpose:** Village level monitoring.
 
 | Section | Content Details | Illustration & Animation |

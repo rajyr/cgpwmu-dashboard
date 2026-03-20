@@ -15,7 +15,7 @@ const Header = ({ setIsMobileOpen }) => {
             admin: "Admin",
             nodal: "Nodal Officer",
             pwmu: "PWMU Manager",
-            village: "Village Admin",
+            village: "Village Shed",
             vendor: "Vendor"
         },
         hi: {
@@ -25,7 +25,7 @@ const Header = ({ setIsMobileOpen }) => {
             admin: "प्रशासक",
             nodal: "नोडल अधिकारी",
             pwmu: "PWMU प्रबंधक",
-            village: "ग्राम प्रशासक",
+            village: "ग्राम शेड",
             vendor: "विक्रेता"
         }
     };

@@ -51,7 +51,8 @@ export const supabase = {
             selectStr: '*',
             filters: [],
             orderStr: null,
-            limitVal: null
+            limitVal: null,
+            dataToUpdate: null
         };
 
         const builder = {
@@ -109,6 +110,10 @@ export const supabase = {
             },
             limit: function(val) {
                 query.limitVal = val;
+                return this;
+            },
+            update: function(data) {
+                query.dataToUpdate = data;
                 return this;
             },
             maybeSingle: async () => {
@@ -198,6 +203,14 @@ export const supabase = {
                 });
                 if (query.orderStr) params.append('order', query.orderStr);
                 if (query.limitVal) params.append('limit', query.limitVal);
+                
+                if (query.dataToUpdate) {
+                    const data = await fetchLocal(`${API_URL}/data/${table}?${params.toString()}`, {
+                        method: 'PATCH',
+                        body: JSON.stringify(query.dataToUpdate)
+                    });
+                    return onfulfilled({ data, error: null });
+                }
 
                 const data = await fetchLocal(`${API_URL}/data/${table}?${params.toString()}`);
                 return onfulfilled({ data, error: null });

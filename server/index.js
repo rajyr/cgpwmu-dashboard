@@ -161,6 +161,52 @@ dataRouter.get('/', (req, res) => {
   res.status(400).json({ error: 'Table name is required in the path (e.g., /api/data/users)' });
 });
 
+// --- Admin Database Management Endpoints ---
+dataRouter.get('/admin/tables', authenticateToken, (req, res) => {
+  if (req.user?.role !== 'StateAdmin') return res.status(403).json({ error: 'Unauthorized' });
+  try {
+    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all();
+    res.json(tables.map(t => t.name));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+dataRouter.get('/admin/schema/:table', authenticateToken, (req, res) => {
+  if (req.user?.role !== 'StateAdmin') return res.status(403).json({ error: 'Unauthorized' });
+  try {
+    // Only allow alphanumeric table names to prevent SQL injection in PRAGMA
+    if (!/^[a-zA-Z0-9_]+$/.test(req.params.table)) return res.status(400).json({ error: 'Invalid table name' });
+    const schema = db.prepare(`PRAGMA table_info(${req.params.table})`).all();
+    res.json(schema);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+dataRouter.post('/admin/query', authenticateToken, (req, res) => {
+  if (req.user?.role !== 'StateAdmin') return res.status(403).json({ error: 'Unauthorized' });
+  const { query, params = [] } = req.body;
+  if (!query) return res.status(400).json({ error: 'Query is required' });
+  
+  // Basic safety: Prevent DROP tables entirely to save them from themselves
+  if (/DROP\s+TABLE/i.test(query)) {
+    return res.status(403).json({ error: 'DROP TABLE operations are blocked via this interface for safety. Use init-db.js to reset.' });
+  }
+
+  try {
+    if (query.trim().toUpperCase().startsWith('SELECT') || query.trim().toUpperCase().startsWith('PRAGMA')) {
+      const data = db.prepare(query).all(...params);
+      res.json({ success: true, data });
+    } else {
+      const info = db.prepare(query).run(...params);
+      res.json({ success: true, changes: info.changes, lastInsertRowid: info.lastInsertRowid });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 dataRouter.get('/:table', authenticateToken, (req, res) => {
   const { table } = req.params;
   if (!table || table === 'undefined' || table === 'null') {
@@ -168,8 +214,9 @@ dataRouter.get('/:table', authenticateToken, (req, res) => {
   }
   const { select, order, limit, ...filters } = req.query;
   
+  let query = '';
   try {
-    let query = `SELECT ${select || '*'} FROM ${table}`;
+    query = `SELECT ${select || '*'} FROM ${table}`;
     const params = [];
     const whereClauses = [];
 
@@ -260,6 +307,9 @@ dataRouter.get('/:table', authenticateToken, (req, res) => {
       if (row.registration_data && typeof row.registration_data === 'string') {
         try { row.registration_data = JSON.parse(row.registration_data); } catch (e) {}
       }
+      if (row.machine_health && typeof row.machine_health === 'string') {
+        try { row.machine_health = JSON.parse(row.machine_health); } catch (e) {}
+      }
       return row;
     });
     res.json(parsedData);
@@ -342,6 +392,42 @@ dataRouter.put('/:table', authenticateToken, (req, res) => {
   }
 });
 
+dataRouter.patch('/:table', authenticateToken, (req, res) => {
+  const { table } = req.params;
+  const data = req.body;
+  const filters = req.query;
+  try {
+    const params = [];
+    const setClauses = [];
+    Object.entries(data).forEach(([key, value]) => {
+      setClauses.push(`${key} = ?`);
+      if (typeof value === 'boolean') params.push(value ? 1 : 0);
+      else if (typeof value === 'object' && value !== null) params.push(JSON.stringify(value));
+      else params.push(value);
+    });
+
+    const whereClauses = [];
+    Object.entries(filters).forEach(([key, value]) => {
+      if (typeof value === 'string' && value.startsWith('eq.')) {
+        whereClauses.push(`${key} = ?`);
+        params.push(value.split('.')[1]);
+      }
+    });
+
+    if (setClauses.length > 0 && whereClauses.length > 0) {
+      const query = `UPDATE ${table} SET ${setClauses.join(', ')} WHERE ${whereClauses.join(' AND ')}`;
+      console.log(`[UPDATE] ${table}:`, { data, filters });
+      db.prepare(query).run(...params);
+      res.json({ message: 'Updated' });
+    } else {
+      res.status(400).json({ error: 'Data and filters (eq) required for update' });
+    }
+  } catch (error) {
+    console.error(`Database update error in ${table}:`, error);
+    res.status(500).json({ error: `Database update error in ${table}: ${error.message}` });
+  }
+});
+
 dataRouter.delete('/:table', authenticateToken, (req, res) => {
   const { table } = req.params;
   const filters = req.query;
@@ -379,10 +465,83 @@ app.get(['/api/users/profile', '/cgpwmu/api/users/profile'], authenticateToken, 
     } catch (error) { res.status(500).json({ error: 'Server error' }); }
 });
 
+app.put('/api/users/profile', authenticateToken, handleProfileUpdate);
+app.put('/cgpwmu/api/users/profile', authenticateToken, handleProfileUpdate);
+
+function handleProfileUpdate(req, res) {
+    console.log(`[PROFILE UPDATE] User: ${req.user.id} (${req.user.email})`);
+    try {
+        const { full_name, phone_number, registration_data } = req.body;
+        console.log('[PROFILE UPDATE DATA]', { full_name, phone_number, regDataKeys: Object.keys(registration_data || {}) });
+        
+        db.prepare(`
+            UPDATE users 
+            SET full_name = ?, phone_number = ?, registration_data = ?
+            WHERE id = ?
+        `).run(full_name, phone_number, JSON.stringify(registration_data), req.user.id);
+        
+        console.log('[PROFILE UPDATE SUCCESS]');
+        res.json({ message: 'Profile updated successfully' });
+    } catch (error) {
+        console.error('[PROFILE UPDATE ERROR]', error);
+        res.status(500).json({ error: 'Server error', details: error.message });
+    }
+}
+
 app.use('/api/auth', authRouter);
 app.use('/cgpwmu/api/auth', authRouter);
 app.use('/api/data', dataRouter);
 app.use('/cgpwmu/api/data', dataRouter);
+
+// Coverage Statistics for Map
+app.get(['/api/location-stats', '/cgpwmu/api/location-stats'], (req, res) => {
+    try {
+        const locPath = path.join(__dirname, '../public/data/locationData.json');
+        const locationData = JSON.parse(fs.readFileSync(locPath, 'utf8'));
+        
+        const stats = {};
+        
+        // 1. Calculate Total Villages from locationData.json
+        Object.keys(locationData).forEach(rawDistrict => {
+            const dName = rawDistrict.split(' (')[0];
+            let villageCount = 0;
+            const blocks = locationData[rawDistrict];
+            Object.values(blocks).forEach(gps => {
+                Object.values(gps).forEach(villages => {
+                    villageCount += villages.length;
+                });
+            });
+            stats[dName] = { totalVillages: villageCount, reportingVillages: 0, totalSHGs: villageCount, reportingSHGs: 0 };
+        });
+
+        // 2. Count Reporting Villages from village_waste_reports
+        const reportingV = db.prepare(`
+            SELECT district, COUNT(DISTINCT village_name) as count 
+            FROM village_waste_reports 
+            GROUP BY district
+        `).all();
+        reportingV.forEach(rv => {
+            const d = (rv.district || '').split(' (')[0];
+            if (stats[d]) stats[d].reportingVillages = rv.count;
+        });
+
+        // 3. Count Active SHGs (Village Users who have reported)
+        const activeSHGs = db.prepare(`
+            SELECT district, COUNT(DISTINCT user_id) as count 
+            FROM village_waste_reports 
+            GROUP BY district
+        `).all();
+        activeSHGs.forEach(as => {
+            const d = (as.district || '').split(' (')[0];
+            if (stats[d]) stats[d].reportingSHGs = as.count;
+        });
+
+        res.json(stats);
+    } catch (error) {
+        console.error('[LOCATION STATS ERROR]', error);
+        res.status(500).json({ error: 'Failed to fetch location stats' });
+    }
+});
 
 app.get(/\/cgpwmu\/.*/, (req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));

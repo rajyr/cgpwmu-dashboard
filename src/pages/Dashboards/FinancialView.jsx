@@ -5,32 +5,35 @@ import {
     LineChart, Line, PieChart, Pie, Cell
 } from 'recharts';
 import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../lib/supabaseClient';
 
 const API_BASE = '/cgpwmu/api';
-const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 const FinancialView = () => {
-    const { userRole } = useAuth();
+    const { user, userRole } = useAuth();
     const [selectedDistrict, setSelectedDistrict] = useState('All Districts');
     const [pwmus, setPwmus] = useState([]);
     const [collections, setCollections] = useState([]);
+    const [monthlyReports, setMonthlyReports] = useState([]);
+    const [villageReports, setVillageReports] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchData = async () => {
+            if (!user) return;
+            setLoading(true);
             try {
-                const session = JSON.parse(localStorage.getItem('cgpwmu_session') || '{}');
-                const token = session.access_token;
-                if (!token) return;
-
-                const [pwmuRes, collRes, pickRes] = await Promise.all([
-                    fetch(`${API_BASE}/data/pwmu_centers?select=*`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } }),
-                    fetch(`${API_BASE}/data/village_waste_reports?select=*`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } }),
-                    fetch(`${API_BASE}/data/vendor_pickups?select=*`, { headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${token}` } })
+                const [pwmuRes, collRes, monthlyRes, villageRes] = await Promise.all([
+                    supabase.from('pwmu_centers').select('*'),
+                    supabase.from('village_waste_reports').select('*'),
+                    supabase.from('monthly_reports').select('*'),
+                    supabase.from('village_monthly_reports').select('*')
                 ]);
 
-                if (pwmuRes.ok) setPwmus(await pwmuRes.json());
-                if (collRes.ok) setCollections(await collRes.json());
+                if (pwmuRes.data) setPwmus(pwmuRes.data);
+                if (collRes.data) setCollections(collRes.data);
+                if (monthlyRes.data) setMonthlyReports(monthlyRes.data);
+                if (villageRes.data) setVillageReports(villageRes.data);
 
             } catch (err) {
                 console.error('Error fetching financial data:', err);
@@ -39,7 +42,7 @@ const FinancialView = () => {
             }
         };
         fetchData();
-    }, []);
+    }, [user]);
 
     // Filtered data
     const filteredPwmus = useMemo(() =>
@@ -76,11 +79,31 @@ const FinancialView = () => {
         };
     });
 
-    // Break-even Analysis Data (Aggregated monthly simulation)
-    const breakEvenData = [
-        { month: 'Jul', revenue: Math.round(totalSales * 0.8 / 1000), cost: Math.round(filteredPwmus.reduce((sum, p) => sum + Number(p.expenditure), 0) / 1000) },
-        { month: 'Aug', revenue: Math.round(totalSales / 1000), cost: Math.round(filteredPwmus.reduce((sum, p) => sum + Number(p.expenditure), 0) / 1000) },
-    ];
+    // Break-even Analysis Data (Aggregated from monthly_reports)
+    const breakEvenData = useMemo(() => {
+        const grouped = {};
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        
+        monthlyReports.forEach(r => {
+            // Filter by district if selected
+            const pwmu = pwmus.find(p => p.id === r.pwmu_id);
+            if (selectedDistrict !== 'All Districts' && pwmu?.district !== selectedDistrict) return;
+
+            const key = `${r.report_month} ${r.report_year}`;
+            if (!grouped[key]) grouped[key] = { month: r.report_month, revenue: 0, cost: 0, sortKey: `${r.report_year}-${String(months.indexOf(r.report_month) + 1).padStart(2, '0')}` };
+            grouped[key].revenue += Number(r.total_revenue || 0);
+            grouped[key].cost += Number(r.total_expenses || 0);
+        });
+
+        const sorted = Object.values(grouped).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+        
+        // Convert to 'k' (thousands) for easier display if needed, or leave as is
+        return sorted.map(s => ({
+            month: s.month,
+            revenue: Math.round(s.revenue / 1000),
+            cost: Math.round(s.cost / 1000)
+        }));
+    }, [monthlyReports, pwmus, selectedDistrict]);
 
     if (loading) {
         return (

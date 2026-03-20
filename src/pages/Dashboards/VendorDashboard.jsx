@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     Flame, Store, MapPin, Truck, ChevronRight,
-    TrendingUp, CalendarCheck, PackageSearch, Loader2
+    TrendingUp, CalendarCheck, PackageSearch, Loader2, Building2
 } from 'lucide-react';
 import {
     LineChart, Line, XAxis, YAxis, CartesianGrid,
@@ -92,6 +92,7 @@ function VendorDashboard() {
     const [allVendors, setAllVendors] = useState([]);
     const [marketData, setMarketData] = useState([]);
     const [pwmuCoords, setPwmuCoords] = useState({});
+    const [pwmuDetails, setPwmuDetails] = useState({});
     const [pickupData, setPickupData] = useState([]);
     const [loadingProfile, setLoadingProfile] = useState(true);
 
@@ -137,18 +138,21 @@ function VendorDashboard() {
                     setAllVendors(await vendorsRes.json());
                 }
 
-                // 2b. Fetch PWMU coordinates
+                // 2b. Fetch PWMU coordinates and details
                 const pwmuRes = await fetch(
-                    `${API_BASE}/data/pwmu_centers?select=name,latitude,longitude`,
+                    `${API_BASE}/data/pwmu_centers?select=id,name,district,latitude,longitude`,
                     { headers: { ...headers, 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(8000) }
                 );
                 if (pwmuRes.ok) {
                     const coords = await pwmuRes.json();
                     const coordMap = {};
+                    const detailsMap = {};
                     coords.forEach(c => {
-                        coordMap[c.name] = { lat: c.latitude, lon: c.longitude };
+                        coordMap[c.name] = { lat: c.latitude, lon: c.longitude, district: c.district, id: c.id };
+                        detailsMap[c.id] = c;
                     });
                     setPwmuCoords(coordMap);
+                    setPwmuDetails(detailsMap);
                 }
 
                 // 3. Fetch market availability
@@ -218,6 +222,10 @@ function VendorDashboard() {
     // For admin: get selected vendor info
     const selectedVendorObj = selectedVendor !== 'All Vendors' && selectedVendor !== 'self'
         ? allVendors.find(v => v.id === selectedVendor) : null;
+
+    const partnerCount = selectedVendorObj 
+        ? (selectedVendorObj.registration_data?.partnered_pwmus?.length || 0)
+        : (vendorProfile?.registration_data?.partnered_pwmus?.length || 0);
 
     const getDisplayName = () => {
         if (selectedVendor === 'All Vendors') return 'State Vendor Directory';
@@ -370,21 +378,93 @@ function VendorDashboard() {
                                     <Flame className="w-3 h-3" /> {t('hotItems', venTrans)}
                                 </span>
                             </div>
+
+                            {/* Partnered PWMUs Cards Section */}
+                            {userRole === 'Vendor' && vendorProfile?.registration_data?.partnered_pwmus?.length > 0 && (
+                                <div className="bg-blue-50/30 p-6 border-b border-gray-100">
+                                    <h4 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                        <Building2 className="w-4 h-4 text-blue-600" /> Your Partnered PWMU Hubs
+                                    </h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
+                                        {vendorProfile.registration_data.partnered_pwmus.map(pwmuId => {
+                                            const pwmu = pwmuDetails[pwmuId];
+                                            if (!pwmu) return null;
+
+                                            // Filter marketData for this specific PWMU
+                                            const pwmuStock = marketData.filter(m => m.pwmu_id === pwmuId);
+                                            
+                                            // Pre-calculate 6 main categories
+                                            const categories = [
+                                                { id: 'WET', label: 'Wet Waste', color: 'text-green-600 bg-green-50' },
+                                                { id: 'PLASTIC', label: 'Plastic', color: 'text-blue-600 bg-blue-50' },
+                                                { id: 'METAL', label: 'Metal', color: 'text-purple-600 bg-purple-50' },
+                                                { id: 'GLASS', label: 'Glass', color: 'text-amber-600 bg-amber-50' },
+                                                { id: 'EWASTE', label: 'E-Waste', color: 'text-red-600 bg-red-50' },
+                                                { id: 'OTHER', label: 'Other/Mixed', color: 'text-gray-600 bg-gray-50' }
+                                            ];
+
+                                            return (
+                                                <div key={pwmuId} className="bg-white rounded-xl border border-blue-100 shadow-sm p-5 hover:shadow-md transition-shadow">
+                                                    <div className="flex justify-between items-start mb-4 border-b border-gray-50 pb-3">
+                                                        <div>
+                                                            <h5 className="font-bold text-gray-900 leading-tight">{pwmu.name}</h5>
+                                                            <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                                                                <MapPin className="w-3 h-3" /> {pwmu.district}
+                                                                <span className="mx-1 text-gray-300">|</span>
+                                                                <Truck className="w-3 h-3" /> {pwmuCoords[pwmu.name] && vendorProfile.latitude ? `${calculateDistance(vendorProfile.latitude, vendorProfile.longitude, pwmu.latitude, pwmu.longitude)} km` : '—'}
+                                                            </p>
+                                                        </div>
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-700 px-2 py-1 rounded">Partner</span>
+                                                    </div>
+                                                    
+                                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                                        {categories.map(cat => {
+                                                            // Find exact match or sum if multiple (usually exact)
+                                                            const item = pwmuStock.find(m => m.material?.toUpperCase() === cat.id);
+                                                            const stock = item ? Number(item.stock_kg || 0) : 0;
+                                                            return (
+                                                                <div key={cat.id} className={`rounded-lg p-2.5 flex flex-col items-center justify-center text-center border border-transparent hover:border-black/5 transition-colors ${cat.color}`}>
+                                                                    <span className="text-[10px] font-bold uppercase tracking-wider opacity-80 mb-1">{cat.label}</span>
+                                                                    <span className="text-sm font-black">{stock.toLocaleString()} <span className="text-[10px] font-medium opacity-70">kg</span></span>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
                         {/* Aggregated State Stock Summary by Type */}
                         {marketData.length > 0 && (() => {
                             const totalByType = {};
+                            const materialMap = {
+                                'WET': 'Wet',
+                                'PLASTIC': 'Plastic',
+                                'METAL': 'Metal',
+                                'GLASS': 'Glass',
+                                'EWASTE': 'EWaste',
+                                'OTHER': 'Other',
+                                'BAILING': 'Plastic',
+                                'SHREDDING': 'Plastic',
+                                'FATKA_CLEANING': 'Other',
+                                'PET': 'Plastic', 'HDPE': 'Plastic', 'LDPE': 'Plastic', 'PP': 'Plastic', 'MLP': 'Plastic', 'RDF': 'Plastic', 'MIXED': 'Plastic'
+                            };
                             marketData.forEach(item => {
-                                if (!totalByType[item.material]) totalByType[item.material] = 0;
-                                totalByType[item.material] += Number(item.stock_kg || 0);
+                                const key = (item.material || '').toUpperCase();
+                                const material = materialMap[key] || 'Other';
+                                if (!totalByType[material]) totalByType[material] = 0;
+                                totalByType[material] += Number(item.stock_kg || 0);
                             });
                             const colors = {
-                                PET: 'bg-blue-50 border-blue-200 text-blue-700',
-                                HDPE: 'bg-green-50 border-green-200 text-green-700',
-                                LDPE: 'bg-yellow-50 border-yellow-200 text-yellow-700',
-                                PP: 'bg-purple-50 border-purple-200 text-purple-700',
-                                MLP: 'bg-orange-50 border-orange-200 text-orange-700',
-                                RDF: 'bg-red-50 border-red-200 text-red-700',
-                                MIXED: 'bg-gray-50 border-gray-200 text-gray-700',
+                                Wet: 'bg-green-50 border-green-200 text-green-700',
+                                Plastic: 'bg-blue-50 border-blue-200 text-blue-700',
+                                Metal: 'bg-purple-50 border-purple-200 text-purple-700',
+                                Glass: 'bg-amber-50 border-amber-200 text-amber-700',
+                                EWaste: 'bg-red-50 border-red-200 text-red-700',
+                                Other: 'bg-gray-50 border-gray-100 text-gray-500',
                             };
                             return (
                                 <div className="mx-4 mb-3">
@@ -394,7 +474,7 @@ function VendorDashboard() {
                                             <div key={material} className={`px-3 py-1.5 rounded-full border text-xs font-bold flex items-center gap-1.5 ${colors[material] || 'bg-gray-50 border-gray-200 text-gray-700'}`}>
                                                 <span>{material}</span>
                                                 <span className="opacity-60">·</span>
-                                                <span>{total.toFixed(0)} kg</span>
+                                                <span>{Math.round(total)} kg</span>
                                             </div>
                                         ))}
                                     </div>
@@ -467,7 +547,7 @@ function VendorDashboard() {
                                     </div>
                                 </div>
                                 <p className="text-2xl font-bold text-gray-800">
-                                    {[...new Set(pickupData.map(p => p.pwmu_name))].length}
+                                    {partnerCount}
                                 </p>
                                 <p className="text-xs text-gray-500 font-medium mt-1">{t('pwmusPartnered', venTrans)}</p>
                             </div>

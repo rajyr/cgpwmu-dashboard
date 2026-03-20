@@ -234,14 +234,22 @@ const DistrictView = () => {
                                     <tr key={i} className="border-t border-gray-50 hover:bg-gray-50/50 transition-colors">
                                         <td className="py-4 text-sm font-semibold text-gray-700">{p.name}</td>
                                         <td className="py-4 text-xs text-gray-500">{p.village || '-'}</td>
-                                        {machineTypes.map((_, j) => {
-                                            const isOperational = p.status?.toLowerCase() === 'operational';
+                                        {machineTypes.map((type, j) => {
+                                            const healthData = p.machine_health || {};
+                                            const status = healthData[type] ?? 1; // Default to Good (1)
+                                            
+                                            // status codes: 0: Critical, 1: Good, 2: Warning
+                                            const colorClass = status === 0 ? 'bg-red-500 animate-pulse shadow-red-200' : 
+                                                              status === 2 ? 'bg-yellow-500 shadow-yellow-200' : 
+                                                              'bg-green-500 shadow-green-200';
+                                            
                                             return (
                                                 <td key={j} className="py-4 text-center">
                                                     <div className="flex justify-center">
-                                                        <div className={`w-3.5 h-3.5 rounded-sm ${isOperational
-                                                            ? 'bg-green-500 shadow-sm shadow-green-200'
-                                                            : 'bg-red-500 shadow-sm shadow-red-200 animate-pulse'}`}></div>
+                                                        <div 
+                                                            title={`${type}: ${status === 0 ? 'Critical' : status === 2 ? 'Warning' : 'Operational'}`}
+                                                            className={`w-3.5 h-3.5 rounded-sm shadow-sm transition-all duration-300 ${colorClass}`}
+                                                        ></div>
                                                     </div>
                                                 </td>
                                             );

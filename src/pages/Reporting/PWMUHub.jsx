@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Truck, FileBarChart, Bell, MapPin, Calendar as CalendarIcon, Clock, CheckCircle2, AlertTriangle, ArrowRight, Factory, History, XCircle, ChevronLeft, ChevronRight, TrendingUp, Users, Activity, Loader2 } from 'lucide-react';
+import { Truck, FileBarChart, Bell, MapPin, Calendar as CalendarIcon, Clock, CheckCircle2, AlertTriangle, AlertCircle, ArrowRight, Factory, History, XCircle, ChevronLeft, ChevronRight, TrendingUp, Users, Activity, Loader2 } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabaseClient';
@@ -22,6 +22,12 @@ const PWMUHub = () => {
     const [notifications, setNotifications] = useState([]);
     const [logDetails, setLogDetails] = useState({});
     const [linkedVillages, setLinkedVillages] = useState({ total: 0, submittedToday: 0 });
+    
+    // NEW: Selection states for Admins
+    const [allCenters, setAllCenters] = useState([]);
+    const [selectedCenterId, setSelectedCenterId] = useState(new URLSearchParams(window.location.search).get('centerId'));
+    const [searchQuery, setSearchQuery] = useState('');
+    const [districtFilter, setDistrictFilter] = useState('All');
 
     const currentDateObj = new Date();
     const today = currentDateObj.toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -112,12 +118,21 @@ const PWMUHub = () => {
     useEffect(() => {
         const fetchHubData = async () => {
             if (!user) return;
+            
+            // Sync URL param if it changes externally
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlCenterId = urlParams.get('centerId');
+            if (urlCenterId && urlCenterId !== selectedCenterId) {
+                setSelectedCenterId(urlCenterId);
+            }
+
             setLoading(true);
+            let centerData = null;
 
             try {
                 // 1. Identify PWMU Center
-                let centerData = null;
                 const reg = user.registration_data || {};
+                const isAdmin = user.role === 'StateAdmin' || user.role === 'DistrictNodal';
 
                 // Role can be in user.role OR reg.role/type
                 const isManager = user.role === 'PWMUManager' || reg.role === 'PWMUManager' || reg.type === 'PWMU';
@@ -135,12 +150,27 @@ const PWMUHub = () => {
                 }
 
                 if (!centerData) {
-                    const { data } = await supabase
-                        .from('pwmu_centers')
-                        .select('*')
-                        .or(`id.eq.${user.id},nodal_officer_id.eq.${user.id}`)
-                        .maybeSingle();
-                    if (data) centerData = data;
+                    // If we have a selectedCenterId (from Admin selector or URL), fetch that specifically
+                    if (selectedCenterId) {
+                        const { data } = await supabase
+                            .from('pwmu_centers')
+                            .select('*')
+                            .eq('id', selectedCenterId)
+                            .maybeSingle();
+                        if (data) centerData = data;
+                    } 
+                    // Otherwise try to find one assigned to this nodal agent (only if NOT state/district admin)
+                    else if (!isAdmin) {
+                        const { data } = await supabase
+                            .from('pwmu_centers')
+                            .select('*')
+                            .or(`id.eq.${user.id},nodal_officer_id.eq.${user.id}`)
+                            .maybeSingle();
+                        if (data) {
+                            centerData = data;
+                            setSelectedCenterId(data.id);
+                        }
+                    }
                 }
 
                 if (centerData) {
@@ -153,9 +183,64 @@ const PWMUHub = () => {
                         .eq('role', 'Village');
                     
                     const linked = villages?.filter(v => {
-                        const rd = v.registration_data || {};
-                        return rd.pwmuId === centerData.id || rd.centerName === centerData.name;
+                        let rd = v.registration_data || {};
+                        if (typeof rd === 'string') {
+                            try { rd = JSON.parse(rd); } catch(e) {}
+                        }
+                        return String(rd.pwmuId) === String(centerData.id) || rd.centerName === centerData.name;
                     }) || [];
+
+                    // Get manager's serviceVillages
+                    let serviceVillages = [];
+                    if (isManager && String(centerData.id) === String(user.registration_data?.pwmuId || user.id)) {
+                        serviceVillages = user.registration_data?.serviceVillages || [];
+                    } else {
+                        const searchId = centerData.nodal_officer_id || centerData.id;
+                        const { data: managerUser } = await supabase
+                            .from('users')
+                            .select('registration_data')
+                            .eq('id', searchId)
+                            .maybeSingle();
+                        if (managerUser) {
+                            let mrd = managerUser.registration_data || {};
+                            if (typeof mrd === 'string') {
+                                try { mrd = JSON.parse(mrd); } catch(e) {}
+                            }
+                            serviceVillages = mrd.serviceVillages || [];
+                        }
+                    }
+
+                    const extractCode = (str) => {
+                        if (!str) return null;
+                        const match = str.match(/\((\d+)\)/);
+                        return match ? match[1] : null;
+                    };
+
+                    const combinedVillages = [...linked.map(v => {
+                        let rd = v.registration_data || {};
+                        if (typeof rd === 'string') { try { rd = JSON.parse(rd); } catch(e) {} }
+                        return {
+                            id: v.id,
+                            name: rd.villageName || rd.primaryVillage || rd.gramPanchayat || 'Village'
+                        };
+                    })];
+
+                    serviceVillages.forEach(vName => {
+                        const vCode = extractCode(vName);
+                        // Simplified duplicate check
+                        const exists = combinedVillages.find(fv => {
+                            if (fv.name === vName) return true;
+                            const fvCode = extractCode(fv.name);
+                            if (vCode && fvCode && vCode === fvCode) return true;
+                            return false;
+                        });
+                        if (!exists) {
+                            combinedVillages.push({
+                                id: `profile-${vName}`,
+                                name: vName
+                            });
+                        }
+                    });
 
                     // Local-time safe date range (YYYY-MM-DD)
                     const formatLocal = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -167,7 +252,7 @@ const PWMUHub = () => {
                     const [logsRes, villageReportsRes] = await Promise.all([
                         supabase
                             .from('pwmu_operational_logs')
-                            .select('log_date, total_intake_kg')
+                            .select('log_date, total_intake_kg, processed_stock_breakdown')
                             .eq('pwmu_id', centerData.id)
                             .gte('log_date', startStr)
                             .lte('log_date', endStr),
@@ -180,12 +265,12 @@ const PWMUHub = () => {
                     const pwmuLogs = logsRes.data || [];
                     const todayReports = villageReportsRes.data || [];
 
-                    const submittedTodayCount = linked.filter(v => 
-                        todayReports.some(r => r.village_id === v.id)
+                    const submittedTodayCount = combinedVillages.filter(v => 
+                        todayReports.some(r => r.village_id === v.id || r.village_name === v.name)
                     ).length;
 
                     setLinkedVillages({
-                        total: linked.length,
+                        total: combinedVillages.length,
                         submittedToday: submittedTodayCount
                     });
 
@@ -226,7 +311,7 @@ const PWMUHub = () => {
                         // Alerts
                         const alerts = [];
                         if (!pwmuLogs.some(l => l.log_date === todayStr)) {
-                            const unsubmittedCount = linked.length - submittedTodayCount;
+                            const unsubmittedCount = combinedVillages.length - submittedTodayCount;
                             if (unsubmittedCount > 0) {
                                 alerts.push({ 
                                     id: 1, 
@@ -245,12 +330,41 @@ const PWMUHub = () => {
             } catch (err) {
                 console.error('Error fetching hub data:', err);
             } finally {
+                // If it's an Admin/Nodal and we still don't have centerData, 
+                // fetch all centers for the selector
+                const reg = user.registration_data || {};
+                const isAdmin = user.role === 'StateAdmin' || user.role === 'DistrictNodal';
+                
+                if (isAdmin && !centerData) {
+                    const { data: centers } = await supabase
+                        .from('pwmu_centers')
+                        .select('*')
+                        .order('name');
+                    setAllCenters(centers || []);
+                }
+                
                 setLoading(false);
             }
         };
 
         fetchHubData();
-    }, [user, currentMonth, currentYear]);
+    }, [user, currentMonth, currentYear, selectedCenterId]);
+
+    // Handle switching centers
+    const handleSelectCenter = (id) => {
+        setSelectedCenterId(id);
+        const url = new URL(window.location);
+        url.searchParams.set('centerId', id);
+        window.history.pushState({}, '', url);
+    };
+
+    const handleClearSelection = () => {
+        setSelectedCenterId(null);
+        setPwmuData(null);
+        const url = new URL(window.location);
+        url.searchParams.delete('centerId');
+        window.history.pushState({}, '', url);
+    };
 
     const missedDays = Array.from({ length: daysInMonth }, (_, i) => i + 1).filter(d => {
         const dDate = new Date(currentYear, currentMonth, d);
@@ -266,10 +380,88 @@ const PWMUHub = () => {
         return (
             <div className="flex flex-col items-center justify-center h-64 text-[#005DAA]">
                 <Loader2 className="w-10 h-10 animate-spin mb-4" />
-                <p className="font-bold">Loading your PWMU Hub...</p>
+                <p className="font-bold">Loading PWMU Data...</p>
             </div>
         );
     }
+
+    // PWMU Selector View for Admins
+    if (!pwmuData && (user?.role === 'StateAdmin' || user?.role === 'DistrictNodal')) {
+        const districts = ['All', ...new Set(allCenters.map(c => c.district))];
+        const filtered = allCenters.filter(c => {
+            const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                 c.district.toLowerCase().includes(searchQuery.toLowerCase());
+            const matchesDistrict = districtFilter === 'All' || c.district === districtFilter;
+            return matchesSearch && matchesDistrict;
+        });
+
+        return (
+            <div className="animate-fade-in-up space-y-6 max-w-7xl mx-auto">
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
+                        <div>
+                            <h1 className="text-3xl font-bold text-gray-800 mb-2">Select PWMU Hub</h1>
+                            <p className="text-gray-500">Pick a processing center to view its operational status and logs.</p>
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                            <div className="relative">
+                                <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <input 
+                                    type="text" 
+                                    placeholder="Search PWMU..." 
+                                    className="pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all w-full sm:w-64"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                />
+                            </div>
+                            <select 
+                                className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                value={districtFilter}
+                                onChange={(e) => setDistrictFilter(e.target.value)}
+                            >
+                                {districts.map(d => <option key={d} value={d}>{d}</option>)}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {filtered.map(center => (
+                            <div 
+                                key={center.id} 
+                                onClick={() => handleSelectCenter(center.id)}
+                                className="group bg-white border border-gray-100 rounded-2xl p-6 shadow-sm hover:shadow-md hover:border-blue-300 transition-all cursor-pointer relative overflow-hidden"
+                            >
+                                <div className="absolute top-0 right-0 p-3">
+                                    <div className={`w-2 h-2 rounded-full ${center.status === 'operational' ? 'bg-green-500' : 'bg-red-500'} animate-pulse`}></div>
+                                </div>
+                                <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center mb-4 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                    <Factory className="w-6 h-6" />
+                                </div>
+                                <h3 className="text-lg font-bold text-gray-800 mb-1">{center.name}</h3>
+                                <p className="text-sm text-gray-500 flex items-center gap-1.5 mb-4">
+                                    <MapPin className="w-3 h-3" />
+                                    {center.district} • {center.block}
+                                </p>
+                                <div className="flex items-center text-blue-600 font-bold text-sm">
+                                    Open Dashboard <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {filtered.length === 0 && (
+                        <div className="text-center py-20 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                            <XCircle className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                            <p className="text-gray-500 font-medium">No PWMU centers found matching your filters.</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
+    // Safety fallback
+    if (!pwmuData) return null;
 
     return (
         <div className="animate-fade-in-up space-y-6 max-w-7xl mx-auto">
@@ -279,8 +471,19 @@ const PWMUHub = () => {
                     <Factory className="w-64 h-64" />
                 </div>
                 <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <div>
-                        <h1 className="text-3xl font-bold mb-2">{t('welcome', hubTranslations)}, {user?.full_name?.split(' ')[0]}</h1>
+                    <div className="flex-grow">
+                        <div className="flex items-center gap-3 mb-2">
+                             <h1 className="text-3xl font-bold">{t('welcome', hubTranslations)}, {user?.full_name?.split(' ')[0]}</h1>
+                             {(user?.role === 'StateAdmin' || user?.role === 'DistrictNodal') && (
+                                <button 
+                                    onClick={handleClearSelection}
+                                    className="bg-white/10 hover:bg-white/20 px-3 py-1 rounded-lg text-xs font-bold border border-white/20 transition-all flex items-center gap-1.5"
+                                >
+                                    <ChevronLeft className="w-3 h-3" />
+                                    Switch PWMU
+                                </button>
+                             )}
+                        </div>
                         <p className="text-blue-100 flex flex-wrap items-center gap-x-4 gap-y-1">
                             <span className="flex items-center gap-1.5 opacity-90">
                                 <CalendarIcon className="w-4 h-4" />
@@ -388,10 +591,42 @@ const PWMUHub = () => {
                                                 className={`relative group aspect-square rounded-xl p-1.5 flex flex-col items-center justify-center transition-all ${bgClass} ${(isMissed || isSubmitted) ? 'cursor-pointer hover:shadow-md' : 'cursor-default'} ${isToday ? 'ring-2 ring-[#005DAA] ring-offset-2' : ''}`}>
                                                 <span className={`text-[13px] ${textClass}`}>{day}</span>
                                                 {!isFuture && (
-                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max bg-gray-900 text-white text-xs rounded-lg py-1.5 px-3 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 shadow-xl">
-                                                        {isSubmitted
-                                                            ? `${t('totalIntake', hubTranslations).split(' (')[0]}: ${logDetails[day]?.total_intake_kg || 0} ${t('kg', hubTranslations)}`
-                                                            : t('dataMissing', hubTranslations)}
+                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max min-w-[180px] bg-gray-900 text-white text-[11px] rounded-xl p-3 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-20 shadow-2xl border border-white/10 backdrop-blur-md">
+                                                        {isSubmitted ? (
+                                                            <div className="space-y-2">
+                                                                <div className="flex items-center justify-between border-b border-white/10 pb-1.5 mb-1.5">
+                                                                    <span className="font-bold text-blue-300 tracking-tight">{t('dailyLogTitle', hubTranslations)}</span>
+                                                                    <span className="font-black text-white">{day} {monthName.split(' ')[0]}</span>
+                                                                </div>
+                                                                
+                                                                {/* 6 Waste Distribution */}
+                                                                <div className="space-y-1">
+                                                                    {Object.entries(JSON.parse(logDetails[day]?.processed_stock_breakdown || '{}')).map(([k, v]) => {
+                                                                        const val = parseFloat(v);
+                                                                        if (!val || val <= 0) return null;
+                                                                        // Map keys to labels from DailyLog translations if possible, or just capitalize
+                                                                        const label = k.charAt(0) + k.slice(1).toLowerCase();
+                                                                        return (
+                                                                            <div key={k} className="flex items-center justify-between gap-4 opacity-90">
+                                                                                <span className="text-gray-400">{label}:</span>
+                                                                                <span className="font-mono font-bold">{val.toFixed(2)} {t('kg', hubTranslations)}</span>
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                </div>
+
+                                                                <div className="pt-2 border-t border-white/20 mt-2 flex items-center justify-between">
+                                                                    <span className="font-bold text-gray-400">{t('totalIntake', hubTranslations).split(' (')[0]}:</span>
+                                                                    <span className="font-black text-blue-400 text-sm">{Number(logDetails[day]?.total_intake_kg || 0).toFixed(2)} {t('kg', hubTranslations)}</span>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex items-center gap-2">
+                                                                <AlertCircle className="w-3.5 h-3.5 text-red-400" />
+                                                                <span className="font-bold text-red-100">{t('dataMissing', hubTranslations)}</span>
+                                                            </div>
+                                                        )}
+                                                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-gray-900"></div>
                                                     </div>
                                                 )}
                                             </div>

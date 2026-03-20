@@ -88,9 +88,21 @@ const VillageDailyReport = () => {
     const location = useLocation();
 
     const today = new Date().toISOString().split('T')[0];
-    const minDateObj = new Date();
-    minDateObj.setDate(minDateObj.getDate() - 30);
-    const minDate = minDateObj.toISOString().split('T')[0];
+
+    const getMinMaxDates = () => {
+        const d = new Date();
+        const currentYear = d.getFullYear();
+        const currentMonth = d.getMonth(); // 0-indexed
+        let prevMonth = currentMonth - 1;
+        let prevYear = currentYear;
+        if (prevMonth < 0) {
+            prevMonth = 11;
+            prevYear -= 1;
+        }
+        const minStr = `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}-01`;
+        return { minDate: minStr, maxDate: today };
+    };
+    const { minDate, maxDate } = getMinMaxDates();
 
     // Get date from URL or default to today
     const getInitialDate = () => {
@@ -498,7 +510,7 @@ const VillageDailyReport = () => {
                                 name="date"
                                 value={basicInfo.date}
                                 min={minDate}
-                                max={today}
+                                max={maxDate}
                                 onChange={handleBasicInfoChange}
                                 disabled={isLocked}
                                 className="bg-transparent border-none text-gray-700 font-semibold focus:ring-0 p-0 text-sm cursor-pointer outline-none disabled:cursor-not-allowed"

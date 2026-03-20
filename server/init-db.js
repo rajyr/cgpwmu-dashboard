@@ -107,12 +107,56 @@ db.exec(`
     expenditure REAL DEFAULT 0,
     status TEXT DEFAULT 'operational',
     reporting_count INTEGER DEFAULT 0,
+    processed_stock_breakdown TEXT, -- JSON string
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(pwmu_id, log_date)
   );
 
-  -- 4. PWMU Monthly Reports (aggregated data)
+  -- 4. PWMU Monthly Reports (Detailed Submission)
+  CREATE TABLE IF NOT EXISTS monthly_reports (
+    id TEXT PRIMARY KEY,
+    pwmu_id TEXT REFERENCES pwmu_centers(id) ON DELETE CASCADE,
+    report_month TEXT NOT NULL,
+    report_year INTEGER NOT NULL,
+    machine_status TEXT, -- JSON string
+    electricity_bill REAL DEFAULT 0,
+    honorarium REAL DEFAULT 0,
+    other_expenses REAL DEFAULT 0,
+    total_revenue REAL DEFAULT 0,
+    total_expenses REAL DEFAULT 0,
+    net_balance REAL DEFAULT 0,
+    sales_records TEXT, -- JSON string
+    collection_data TEXT, -- JSON string
+    closing_stock TEXT, -- JSON string
+    process_loss_kg REAL DEFAULT 0,
+    submitted_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(pwmu_id, report_month, report_year)
+  );
+
+  -- 5. Village Monthly Reports (Detailed Submission)
+  CREATE TABLE IF NOT EXISTS village_monthly_reports (
+    id TEXT PRIMARY KEY,
+    village_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+    village_name TEXT,
+    pwmu_id TEXT REFERENCES pwmu_centers(id) ON DELETE SET NULL,
+    report_month TEXT NOT NULL,
+    report_year INTEGER NOT NULL,
+    recycler_type TEXT,
+    waste_sold_kg REAL DEFAULT 0,
+    revenue_earned REAL DEFAULT 0,
+    num_workers INTEGER DEFAULT 0,
+    honorarium_per_worker REAL DEFAULT 0,
+    other_expenses REAL DEFAULT 0,
+    total_honorarium REAL DEFAULT 0,
+    total_expenses REAL DEFAULT 0,
+    net_balance REAL DEFAULT 0,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(village_id, report_month, report_year)
+  );
+
+  -- 6. PWMU Monthly Reports Summary (Optional/Aggregated)
   CREATE TABLE IF NOT EXISTS pwmu_monthly_reports (
     id TEXT PRIMARY KEY,
     pwmu_id TEXT REFERENCES pwmu_centers(id) ON DELETE CASCADE,
@@ -191,7 +235,11 @@ const migrations = [
   { table: 'users', column: 'latitude', type: 'REAL' },
   { table: 'users', column: 'longitude', type: 'REAL' },
   { table: 'pwmu_centers', column: 'latitude', type: 'REAL' },
-  { table: 'pwmu_centers', column: 'longitude', type: 'REAL' }
+  { table: 'pwmu_centers', column: 'longitude', type: 'REAL' },
+  { table: 'pwmu_operational_logs', column: 'processed_stock_breakdown', type: 'TEXT' },
+  { table: 'monthly_reports', column: 'collection_data', type: 'TEXT' },
+  { table: 'monthly_reports', column: 'closing_stock', type: 'TEXT' },
+  { table: 'monthly_reports', column: 'process_loss_kg', type: 'REAL DEFAULT 0' }
 ];
 
 migrations.forEach(m => {
@@ -227,7 +275,7 @@ const insertUser = db.prepare(`
   INSERT OR REPLACE INTO users (id, email, password_hash, full_name, role, status, registration_data)
   VALUES (?, ?, ?, ?, ?, ?, ?)
 `);
-insertUser.run(adminId, 'admin@cgpwmu.com', passwordHash, 'State Administrator', 'StateAdmin', 'approved', adminRegData);
+insertUser.run(adminId, 'superadmin@cgpwmu.com', passwordHash, 'State Administrator', 'StateAdmin', 'approved', adminRegData);
 
 // Seed PWMUs with stable IDs
 const pwmuData = [

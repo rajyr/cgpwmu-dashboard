@@ -45,13 +45,13 @@ The platform follows a **Modern, Premium, and Trust-focused** design language ta
 ### 2. Authentication & Onboarding
 
 #### **Login (`/login`)**
-*   **Purpose**: Secure entry point for all roles (Admin, PWMU Manager, Vendor, Sarpanch).
+*   **Purpose**: Secure entry point for all roles (Admin, PWMU Manager, Vendor, Village Shed).
 *   **How to Use**: Select your role tab, enter credentials, and sign in. It features a role-based redirection system.
 *   **Output Results**: Authenticated user session with access to role-specific private dashboards.
 
 #### **Registration Portal (`/register`)**
 *   **Purpose**: Central hub for onboarding new entities.
-*   **How to Use**: Choose to register as a **PWMU Center**, **Village (GP)**, or **Vendor**.
+*   **How to Use**: Choose to register as a **PWMU Center**, **Village Shed**, or **Vendor**.
 *   **Output Results**: Submission of registration data for admin approval.
 
 ---
@@ -64,7 +64,7 @@ The platform follows a **Modern, Premium, and Trust-focused** design language ta
 *   **Output Results**: Real-time visibility into active units, revenue vs. expense, and waste composition.
 
 #### **Village Hub (`/dashboard/village-hub`)**
-*   **Purpose**: Specifically for Sarpanchs and Village Administrators.
+*   **Purpose**: Specifically for Village Shed and Village Administrators.
 *   **How to Use**: Check local collection status and worker attendance.
 *   **Output Results**: Ensures village-level accountability and collection efficiency.
 
@@ -85,7 +85,7 @@ The platform follows a **Modern, Premium, and Trust-focused** design language ta
 The CG-PWMU platform is designed to be a collaborative ecosystem where data flows from the grassroots level to the highest state offices.
 
 ### 1. Village Level (Gram Panchayats)
-*   **Who uses it**: Sarpanchs, Village Secretaries, and Swachhagrahis.
+*   **Who uses it**: Village Shed Administrators, Village Secretaries, and Swachhagrahis.
 *   **How they use it**:
     *   **Daily Logging**: Recording the total weight of wet and dry waste collected from households.
     *   **Worker Attendance**: Tracking the number of Swachhagrahis active in each collection cycle.
@@ -120,7 +120,7 @@ To ensure high-quality data, the platform collects specific metrics at every sta
 
 ### 1. Registration (The "Digital Identity")
 *   **PWMU Centers**: Location (District, Block, GP), Facility Name, Setup Date, Daily Capacity (Tons), Machinery Audit (Baler/Shredder status), Nodal Officer details.
-*   **Villages (GP)**: Location, Total Households, Sarpanch Contact, and **Linked PWMU** (defining its service destination).
+*   **Villages (Shed)**: Location, Total Households, Village Shed Contact, and **Linked PWMU** (defining its service destination).
 *   **Vendors/Recyclers**: Firm Name, Tax IDs (GST), Preferred Material Types (PET, LDPE, MLP, etc.), and Operating Capacity.
 
 ### 2. Daily Reporting (The "Operational Pulse")

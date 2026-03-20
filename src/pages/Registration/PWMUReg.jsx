@@ -41,6 +41,10 @@ const PWMUReg = () => {
             balerDesc: "Compresses sorted plastic into dense, transportable bales.",
             shredderTitle: "Plastic Shredder Machine",
             shredderDesc: "Cuts hard plastics into smaller, manageable flakes for recycling.",
+            fatkaTitle: "Fatka (Dust Remover) Machine",
+            fatkaDesc: "Removes dust and contaminants from plastic before processing.",
+            weightTitle: "Digital Weighing Machine",
+            weightDesc: "Accurately weighs collected and processed plastic waste.",
             nodalContact: "Nodal Contact & Login Details",
             officerName: "Officer Name",
             fullName: "Full Name",
@@ -103,6 +107,10 @@ const PWMUReg = () => {
             balerDesc: "सॉर्ट किए गए प्लास्टिक को घने, परिवहन योग्य गांठों में संपीड़ित करता है।",
             shredderTitle: "प्लास्टिक श्रेडर मशीन",
             shredderDesc: "पुनर्चक्रण के लिए कठोर प्लास्टिक को छोटे, प्रबंधनीय टुकड़ों में काटता है।",
+            fatkaTitle: "फटका (धूल निवारक) मशीन",
+            fatkaDesc: "प्रसंस्करण से पहले प्लास्टिक से धूल और संदूषक हटाता है।",
+            weightTitle: "डिजिटल वजनी मशीन",
+            weightDesc: "संग्रहीत और प्रसंस्कृत प्लास्टिक कचरे का सटीक वजन करता है।",
             nodalContact: "नोडल संपर्क और लॉगिन विवरण",
             officerName: "अधिकारी का नाम",
             fullName: "पूरा नाम",
@@ -174,6 +182,8 @@ const PWMUReg = () => {
         capacity: '',
         hasBaler: false,
         hasShredder: false,
+        hasFatka: false,
+        hasWeight: false,
         nodalName: '',
         phone: '',
         email: '',
@@ -183,6 +193,8 @@ const PWMUReg = () => {
         longitude: null
     });
 
+    const prevPrimaryBlock = React.useRef({ district: '', block: '' });
+
     const [serviceDistrict, setServiceDistrict] = useState('');
     const [serviceBlock, setServiceBlock] = useState('');
     const [showOtherFilters, setShowOtherFilters] = useState(false);
@@ -191,7 +203,29 @@ const PWMUReg = () => {
     React.useEffect(() => {
         if (formData.district) setServiceDistrict(formData.district);
         if (formData.block) setServiceBlock(formData.block);
-    }, [formData.district, formData.block]);
+
+        // Auto-link villages in the selected primary block
+        if (formData.district && formData.block && locationData[formData.district]?.[formData.block]) {
+            const hasChanged = formData.district !== prevPrimaryBlock.current.district || formData.block !== prevPrimaryBlock.current.block;
+            
+            if (hasChanged) {
+                const blockData = locationData[formData.district][formData.block];
+                const allVillagesInBlock = Object.values(blockData).flat();
+                
+                setFormData(prev => {
+                    const otherRegionVillages = prev.serviceVillages.filter(v => {
+                        // Keep villages NOT in the previous block if we wanted to be precise, 
+                        // but for now, merging and uniquing is safer for the user intent.
+                        return true; 
+                    });
+                    const merged = [...new Set([...otherRegionVillages, ...allVillagesInBlock])];
+                    return { ...prev, serviceVillages: merged };
+                });
+                
+                prevPrimaryBlock.current = { district: formData.district, block: formData.block };
+            }
+        }
+    }, [formData.district, formData.block, locationData]);
     const handleInputChange = (e) => {
         const { name, value, type, checked } = e.target;
         setFormData(prev => {
@@ -294,6 +328,8 @@ const PWMUReg = () => {
                     capacity: formData.capacity,
                     hasBaler: formData.hasBaler,
                     hasShredder: formData.hasShredder,
+                    hasFatka: formData.hasFatka,
+                    hasWeight: formData.hasWeight,
                     block: formData.block,
                     gramPanchayat: formData.gramPanchayat,
                     village: formData.village,
@@ -615,6 +651,66 @@ const PWMUReg = () => {
                                                 className="hidden"
                                             />
                                         </label>
+
+                                        {/* Fatka Machine */}
+                                        <label
+                                            className={`flex items-start p-4 border-2 rounded-xl cursor-pointer transition-all duration-300 
+                                                ${formData.hasFatka
+                                                    ? 'border-[#005DAA] bg-blue-50 shadow-md transform -translate-y-1'
+                                                    : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-gray-50'
+                                                }`}
+                                        >
+                                            <div className={`p-3 rounded-full mr-4 transition-colors ${formData.hasFatka ? 'bg-blue-100 text-[#005DAA]' : 'bg-gray-100 text-gray-400'}`}>
+                                                <Loader2 className="w-6 h-6" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <span className={`block text-lg font-bold ${formData.hasFatka ? 'text-[#00427A]' : 'text-gray-800'}`}>
+                                                    {t('fatkaTitle', pwmuTranslations)}
+                                                </span>
+                                                <span className="block text-sm text-gray-500 mt-1">
+                                                    {t('fatkaDesc', pwmuTranslations)}
+                                                </span>
+                                            </div>
+                                            <div className={`mt-2 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors 
+                                                ${formData.hasFatka ? 'bg-[#005DAA] border-[#005DAA]' : 'border-gray-300'}`}
+                                            >
+                                                {formData.hasFatka && <Check className="w-4 h-4 text-white" />}
+                                            </div>
+                                            <input
+                                                type="checkbox" name="hasFatka" checked={formData.hasFatka} onChange={handleInputChange}
+                                                className="hidden"
+                                            />
+                                        </label>
+
+                                        {/* Weighing Machine */}
+                                        <label
+                                            className={`flex items-start p-4 border-2 rounded-xl cursor-pointer transition-all duration-300 
+                                                ${formData.hasWeight
+                                                    ? 'border-[#005DAA] bg-blue-50 shadow-md transform -translate-y-1'
+                                                    : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-gray-50'
+                                                }`}
+                                        >
+                                            <div className={`p-3 rounded-full mr-4 transition-colors ${formData.hasWeight ? 'bg-blue-100 text-[#005DAA]' : 'bg-gray-100 text-gray-400'}`}>
+                                                <CheckCircle2 className="w-6 h-6" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <span className={`block text-lg font-bold ${formData.hasWeight ? 'text-[#00427A]' : 'text-gray-800'}`}>
+                                                    {t('weightTitle', pwmuTranslations)}
+                                                </span>
+                                                <span className="block text-sm text-gray-500 mt-1">
+                                                    {t('weightDesc', pwmuTranslations)}
+                                                </span>
+                                            </div>
+                                            <div className={`mt-2 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors 
+                                                ${formData.hasWeight ? 'bg-[#005DAA] border-[#005DAA]' : 'border-gray-300'}`}
+                                            >
+                                                {formData.hasWeight && <Check className="w-4 h-4 text-white" />}
+                                            </div>
+                                            <input
+                                                type="checkbox" name="hasWeight" checked={formData.hasWeight} onChange={handleInputChange}
+                                                className="hidden"
+                                            />
+                                        </label>
                                     </div>
                                 </div>
                             </div>
@@ -680,6 +776,15 @@ const PWMUReg = () => {
                                     <div className="text-gray-500 col-span-2 pt-2 border-t border-gray-100">{t('villageReview', pwmuTranslations)}</div>
                                     <div className="col-span-2 text-xs text-gray-600 bg-white p-2 rounded-lg border border-gray-100 max-h-24 overflow-y-auto shadow-inner">
                                         {formData.serviceVillages.join(', ') || 'N/A'}
+                                    </div>
+
+                                    <div className="text-gray-500 col-span-2 pt-2 border-t border-gray-100">{t('installedMachinery', pwmuTranslations)}</div>
+                                    <div className="col-span-2 flex flex-wrap gap-2 pt-1">
+                                        {formData.hasBaler && <span className="px-2 py-0.5 bg-green-50 text-green-700 rounded text-[10px] font-bold border border-green-100">Baler</span>}
+                                        {formData.hasShredder && <span className="px-2 py-0.5 bg-green-50 text-green-700 rounded text-[10px] font-bold border border-green-100">Shredder</span>}
+                                        {formData.hasFatka && <span className="px-2 py-0.5 bg-green-50 text-green-700 rounded text-[10px] font-bold border border-green-100">Fatka</span>}
+                                        {formData.hasWeight && <span className="px-2 py-0.5 bg-green-50 text-green-700 rounded text-[10px] font-bold border border-green-100">Scale</span>}
+                                        {!formData.hasBaler && !formData.hasShredder && !formData.hasFatka && !formData.hasWeight && <span className="text-gray-400 italic">None</span>}
                                     </div>
                                 </div>
                             </div>

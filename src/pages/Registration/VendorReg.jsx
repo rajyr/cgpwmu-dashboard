@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Truck, MapPin, User, CheckCircle2, ArrowRight, ArrowLeft, Check, ShieldAlert, Loader2, DollarSign } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { supabase } from '../../lib/supabaseClient';
 
 const VendorReg = () => {
     const [step, setStep] = useState(1);
@@ -23,15 +24,12 @@ const VendorReg = () => {
             firmDetails: "Firm Details & Operations",
             firmName: "Firm Name",
             firmPlaceholder: "e.g. Green Earth Recyclers",
-            district: "Operating District",
-            selectDistrict: "Select District",
+            district: "District",
+            block: "Block",
+            address: "Firm Address",
+            addressPlaceholder: "Enter full office/factory address",
             gst: "GST Number (Optional)",
             gstPlaceholder: "22AAAAA0000A1Z5",
-            wasteType: "Primary Waste Types Purchased",
-            typeLDPE: "LDPE / HDPE",
-            typePET: "PET Bottles",
-            typeMLP: "MLP (Multi-Layer)",
-            typeHard: "Hard Plastic",
             contactDetails: "Contact & Authorization",
             ownerName: "Owner / Manager Name",
             fullName: "Full Name",
@@ -54,10 +52,6 @@ const VendorReg = () => {
             cancel: "Cancel",
             back: "Back",
             continue: "Continue",
-            submitting: "Submitting...",
-            submitRegistration: "Submit Registration",
-            block: "Operating Block",
-            selectBlock: "Select Block",
             detectLocation: "Detect Firm Location",
             locationDetected: "Location Detected",
             detecting: "Detecting...",
@@ -72,15 +66,12 @@ const VendorReg = () => {
             firmDetails: "फर्म विवरण और संचालन",
             firmName: "फर्म का नाम",
             firmPlaceholder: "जैसे ग्रीन अर्थ रीसाइक्लर्स",
-            district: "परिचालन जिला",
-            selectDistrict: "जिला चुनें",
+            district: "जिला",
+            block: "ब्लॉक",
+            address: "फर्म का पता",
+            addressPlaceholder: "कार्यालय/फैक्टरी का पूरा पता दर्ज करें",
             gst: "जीएसटी नंबर (वैकल्पिक)",
             gstPlaceholder: "22AAAAA0000A1Z5",
-            wasteType: "प्राथमिक कचरे के प्रकार",
-            typeLDPE: "LDPE / HDPE",
-            typePET: "पीईटी बोतलें",
-            typeMLP: "MLP (मल्टी-लेयर)",
-            typeHard: "हार्ड प्लास्टिक",
             contactDetails: "संपर्क और प्राधिकरण",
             ownerName: "मालिक / प्रबंधक का नाम",
             fullName: "पूरा नाम",
@@ -103,10 +94,6 @@ const VendorReg = () => {
             cancel: "रद्द करें",
             back: "पीछे",
             continue: "जारी रखें",
-            submitting: "सबमिट हो रहा है...",
-            submitRegistration: "पंजीकरण सबमिट करें",
-            block: "परिचालन ब्लॉक",
-            selectBlock: "ब्लॉक चुनें",
             detectLocation: "फर्म के स्थान का पता लगाएं",
             locationDetected: "स्थान का पता चला",
             detecting: "पता लगाया जा रहा है...",
@@ -117,12 +104,14 @@ const VendorReg = () => {
     const [formData, setFormData] = useState({
         firmName: '',
         district: '',
+        block: '',
+        address: '',
         gstNumber: '',
-        wasteTypes: [],
         ownerName: '',
         phone: '',
         email: '',
         password: '',
+        partneredPwmus: [], // Array of selected PWMU IDs
         latitude: null,
         longitude: null
     });
@@ -130,6 +119,7 @@ const VendorReg = () => {
     const [locationData, setLocationData] = useState({});
     const [districts, setDistricts] = useState([]);
     const [blocks, setBlocks] = useState([]);
+    const [pwmuCenters, setPwmuCenters] = useState([]);
 
     useEffect(() => {
         const fetchLocationData = async () => {
@@ -154,7 +144,22 @@ const VendorReg = () => {
                 }
             }
         };
+
+        const fetchPwmus = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('pwmu_centers')
+                    .select('id, name, district');
+                
+                if (error) throw error;
+                setPwmuCenters(data || []);
+            } catch (err) {
+                console.error("Failed to fetch PWMUs:", err);
+            }
+        };
+
         fetchLocationData();
+        fetchPwmus();
     }, []);
 
     useEffect(() => {
@@ -167,21 +172,18 @@ const VendorReg = () => {
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prev => {
-            const newData = { ...prev, [name]: value };
-            if (name === 'district') {
-                newData.block = ''; // Reset block when district changes
-            }
-            return newData;
-        });
+        setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleTypeToggle = (type) => {
+    const handlePwmuToggle = (pwmuId) => {
         setFormData(prev => {
-            const types = prev.wasteTypes.includes(type)
-                ? prev.wasteTypes.filter(t => t !== type)
-                : [...prev.wasteTypes, type];
-            return { ...prev, wasteTypes: types };
+            const isSelected = prev.partneredPwmus.includes(pwmuId);
+            return {
+                ...prev,
+                partneredPwmus: isSelected 
+                    ? prev.partneredPwmus.filter(id => id !== pwmuId)
+                    : [...prev.partneredPwmus, pwmuId]
+            };
         });
     };
 
@@ -189,28 +191,7 @@ const VendorReg = () => {
     const prevStep = () => setStep(prev => Math.max(prev - 1, 1));
  
     const handleDetectLocation = () => {
-        if (!navigator.geolocation) {
-            alert(t('locationReq', vendorTranslations));
-            return;
-        }
-        
-        setSubmitting(true);
-        navigator.geolocation.getCurrentPosition(
-            (pos) => {
-                setFormData(prev => ({
-                    ...prev,
-                    latitude: pos.coords.latitude,
-                    longitude: pos.coords.longitude
-                }));
-                setSubmitting(false);
-            },
-            (err) => {
-                console.error("Location error:", err);
-                alert("Failed to get location. Please ensure GPS is on and permissions granted.");
-                setSubmitting(false);
-            },
-            { enableHighAccuracy: true }
-        );
+        // Removed as per request
     };
 
     const handleSubmit = async (e) => {
@@ -222,18 +203,20 @@ const VendorReg = () => {
             await signUp(formData.email, formData.password, {
                 full_name: formData.ownerName,
                 role: 'Vendor',
-                district: formData.district,
-                block: formData.block,
                 phone_number: formData.phone,
                 registration_data: {
                     firmName: formData.firmName,
-                    gstNumber: formData.gstNumber,
-                    wasteTypes: formData.wasteTypes,
+                    district: formData.district,
                     block: formData.block,
+                    address: formData.address,
+                    gstNumber: formData.gstNumber,
                     type: 'Vendor',
+                    partnered_pwmus: formData.partneredPwmus,
                     latitude: formData.latitude,
                     longitude: formData.longitude
                 },
+                district: formData.district,
+                block: formData.block,
                 latitude: formData.latitude,
                 longitude: formData.longitude
             });
@@ -316,35 +299,28 @@ const VendorReg = () => {
                                         name="district" value={formData.district} onChange={handleInputChange}
                                         className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
                                     >
-                                        <option value="">{t('selectDistrict', vendorTranslations)}</option>
+                                        <option value="">Select District</option>
                                         {districts.map(d => <option key={d} value={d}>{d}</option>)}
                                     </select>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">{t('block', vendorTranslations)}</label>
                                     <select
-                                        name="block" value={formData.block || ''} onChange={handleInputChange}
-                                        disabled={!formData.district}
-                                        className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                        name="block" value={formData.block} onChange={handleInputChange} disabled={!formData.district}
+                                        className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
                                     >
-                                        <option value="">{t('selectBlock', vendorTranslations)}</option>
+                                        <option value="">Select Block</option>
                                         {blocks.map(b => <option key={b} value={b}>{b}</option>)}
                                     </select>
                                 </div>
                                 <div className="md:col-span-2">
-                                    <button
-                                        type="button"
-                                        onClick={handleDetectLocation}
-                                        className={`w-full flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${formData.latitude ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-blue-50/50 border-blue-100 text-blue-700 hover:bg-blue-100'}`}
-                                    >
-                                        <MapPin className={`w-5 h-5 ${formData.latitude ? 'text-blue-600' : 'text-blue-600'}`} />
-                                        <span className="font-bold">
-                                            {formData.latitude ? `${t('locationDetected', vendorTranslations)} (${formData.latitude.toFixed(4)}, ${formData.longitude.toFixed(4)})` : t('detectLocation', vendorTranslations)}
-                                        </span>
-                                        {formData.latitude && <CheckCircle2 className="w-4 h-4 ml-2" />}
-                                    </button>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('address', vendorTranslations)}</label>
+                                    <textarea
+                                        name="address" value={formData.address} onChange={handleInputChange} placeholder={t('addressPlaceholder', vendorTranslations)} rows="2"
+                                        className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                                    />
                                 </div>
-                                <div>
+                                <div className="md:col-span-2">
                                     <label className="block text-sm font-medium text-gray-700 mb-1">{t('gst', vendorTranslations)}</label>
                                     <input
                                         type="text" name="gstNumber" value={formData.gstNumber} onChange={handleInputChange} placeholder={t('gstPlaceholder', vendorTranslations)}
@@ -352,26 +328,24 @@ const VendorReg = () => {
                                     />
                                 </div>
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">{t('wasteType', vendorTranslations)}</label>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        {[
-                                            { id: 'LDPE', label: t('typeLDPE', vendorTranslations) },
-                                            { id: 'PET', label: t('typePET', vendorTranslations) },
-                                            { id: 'MLP', label: t('typeMLP', vendorTranslations) },
-                                            { id: 'Hard', label: t('typeHard', vendorTranslations) }
-                                        ].map(type => (
-                                            <button
-                                                key={type.id}
-                                                type="button"
-                                                onClick={() => handleTypeToggle(type.id)}
-                                                className={`p-3 rounded-lg border-2 text-sm font-medium transition-all text-left flex items-center justify-between
-                                                    ${formData.wasteTypes.includes(type.id)
-                                                        ? 'border-blue-600 bg-blue-50 text-blue-700'
-                                                        : 'border-gray-100 bg-gray-50 text-gray-600 hover:border-blue-200'}`}
-                                            >
-                                                {type.label}
-                                                {formData.wasteTypes.includes(type.id) && <Check className="w-4 h-4" />}
-                                            </button>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Partnered PWMU Hubs (Optional)</label>
+                                    <p className="text-xs text-gray-500 mb-3">Select the PWMU hubs you plan to purchase waste from.</p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-48 overflow-y-auto p-2 border border-gray-200 rounded-lg bg-gray-50/50">
+                                        {pwmuCenters.length === 0 ? (
+                                            <p className="text-xs text-gray-400 p-2 col-span-full">Loading PWMU Hubs...</p>
+                                        ) : pwmuCenters.map(pwmu => (
+                                            <label key={pwmu.id} className={`flex items-start gap-2 p-2 rounded border cursor-pointer transition-colors ${formData.partneredPwmus.includes(pwmu.id) ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:border-blue-300'}`}>
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={formData.partneredPwmus.includes(pwmu.id)}
+                                                    onChange={() => handlePwmuToggle(pwmu.id)}
+                                                    className="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                />
+                                                <div className="flex flex-col">
+                                                    <span className="text-xs font-bold text-gray-800 leading-tight">{pwmu.name}</span>
+                                                    <span className="text-[10px] text-gray-500">{pwmu.district}</span>
+                                                </div>
+                                            </label>
                                         ))}
                                     </div>
                                 </div>
@@ -424,6 +398,9 @@ const VendorReg = () => {
                                     <div className="text-gray-500">{t('firmReview', vendorTranslations)}</div>
                                     <div className="font-semibold text-gray-800 text-right">{formData.firmName}</div>
 
+                                    <div className="text-gray-500">{t('address', vendorTranslations)}</div>
+                                    <div className="font-semibold text-gray-800 text-right whitespace-pre-wrap">{formData.district}, {formData.block}, {formData.address}</div>
+
                                     <div className="text-gray-500">{t('ownerReview', vendorTranslations)}</div>
                                     <div className="font-semibold text-gray-800 text-right">{formData.ownerName}</div>
 
@@ -432,6 +409,20 @@ const VendorReg = () => {
 
                                     <div className="text-gray-500">{t('gstReview', vendorTranslations)}</div>
                                     <div className="font-semibold text-gray-800 text-right">{formData.gstNumber || 'N/A'}</div>
+
+                                    <div className="text-gray-500 col-span-2 mt-2 border-t pt-2">Partnered PWMUs:</div>
+                                    <div className="font-semibold text-gray-800 text-left col-span-2">
+                                        {formData.partneredPwmus.length > 0 ? (
+                                            <div className="flex flex-wrap gap-1 mt-1">
+                                                {formData.partneredPwmus.map(id => {
+                                                    const p = pwmuCenters.find(c => c.id === id);
+                                                    return p ? <span key={id} className="text-[10px] bg-blue-100 text-blue-800 px-2 py-1 rounded-full">{p.name}</span> : null;
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <span className="text-sm text-gray-400 font-normal">None selected</span>
+                                        )}
+                                    </div>
                                     
                                     {formData.latitude && (
                                         <>

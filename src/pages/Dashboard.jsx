@@ -98,8 +98,9 @@ const Dashboard = () => {
             roadConst: "Road Const.",
             organicWaste: "Organic Waste",
             plastic: "Plastic",
-            paper: "Paper",
             metal: "Metal",
+            glass: "Glass",
+            ewaste: "E-Waste",
             other: "Other",
             newReg: "New {role} registered: {name}",
             reportSub: "Report submitted for {village}",
@@ -179,8 +180,9 @@ const Dashboard = () => {
             roadConst: "सड़क निर्माण",
             organicWaste: "जैविक कचरा",
             plastic: "प्लास्टिक",
-            paper: "कागज",
             metal: "धातु",
+            glass: "कांच",
+            ewaste: "ई-कचरा",
             other: "अन्य",
             newReg: "नया {role} पंजीकृत: {name}",
             reportSub: "{village} के लिए रिपोर्ट सबमिट की गई",
@@ -388,39 +390,44 @@ const Dashboard = () => {
         // Aggregate by District for Map
         const districtWasteMap = {};
         const districtRevenueMap = {};
-        (rawData.villageReports || []).forEach(c => {
-            const d = c.district?.split(' (')[0];
-            if (d) districtWasteMap[d] = (districtWasteMap[d] || 0) + (parseFloat(c.shared_with_pwmu_kg) || 0);
+        (rawData.pwmuLogs || []).forEach(l => {
+            const rawD = rawData.pwmu.find(pwm => pwm.id === l.pwmu_id)?.district || '';
+            const d = rawD.split(' (')[0];
+            if (d) districtWasteMap[d] = (districtWasteMap[d] || 0) + (parseFloat(l.total_intake_kg) || 0);
         });
         rawData.pickups.forEach(p => {
-            const d = rawData.pwmu.find(pwm => pwm.name === p.pwmu_name)?.district;
+            const rawD = rawData.pwmu.find(pwm => pwm.name === p.pwmu_name)?.district || '';
+            const d = rawD.split(' (')[0];
             if (d) districtRevenueMap[d] = (districtRevenueMap[d] || 0) + (parseFloat(p.amount_paid) || 0);
         });
 
-        // Waste Composition Aggregation
+        // Waste Composition Aggregation (Standardized 6 Categories)
         const getMaterialTotal = (type) => filteredPickups
             .filter(p => p.material?.toLowerCase().includes(type.toLowerCase()))
             .reduce((acc, curr) => acc + (parseFloat(curr.quantity_kg) || 0), 0);
 
         const plastic = getMaterialTotal('plastic');
-        const paper = getMaterialTotal('paper');
         const metal = getMaterialTotal('metal');
+        const glass = getMaterialTotal('glass');
+        const ewaste = getMaterialTotal('ewaste');
         const allPickupsTotal = filteredPickups.reduce((acc, curr) => acc + (parseFloat(curr.quantity_kg) || 0), 0);
-        const other = allPickupsTotal - (plastic + paper + metal);
+        const other = allPickupsTotal - (plastic + metal + glass + ewaste);
 
-        const totalVolComp = totalWetKg + plastic + paper + metal + Math.max(0, other);
+        const totalVolComp = totalWetKg + plastic + metal + glass + ewaste + Math.max(0, other);
         const composition = totalVolComp > 0 ? [
             { name: t('organicWaste', dashTranslations), value: Math.round((totalWetKg / totalVolComp) * 100), color: '#22c55e' },
             { name: t('plastic', dashTranslations), value: Math.round((plastic / totalVolComp) * 100), color: '#3b82f6' },
-            { name: t('paper', dashTranslations), value: Math.round((paper / totalVolComp) * 100), color: '#eab308' },
             { name: t('metal', dashTranslations), value: Math.round((metal / totalVolComp) * 100), color: '#a855f7' },
+            { name: t('glass', dashTranslations), value: Math.round((glass / totalVolComp) * 100), color: '#0ea5e9' },
+            { name: t('ewaste', dashTranslations), value: Math.round((ewaste / totalVolComp) * 100), color: '#6366f1' },
             { name: t('other', dashTranslations), value: Math.round((Math.max(0, other) / totalVolComp) * 100), color: '#64748b' },
         ] : [
-            { name: t('organicWaste', dashTranslations), value: 45, color: '#22c55e' },
+            { name: t('organicWaste', dashTranslations), value: 30, color: '#22c55e' },
             { name: t('plastic', dashTranslations), value: 25, color: '#3b82f6' },
-            { name: t('paper', dashTranslations), value: 15, color: '#eab308' },
-            { name: t('metal', dashTranslations), value: 10, color: '#a855f7' },
-            { name: t('other', dashTranslations), value: 5, color: '#64748b' },
+            { name: t('metal', dashTranslations), value: 15, color: '#a855f7' },
+            { name: t('glass', dashTranslations), value: 10, color: '#0ea5e9' },
+            { name: t('ewaste', dashTranslations), value: 10, color: '#6366f1' },
+            { name: t('other', dashTranslations), value: 10, color: '#64748b' },
         ];
 
         // Recent Activities

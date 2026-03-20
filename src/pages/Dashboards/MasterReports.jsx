@@ -10,7 +10,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
 
 const API_BASE = '/cgpwmu/api';
@@ -43,50 +43,75 @@ function MasterReports() {
     const [sortConfig, setSortConfig] = useState({ key: 'effectiveness', direction: 'desc' });
     const [locationData, setLocationData] = useState({});
 
+    const availableDistricts = useMemo(() => {
+        return [...new Set(data.pwmus.map(p => p.district))].filter(Boolean).sort();
+    }, [data.pwmus]);
+
     // --- Data Fetching ---
     useEffect(() => {
         const fetchAllData = async () => {
+            if (!user) return;
             setLoading(true);
             try {
-                // Determine scope based on user role
-                // Admin: all data
-                // PWMU: only their data
-                // Village: only their data
+                // Individual fetches for better resilience
+                const safeFetch = async (query) => {
+                    try {
+                        const { data, error } = await query;
+                        if (error) console.warn('[MasterReports] Fetch error:', error);
+                        return data || [];
+                    } catch (e) {
+                        console.error('[MasterReports] Fetch crash:', e);
+                        return [];
+                    }
+                };
 
-                let baseQuery = supabase;
-                const session = JSON.parse(localStorage.getItem('cgpwmu_session') || '{}');
-                const headers = { 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY, 'Authorization': `Bearer ${session.access_token}` };
-
-                const responses = await Promise.all([
-                    fetch(`${API_BASE}/data/pwmu_centers?select=*`, { headers }),
-                    fetch(`${API_BASE}/data/users?role=eq.Sarpanch&select=*`, { headers }),
-                    fetch(`${API_BASE}/data/village_waste_reports?select=*`, { headers }),
-                    fetch(`${API_BASE}/data/vendor_pickups?select=*`, { headers }),
-                    fetch(`${API_BASE}/data/monthly_reports?select=*`, { headers })
+                const [pwmus, users, intake, sales, monthly] = await Promise.all([
+                    safeFetch(supabase.from('pwmu_centers').select('*')),
+                    safeFetch(supabase.from('users').select('*').eq('role', 'Sarpanch')),
+                    safeFetch(supabase.from('pwmu_operational_logs').select('*')),
+                    safeFetch(supabase.from('vendor_pickups').select('*')),
+                    safeFetch(supabase.from('monthly_reports').select('*'))
                 ]);
 
-                const [pwmus, villages, intake, sales, monthly] = await Promise.all(responses.map(r => r.json()));
+                console.log('[MasterReports] Fetched raw data:', { 
+                    pwmusCount: pwmus.length, 
+                    usersCount: users.length,
+                    intakeCount: intake.length,
+                    salesCount: sales.length,
+                    monthlyCount: monthly.length
+                });
 
                 setData({
-                    pwmus: Array.isArray(pwmus) ? pwmus : [],
-                    villages: Array.isArray(villages) ? villages.map(v => ({ ...v, reg: JSON.parse(v.registration_data || '{}') })) : [],
-                    intake: Array.isArray(intake) ? intake : [],
-                    sales: Array.isArray(sales) ? sales : [],
-                    monthly: Array.isArray(monthly) ? monthly : []
+                    pwmus: pwmus,
+                    villages: users.map(v => {
+                        try {
+                            return { 
+                                ...v, 
+                                reg: typeof v.registration_data === 'string' ? JSON.parse(v.registration_data || '{}') : (v.registration_data || {})
+                            };
+                        } catch (e) {
+                            console.error('Error parsing registration_data for user:', v.id, e);
+                            return { ...v, reg: {} };
+                        }
+                    }),
+                    intake: intake,
+                    sales: sales,
+                    monthly: monthly
                 });
 
                 // Load location data
-                const locRes = await fetch('/cgpwmu/data/locationData.json');
-                if (locRes.ok) setLocationData(await locRes.json());
-
+                try {
+                    const locRes = await fetch('/cgpwmu/data/locationData.json');
+                    if (locRes.ok) setLocationData(await locRes.json());
+                } catch (e) {}
+                setLoading(false);
             } catch (err) {
-                console.error('Error fetching report data:', err);
-            } finally {
+                console.error('[MasterReports] Critical error in fetchAllData:', err);
                 setLoading(false);
             }
         };
         fetchAllData();
-    }, []);
+    }, [user]);
 
     // --- Filtering Logic ---
     const filteredData = useMemo(() => {
@@ -97,39 +122,58 @@ function MasterReports() {
             // 2. Intake in date range
             const pwmuIntake = data.intake.filter(i => 
                 i.pwmu_id === pwmu.id && 
-                i.collection_date >= filters.startDate && 
-                i.collection_date <= filters.endDate
+                i.log_date >= filters.startDate && 
+                i.log_date <= filters.endDate
             );
 
             // 3. Sales in date range
             const pwmuSales = data.sales.filter(s => 
-                // Using name-based matching if ID isn't available in vendor_pickups
-                (s.pwmu_name === pwmu.name) &&
+                (s.pwmu_name === pwmu.name || s.pwmu_id === pwmu.id) &&
                 s.pickup_date >= filters.startDate && 
                 s.pickup_date <= filters.endDate
             );
 
-            // 4. Calculate Efficiency & Punctuality
-            // Effectiveness = (Processed / Received) or derived from activity
-            // Since we don't have a direct 'effectiveness' flag, we derive it:
-            // High effectiveness if they've submitted monthly reports and have sales
-            const totalRec = pwmuIntake.reduce((sum, i) => sum + (i.shared_with_pwmu_kg || 0), 0);
-            const totalSold = pwmuSales.reduce((sum, s) => sum + (s.quantity_kg || 0), 0);
+            // 4. Calculate Opening Stock (from previous month's report)
+            const start = new Date(filters.startDate);
+            const prevMonthDate = new Date(start);
+            prevMonthDate.setMonth(prevMonthDate.getMonth() - 1);
+            const prevMonth = (prevMonthDate.getMonth() + 1).toString().padStart(2, '0');
+            const prevYear = prevMonthDate.getFullYear();
+
+            const prevReport = data.monthly.find(m => 
+                m.pwmu_id === pwmu.id && 
+                m.report_month === prevMonth && 
+                m.report_year === prevYear
+            );
+
+            let openingStock = 0;
+            if (prevReport?.closing_stock) {
+                try {
+                    const stocks = typeof prevReport.closing_stock === 'string' ? JSON.parse(prevReport.closing_stock) : prevReport.closing_stock;
+                    openingStock = Object.values(stocks).reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
+                } catch (e) {}
+            }
+
+            // 5. Calculate Metrics
+            const totalRec = pwmuIntake.reduce((sum, i) => sum + (Number(i.total_intake_kg) || 0), 0);
+            const totalSold = pwmuSales.reduce((sum, s) => sum + (Number(s.quantity_kg) || 0), 0);
+            const remainingStock = Math.max(0, openingStock + totalRec - totalSold);
             
             // Punctuality = Days reported / Days in range
-            const start = new Date(filters.startDate);
             const end = new Date(filters.endDate);
             const dayDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
-            const uniqueDaysIntake = new Set(pwmuIntake.map(i => i.collection_date)).size;
+            const uniqueDaysIntake = new Set(pwmuIntake.map(i => i.log_date)).size;
             
             const punctuality = Math.min(100, (uniqueDaysIntake / dayDiff) * 100);
-            const effectiveness = totalRec > 0 ? Math.min(100, (totalSold / totalRec) * 100) : 0;
+            const effectiveness = (openingStock + totalRec) > 0 ? Math.min(100, (totalSold / (openingStock + totalRec)) * 100) : 0;
 
             return {
                 ...pwmu,
                 linkedCount: linkedVillages.length,
+                openingStock,
                 totalReceived: totalRec,
                 totalSold: totalSold,
+                remainingStock,
                 revenue: pwmuSales.reduce((sum, s) => sum + (s.amount_paid || 0), 0),
                 effectiveness: parseFloat(effectiveness.toFixed(1)),
                 punctuality: parseFloat(punctuality.toFixed(1)),
@@ -153,9 +197,9 @@ function MasterReports() {
 
     // --- Export Handlers ---
     const exportCSV = () => {
-        const headers = ["PWMU Name", "District", "Villages Linked", "Waste Received (kg)", "Waste Sold (kg)", "Revenue (₹)", "Effectiveness (%)", "Punctuality (%)"];
+        const headers = ["PWMU Name", "District", "Villages Linked", "Opening Stock", "Total Intake", "Sales Vol", "Remaining Stock", "Revenue (₹)", "Effectiveness (%)", "Punctuality (%)"];
         const rows = filteredData.map(r => [
-            r.name, r.district, r.linkedCount, r.totalReceived, r.totalSold, r.revenue, r.effectiveness, r.punctuality
+            r.name, r.district, r.linkedCount, r.openingStock, r.totalReceived, r.totalSold, r.remainingStock, r.revenue, r.effectiveness, r.punctuality
         ]);
         
         let csvContent = "data:text/csv;charset=utf-8," + [headers, ...rows].map(e => e.join(",")).join("\n");
@@ -174,17 +218,17 @@ function MasterReports() {
         doc.setFontSize(10);
         doc.text(`Period: ${filters.startDate} to ${filters.endDate}`, 14, 28);
         
-        const tableColumn = ["PWMU Name", "District", "Villages", "Recv (kg)", "Sold (kg)", "Revenue", "Effect.", "Punct."];
+        const tableColumn = ["PWMU Name", "District", "Villages", "Open (kg)", "Intake (kg)", "Sold (kg)", "Remain (kg)", "Revenue", "Effect.", "Punct."];
         const tableRows = filteredData.map(r => [
-            r.name, r.district, r.linkedCount, r.totalReceived, r.totalSold, `₹${r.revenue}`, `${r.effectiveness}%`, `${r.punctuality}%`
+            r.name, r.district, r.linkedCount, r.openingStock, r.totalReceived, r.totalSold, r.remainingStock, `₹${r.revenue}`, `${r.effectiveness}%`, `${r.punctuality}%`
         ]);
 
-        doc.autoTable({
+        autoTable(doc, {
             startY: 35,
             head: [tableColumn],
             body: tableRows,
             theme: 'striped',
-            headStyles: { fillStyle: '#005DAA' }
+            headStyles: { fillColor: '#005DAA' } // Fix fillStyle to fillColor
         });
 
         doc.save(`PWMU_Master_Report_${filters.startDate}.pdf`);
@@ -271,7 +315,7 @@ function MasterReports() {
                             onChange={(e) => setFilters({...filters, district: e.target.value})}
                             className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2 px-4 text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-[#005DAA]/20">
                             <option value="all">All Districts</option>
-                            {Object.keys(locationData).map(d => <option key={d} value={d}>{d}</option>)}
+                            {availableDistricts.map(d => <option key={d} value={d}>{d}</option>)}
                         </select>
                     </div>
                     <div className="space-y-1.5">
@@ -319,18 +363,26 @@ function MasterReports() {
                                 </th>
                                 <th className="px-6 py-5">District</th>
                                 <th className="px-6 py-5 text-center">Villages</th>
-                                <th className="px-6 py-5 text-center cursor-pointer hover:text-[#005DAA]" onClick={() => setSortConfig({key: 'totalReceived', direction: sortConfig.direction === 'asc' ? 'desc' : 'asc'})}>
-                                    <div className="flex items-center justify-center gap-2">Total Waste <ArrowUpDown className="w-3 h-3" /></div>
+                                <th className="px-5 py-5 text-center cursor-pointer hover:text-[#005DAA]" onClick={() => setSortConfig({key: 'openingStock', direction: sortConfig.direction === 'asc' ? 'desc' : 'asc'})}>
+                                    <div className="flex items-center justify-center gap-2">Opening <ArrowUpDown className="w-3 h-3" /></div>
                                 </th>
-                                <th className="px-6 py-5 text-center">Sales Vol.</th>
+                                <th className="px-5 py-5 text-center cursor-pointer hover:text-[#005DAA]" onClick={() => setSortConfig({key: 'totalReceived', direction: sortConfig.direction === 'asc' ? 'desc' : 'asc'})}>
+                                    <div className="flex items-center justify-center gap-2">Intake <ArrowUpDown className="w-3 h-3" /></div>
+                                </th>
+                                <th className="px-5 py-5 text-center cursor-pointer hover:text-[#005DAA]" onClick={() => setSortConfig({key: 'totalSold', direction: sortConfig.direction === 'asc' ? 'desc' : 'asc'})}>
+                                    <div className="flex items-center justify-center gap-2">Sold <ArrowUpDown className="w-3 h-3" /></div>
+                                </th>
+                                <th className="px-5 py-5 text-center cursor-pointer hover:text-[#005DAA]" onClick={() => setSortConfig({key: 'remainingStock', direction: sortConfig.direction === 'asc' ? 'desc' : 'asc'})}>
+                                    <div className="flex items-center justify-center gap-2 text-blue-600">Remaining <ArrowUpDown className="w-3 h-3" /></div>
+                                </th>
                                 <th className="px-6 py-5 text-right font-black">Revenue</th>
                                 <th className="px-6 py-5 text-center cursor-pointer hover:text-[#005DAA]" onClick={() => setSortConfig({key: 'effectiveness', direction: sortConfig.direction === 'asc' ? 'desc' : 'asc'})}>
-                                    <div className="flex items-center justify-center gap-2 text-blue-600">Effectiveness <ArrowUpDown className="w-3 h-3" /></div>
+                                    <div className="flex items-center justify-center gap-2">Effect. <ArrowUpDown className="w-3 h-3" /></div>
                                 </th>
                                 <th className="px-6 py-5 text-center cursor-pointer hover:text-[#005DAA]" onClick={() => setSortConfig({key: 'punctuality', direction: sortConfig.direction === 'asc' ? 'desc' : 'asc'})}>
-                                    <div className="flex items-center justify-center gap-2 text-green-600">Punctuality <ArrowUpDown className="w-3 h-3" /></div>
+                                    <div className="flex items-center justify-center gap-2 text-green-600">Punct. <ArrowUpDown className="w-3 h-3" /></div>
                                 </th>
-                                <th className="px-8 py-5 text-right">Rank</th>
+                                {/* <th className="px-8 py-5 text-right">Rank</th> */}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
@@ -357,8 +409,10 @@ function MasterReports() {
                                             <Users className="w-3 h-3" /> {row.linkedCount}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-6 text-center font-bold text-gray-800">{row.totalReceived.toLocaleString()} <span className="text-[10px] text-gray-400 uppercase">kg</span></td>
-                                    <td className="px-6 py-6 text-center font-bold text-gray-600">{row.totalSold.toLocaleString()} <span className="text-[10px] text-gray-400 uppercase">kg</span></td>
+                                    <td className="px-5 py-6 text-center text-sm font-bold text-gray-500">{row.openingStock.toLocaleString()} <span className="text-[10px] opacity-60">kg</span></td>
+                                    <td className="px-5 py-6 text-center text-sm font-black text-gray-800">{row.totalReceived.toLocaleString()} <span className="text-[10px] opacity-60 font-bold">kg</span></td>
+                                    <td className="px-5 py-6 text-center text-sm font-bold text-gray-700">{row.totalSold.toLocaleString()} <span className="text-[10px] opacity-40">kg</span></td>
+                                    <td className="px-5 py-6 text-center text-sm font-black text-blue-600 bg-blue-50/20">{row.remainingStock.toLocaleString()} <span className="text-[10px] opacity-60 font-bold">kg</span></td>
                                     <td className="px-6 py-6 text-right font-black text-gray-900 text-base">₹{row.revenue.toLocaleString()}</td>
                                     <td className="px-6 py-6 text-center">
                                         <div className="flex flex-col items-center gap-1.5">
@@ -376,14 +430,14 @@ function MasterReports() {
                                             <span className="text-[10px] font-black text-green-700">{row.punctuality}%</span>
                                         </div>
                                     </td>
-                                    <td className="px-8 py-6 text-right">
+                                    {/* <td className="px-8 py-6 text-right">
                                         <span className={`px-3 py-1.5 rounded-lg text-xs font-black ${
                                             row.grade === 'A' ? 'bg-green-100 text-green-700' : 
                                             row.grade === 'B' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
                                         }`}>
                                             GRADE {row.grade}
                                         </span>
-                                    </td>
+                                    </td> */}
                                 </tr>
                             ))}
                         </tbody>
@@ -409,7 +463,7 @@ function MasterReports() {
                         <Users className="w-5 h-5" />
                     </div>
                     <div>
-                        <h4 className="text-sm font-black text-amber-900 leading-tight">Sarpanch Access (Restricted)</h4>
+                        <h4 className="text-sm font-black text-amber-900 leading-tight">Village Shed Access (Restricted)</h4>
                         <p className="text-xs text-amber-700 font-medium mt-1">You are viewing performance metrics for your linked PWMU center. For detailed block-level insights, contact your Nodal Officer.</p>
                     </div>
                 </div>

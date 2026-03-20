@@ -18,47 +18,42 @@ import {
     Package,
     ArrowLeft,
     ChevronRight,
-    Search
+    Search,
+    FileEdit
 } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabaseClient';
 
 const materialMap = {
-    // English Standard
-    'PET (Bottles, Jars...)': 'PET',
-    'HDPE (Mugs, Crates...)': 'HDPE',
-    'LDPE (Bags, Wraps...)': 'LDPE',
-    'PP (Straws, Toys...)': 'PP',
-    'MLP (Chips Bags...)': 'MLP',
-    'Processed RDF': 'RDF',
-    'Mixed Plastic Scraps': 'MIXED',
-    // Hindi Standards
-    'PET (पानी की बोतलें)': 'PET',
-    'HDPE (दूध के जग)': 'HDPE',
-    'LDPE (प्लास्टिक बैग)': 'LDPE',
-    'PP (टपरवेयर)': 'PP',
-    'MLP (मल्टी-लेयर पैकेज)': 'MLP',
-    'प्रसंस्कृत RDF': 'RDF',
-    'कटा हुआ मिश्रित प्लास्टिक': 'MIXED',
-    // Legacy Fallbacks
-    'PET (Water Bottles)': 'PET',
-    'HDPE (Milk Jugs)': 'HDPE',
-    'LDPE (Plastic Bags)': 'LDPE',
-    'PP (Tupperware)': 'PP',
-    'MLP (Multi-Layer Packages)': 'MLP',
-    'Shredded Mixed Plastic': 'MIXED',
-    'Other / Mixed': 'MIXED'
+    // Sales Material Types to Inventory Categories
+    'BAILING': 'PLASTIC',
+    'SHREDDING': 'PLASTIC',
+    'FATKA_CLEANING': 'PLASTIC',
+    'BAILING (बेलिंग)': 'PLASTIC',
+    'SHREDDING (श्रेडिंग)': 'PLASTIC',
+    'FATKA_CLEANING (फटका-क्लीनिंग)': 'PLASTIC',
+    'Wet': 'WET',
+    'Plastic': 'PLASTIC',
+    'Metal': 'METAL',
+    'Glass': 'GLASS',
+    'EWaste': 'EWASTE',
+    'Other': 'OTHER',
+    'WET': 'WET',
+    'PLASTIC': 'PLASTIC',
+    'METAL': 'METAL',
+    'GLASS': 'GLASS',
+    'EWASTE': 'EWASTE',
+    'OTHER': 'OTHER'
 };
 
 const sidebarMaterials = [
-    { key: 'PET', label: 'PET' },
-    { key: 'HDPE', label: 'HDPE' },
-    { key: 'LDPE', label: 'LDPE' },
-    { key: 'PP', label: 'PP' },
-    { key: 'MLP', label: 'MLP' },
-    { key: 'RDF', label: 'RDF' },
-    { key: 'MIXED', label: 'MIXED' }
+    { key: 'WET', label: 'Wet Waste' },
+    { key: 'PLASTIC', label: 'Plastic' },
+    { key: 'METAL', label: 'Metal' },
+    { key: 'GLASS', label: 'Glass' },
+    { key: 'EWASTE', label: 'E-Waste' },
+    { key: 'OTHER', label: 'Other/Mixed' }
 ];
 
 const PWMUMonthlyReport = () => {
@@ -77,6 +72,8 @@ const PWMUMonthlyReport = () => {
             operationalChecklist: "Operational Condition Checklist",
             functional: "Functional",
             nonFunctional: "Non-Functional",
+            wasteCollection: "Monthly Waste Collection (kg)",
+            totalCollectedTitle: "Total waste received during the month",
             dateBreakdown: "Date Breakdown Occurred",
             primaryReason: "Primary Reason",
             selectReason: "-- Select Reason --",
@@ -117,13 +114,9 @@ const PWMUMonthlyReport = () => {
                 'Other'
             ],
             wasteTypes: [
-                'PET (Bottles, Jars...)', 
-                'HDPE (Mugs, Crates...)', 
-                'LDPE (Bags, Wraps...)',
-                'PP (Straws, Toys...)', 
-                'MLP (Chips Bags...)', 
-                'Processed RDF', 
-                'Mixed Plastic Scraps'
+                'BAILING', 
+                'SHREDDING', 
+                'FATKA_CLEANING'
             ],
             machines: {
                 fatka: 'Fatka / Dust Cleaning Machine',
@@ -145,6 +138,8 @@ const PWMUMonthlyReport = () => {
             operationalChecklist: "परिचालन स्थिति चेकलिस्ट",
             functional: "चालू",
             nonFunctional: "बंद",
+            wasteCollection: "मासिक अपशिष्ट संग्रह (किग्रा)",
+            totalCollectedTitle: "महीने के दौरान प्राप्त कुल कचरा",
             dateBreakdown: "खराबी होने की तिथि",
             primaryReason: "मुख्य कारण",
             selectReason: "-- कारण चुनें --",
@@ -185,8 +180,9 @@ const PWMUMonthlyReport = () => {
                 'अन्य'
             ],
             wasteTypes: [
-                'PET (पानी की बोतलें)', 'HDPE (दूध के जग)', 'LDPE (प्लास्टिक बैग)',
-                'PP (टपरवेयर)', 'MLP (मल्टी-लेयर पैकेज)', 'प्रसंस्कृत RDF', 'कटा हुआ मिश्रित प्लास्टिक'
+                'BAILING (बेलिंग)', 
+                'SHREDDING (श्रेडिंग)', 
+                'FATKA_CLEANING (फटका-क्लीनिंग)'
             ],
             machines: {
                 fatka: 'फटका / धूल सफाई मशीन',
@@ -218,10 +214,42 @@ const PWMUMonthlyReport = () => {
         granular: { selected: false, functional: true, dateBroke: '', reason: '' }
     });
 
-    const [sales, setSales] = useState([]);
+    const [sales, setSales] = useState([{ 
+        id: Date.now(), 
+        vendor: '', 
+        materials: [{ id: `mat-${Date.now()}`, wasteType: '', quantity: '', revenue: '' }] 
+    }]);
+    const [collection, setCollection] = useState({
+        WET: '',
+        PLASTIC: '',
+        METAL: '',
+        GLASS: '',
+        EWASTE: '',
+        OTHER: ''
+    });
+    const [closingStock, setClosingStock] = useState({
+        WET: '',
+        PLASTIC: '',
+        METAL: '',
+        GLASS: '',
+        EWASTE: '',
+        OTHER: ''
+    });
+    const [openingStock, setOpeningStock] = useState({
+        WET: 0,
+        PLASTIC: 0,
+        METAL: 0,
+        GLASS: 0,
+        EWASTE: 0,
+        OTHER: 0
+    });
     const [expenses, setExpenses] = useState({ electricity: '', honorarium: '', other: '' });
+    const [calculatedProcessLoss, setCalculatedProcessLoss] = useState(0);
     const [isSaving, setIsSaving] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
+    const [isLocked, setIsLocked] = useState(false);
+    const [existingId, setExistingId] = useState(null);
+    const [isLoadingReport, setIsLoadingReport] = useState(false);
 
     const { user } = useAuth();
     const currentYearNum = new Date().getFullYear();
@@ -230,18 +258,18 @@ const PWMUMonthlyReport = () => {
     // Get allowed months (current and previous)
     const allowedPeriod = useMemo(() => {
         const monthsData = [
-            { val: '01', label: t('jan', pwmuMonthlyTranslations) },
-            { val: '02', label: t('feb', pwmuMonthlyTranslations) },
-            { val: '03', label: t('mar', pwmuMonthlyTranslations) },
-            { val: '04', label: t('apr', pwmuMonthlyTranslations) },
-            { val: '05', label: t('may', pwmuMonthlyTranslations) },
-            { val: '06', label: t('jun', pwmuMonthlyTranslations) },
-            { val: '07', label: t('jul', pwmuMonthlyTranslations) },
-            { val: '08', label: t('aug', pwmuMonthlyTranslations) },
-            { val: '09', label: t('sep', pwmuMonthlyTranslations) },
-            { val: '10', label: t('oct', pwmuMonthlyTranslations) },
-            { val: '11', label: t('nov', pwmuMonthlyTranslations) },
-            { val: '12', label: t('dec', pwmuMonthlyTranslations) }
+            { val: '01', label: t('jan', monthlyTranslations) },
+            { val: '02', label: t('feb', monthlyTranslations) },
+            { val: '03', label: t('mar', monthlyTranslations) },
+            { val: '04', label: t('apr', monthlyTranslations) },
+            { val: '05', label: t('may', monthlyTranslations) },
+            { val: '06', label: t('jun', monthlyTranslations) },
+            { val: '07', label: t('jul', monthlyTranslations) },
+            { val: '08', label: t('aug', monthlyTranslations) },
+            { val: '09', label: t('sep', monthlyTranslations) },
+            { val: '10', label: t('oct', monthlyTranslations) },
+            { val: '11', label: t('nov', monthlyTranslations) },
+            { val: '12', label: t('dec', monthlyTranslations) }
         ];
 
         let prevMonth = currentMonthNum - 1;
@@ -320,6 +348,150 @@ const PWMUMonthlyReport = () => {
         fetchCenter();
     }, [user]);
 
+    // Fetch Previous Month's Closing Stock (Opening Stock for this month)
+    useEffect(() => {
+        const fetchOpeningStock = async () => {
+            if (!basicInfo.pwmuId || !basicInfo.month || !basicInfo.year) return;
+            
+            // Calculate previous month
+            const m = parseInt(basicInfo.month);
+            const y = parseInt(basicInfo.year);
+            const prevM = (m === 1 ? 12 : m - 1).toString().padStart(2, '0');
+            const prevY = (m === 1 ? y - 1 : y);
+
+            try {
+                const { data } = await supabase
+                    .from('monthly_reports')
+                    .select('closing_stock')
+                    .eq('pwmu_id', basicInfo.pwmuId)
+                    .eq('report_month', prevM)
+                    .eq('report_year', prevY)
+                    .maybeSingle();
+
+                if (data?.closing_stock) {
+                    const stocks = typeof data.closing_stock === 'string' ? JSON.parse(data.closing_stock) : data.closing_stock;
+                    const parsed = {};
+                    Object.entries(stocks).forEach(([k, v]) => parsed[k] = parseFloat(v) || 0);
+                    setOpeningStock(parsed);
+                } else {
+                    setOpeningStock({ WET: 0, PLASTIC: 0, METAL: 0, GLASS: 0, EWASTE: 0, OTHER: 0 });
+                }
+            } catch (err) {
+                console.error("Failed to fetch opening stock:", err);
+            }
+        };
+        fetchOpeningStock();
+    }, [basicInfo.pwmuId, basicInfo.month, basicInfo.year]);
+
+    // Fetch Existing Report for the selected month/year
+    useEffect(() => {
+        const fetchExisting = async () => {
+            if (!basicInfo.pwmuId || !basicInfo.month || !basicInfo.year) return;
+            setIsLoadingReport(true);
+            try {
+                const { data, error } = await supabase
+                    .from('monthly_reports')
+                    .select('*')
+                    .eq('pwmu_id', basicInfo.pwmuId)
+                    .eq('report_month', basicInfo.month)
+                    .eq('report_year', parseInt(basicInfo.year))
+                    .maybeSingle();
+
+                if (data) {
+                    setExistingId(data.id);
+                    setIsLocked(true);
+                    // Populate fields if it's an existing report
+                    if (data.machine_status) {
+                        try {
+                            const status = typeof data.machine_status === 'string' ? JSON.parse(data.machine_status) : data.machine_status;
+                            setMachineStatus(status);
+                        } catch (e) {}
+                    }
+                    if (data.opening_stock) {
+                        try {
+                            const opSt = typeof data.opening_stock === 'string' ? JSON.parse(data.opening_stock) : data.opening_stock;
+                            setOpeningStock(opSt);
+                        } catch (e) {}
+                    }
+                    setExpenses({
+                        electricity: data.electricity_bill?.toString() || '',
+                        honorarium: data.honorarium?.toString() || '',
+                        other: data.other_expenses?.toString() || ''
+                    });
+                    if (data.sales_records) {
+                        try {
+                            const records = typeof data.sales_records === 'string' ? JSON.parse(data.sales_records) : data.sales_records;
+                            setSales(records);
+                        } catch (e) {}
+                    }
+                    if (data.collection_data) {
+                        try {
+                            const coll = typeof data.collection_data === 'string' ? JSON.parse(data.collection_data) : data.collection_data;
+                            setCollection(coll);
+                        } catch (e) {}
+                    }
+                    if (data.closing_stock) {
+                        try {
+                            const closeSt = typeof data.closing_stock === 'string' ? JSON.parse(data.closing_stock) : data.closing_stock;
+                            setClosingStock(closeSt);
+                        } catch (e) {}
+                    }
+                } else {
+                    setExistingId(null);
+                    setIsLocked(false);
+                    // Reset to defaults for new entry
+                    const defaultState = { WET: '', PLASTIC: '', METAL: '', GLASS: '', EWASTE: '', OTHER: '' };
+                    setCollection(defaultState);
+                    setClosingStock(defaultState);
+
+                    // NEW: If no monthly report exists, aggregate from daily logs
+                    console.log("[Aggregator] No monthly report found. Fetching daily logs...");
+                    const yearMonth = `${basicInfo.year}-${basicInfo.month}`;
+                    const { data: logs, error: lErr } = await supabase
+                        .from('pwmu_operational_logs')
+                        .select('processed_stock_breakdown, total_intake_kg')
+                        .eq('pwmu_id', basicInfo.pwmuId)
+                        .like('log_date', `${yearMonth}-%`);
+
+                    if (!lErr && logs && logs.length > 0) {
+                        const aggregate = { WET: 0, PLASTIC: 0, METAL: 0, GLASS: 0, EWASTE: 0, OTHER: 0 };
+                        logs.forEach(log => {
+                            if (log.processed_stock_breakdown) {
+                                try {
+                                    const breakdown = typeof log.processed_stock_breakdown === 'string' 
+                                        ? JSON.parse(log.processed_stock_breakdown) 
+                                        : log.processed_stock_breakdown;
+                                    Object.entries(breakdown).forEach(([k, v]) => {
+                                        const uk = k.toUpperCase();
+                                        if (aggregate.hasOwnProperty(uk)) {
+                                            aggregate[uk] += (parseFloat(v) || 0);
+                                        }
+                                    });
+                                } catch (e) {
+                                    console.warn("Failed to parse log breakdown:", e);
+                                }
+                            }
+                        });
+                        
+                        // Convert back to strings for the input fields
+                        const stringified = {};
+                        Object.entries(aggregate).forEach(([k, v]) => {
+                            stringified[k] = v > 0 ? v.toString() : '';
+                        });
+                        console.log("[Aggregator] Final Monthly Aggregate:", stringified);
+                        setCollection(stringified);
+                    }
+                }
+            } catch (err) {
+                console.error("Error fetching existing report:", err);
+            } finally {
+                setIsLoadingReport(false);
+            }
+        };
+        fetchExisting();
+    }, [basicInfo.pwmuId, basicInfo.month, basicInfo.year, t]);
+
+
     const months = [
         { val: '01', label: t('jan', monthlyTranslations) }, { val: '02', label: t('feb', monthlyTranslations) }, { val: '03', label: t('mar', monthlyTranslations) },
         { val: '04', label: t('apr', monthlyTranslations) }, { val: '05', label: t('may', monthlyTranslations) }, { val: '06', label: t('jun', monthlyTranslations) },
@@ -333,6 +505,7 @@ const PWMUMonthlyReport = () => {
 
     // Handlers
     const handleBasicInfoChange = (e) => setBasicInfo(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    const handleCollectionChange = (e) => setCollection(prev => ({ ...prev, [e.target.name]: e.target.value }));
     const handleExpenseChange = (e) => setExpenses(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
     const toggleMachineSelection = (key) => {
@@ -438,6 +611,9 @@ const PWMUMonthlyReport = () => {
     const totalExpenses = (Number(expenses.electricity) || 0) + (Number(expenses.honorarium) || 0) + (Number(expenses.other) || 0);
     const netBalance = totalRevenue - totalExpenses;
 
+    const totalCollectedWaste = Object.values(collection).reduce((sum, val) => sum + (Number(val) || 0), 0);
+    const totalSoldWaste = Object.values(salesAggregate).reduce((sum, val) => sum + (Number(val) || 0), 0);
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!user) return;
@@ -468,14 +644,38 @@ const PWMUMonthlyReport = () => {
                 total_expenses: totalExpenses,
                 net_balance: netBalance,
                 sales_records: sales,
+                collection_data: collection,
+                closing_stock: closingStock,
+                opening_stock: openingStock, 
+                process_loss_kg: calculatedProcessLoss,
                 submitted_by: user?.id,
-                created_at: new Date().toISOString()
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
             };
 
-            // 2. Insert into monthly_reports
-            const { error: reportError } = await supabase
-                .from('monthly_reports')
-                .insert([reportData]);
+            // PRE-SAVE VALIDATION: Ensure Remaining + Sold <= Opening + Intake
+            const categories = Object.keys(collection);
+            for (const cat of categories) {
+                const avail = (openingStock[cat] || 0) + (parseFloat(collection[cat]) || 0);
+                const sold = salesAggregate[cat] || 0;
+                const remain = parseFloat(closingStock[cat]) || 0;
+
+                if (remain + sold > avail + 0.1) { // 0.1 margin for rounding
+                    alert(`Validation Error [${cat}]: Your Remaining Waste (${remain}kg) + Sold Waste (${sold}kg) is more than what was available (${avail.toFixed(1)}kg). Please correct the figures.`);
+                    setIsSaving(false);
+                    return;
+                }
+            }
+
+            // 2. Insert or Update monthly_reports
+            const { error: reportError } = existingId 
+                ? await supabase
+                    .from('monthly_reports')
+                    .update(reportData)
+                    .eq('id', existingId)
+                : await supabase
+                    .from('monthly_reports')
+                    .insert([reportData]);
 
             if (reportError) throw reportError;
 
@@ -524,39 +724,24 @@ const PWMUMonthlyReport = () => {
                 }
             }
 
-            // 5. Deduct sold quantities from market_availability (completing the service loop)
-            // Group sold quantities by material
-            const soldByMaterial = {};
-            flattenedSales
-                .filter(s => s.wasteType && Number(s.quantity) > 0)
-                .forEach(s => {
-                    // Normalize material key (extract uppercase code from label like "PET (Bottles...)")
-                    const materialKey = s.wasteType.split(' ')[0].toUpperCase();
-                    soldByMaterial[materialKey] = (soldByMaterial[materialKey] || 0) + parseFloat(s.quantity);
-                });
-
-            if (Object.keys(soldByMaterial).length > 0) {
-                // Fetch current stock for this PWMU
-                const { data: currentStockRows } = await supabase
-                    .from('market_availability')
-                    .select('id, material, stock_kg')
-                    .eq('pwmu_id', basicInfo.pwmuId);
-
-                if (currentStockRows && currentStockRows.length > 0) {
-                    for (const row of currentStockRows) {
-                        const materialKey = row.material.toUpperCase();
-                        const soldQty = soldByMaterial[materialKey] || 0;
-                        if (soldQty > 0) {
-                            const newStock = Math.max(0, (row.stock_kg || 0) - soldQty);
-                            await supabase
-                                .from('market_availability')
-                                .upsert([{ ...row, stock_kg: newStock }], { onConflict: 'pwmu_id,material' });
-                        }
-                    }
-                }
+            // 5. Replace market_availability with Closing Stock explicitly reported by user
+            const materialsToUpdate = Object.entries(closingStock).filter(([k,v]) => v !== '');
+            if (materialsToUpdate.length > 0) {
+                const inserts = materialsToUpdate.map(([key, value]) => ({
+                    pwmu_id: basicInfo.pwmuId,
+                    pwmu_name: basicInfo.pwmuName,
+                    material: key,
+                    stock_kg: parseFloat(value) || 0,
+                    updated_at: new Date().toISOString()
+                }));
+                
+                // Manually delete and insert to ensure clean override and avoid unique constraint failures on mock backend
+                await supabase.from('market_availability').delete().eq('pwmu_id', basicInfo.pwmuId);
+                await supabase.from('market_availability').insert(inserts);
             }
 
             setIsSaving(false);
+            setIsLocked(true);
             setShowSuccess(true);
             setTimeout(() => {
                 navigate('/dashboard/pwmu');
@@ -591,9 +776,8 @@ const PWMUMonthlyReport = () => {
             </div>
         );
     }
-
     return (
-        <div className="min-h-[calc(100vh-80px)] bg-[#f4f7f6] p-4 lg:p-8 pb-32">
+        <div className="min-h-[calc(100vh-80px)] bg-[#f4f7f6] p-4 lg:p-8 pb-48">
             <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                 
                 {/* Main Form Content */}
@@ -632,6 +816,7 @@ const PWMUMonthlyReport = () => {
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
+                    <fieldset disabled={isLocked} className="space-y-6">
 
                     {/* Section 1: Basic Information */}
                     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -657,7 +842,7 @@ const PWMUMonthlyReport = () => {
                         </div>
                     </div>
 
-                    {/* Section 2: Asset Status */}
+                    {/* Section 3: Asset Status */}
                     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                         <div className="bg-gray-50/50 px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                             <div className="flex items-center gap-2">
@@ -966,6 +1151,8 @@ const PWMUMonthlyReport = () => {
                             </div>
                         </div>
                     </div>
+                    </fieldset>
+                    <div className="h-24"></div> {/* Extra spacer so the fixed bar doesn't hide the last card content */}
 
                     {/* Bottom Action Bar (Sticky) */}
                     <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-md border-t border-gray-200 z-20 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -979,26 +1166,44 @@ const PWMUMonthlyReport = () => {
                         </div>
 
                         <div className="flex gap-3 w-full sm:w-auto">
+                            {isLocked && (
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setIsLocked(false);
+                                    }}
+                                    className="flex-1 sm:flex-none px-8 py-2.5 rounded-xl bg-orange-500 text-white font-bold hover:bg-orange-600 shadow-md hover:shadow-lg transition-all flex items-center justify-center min-w-[160px]"
+                                >
+                                    <FileEdit className="w-5 h-5 mr-2" />
+                                    Edit Report
+                                </button>
+                            )}
+                            
                             <button type="button" onClick={() => navigate('/dashboard/pwmu')} className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 transition-colors">
                                 {t('cancel', monthlyTranslations)}
                             </button>
-                            <button
-                                type="submit"
-                                disabled={isSaving || !basicInfo.pwmuName}
-                                className="flex-1 sm:flex-none px-8 py-2.5 rounded-xl bg-[#005DAA] text-white font-bold hover:bg-[#00427A] shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-w-[160px]"
-                            >
-                                {isSaving ? (
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                        <span>{t('saving', monthlyTranslations)}</span>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <CheckCircle2 className="w-5 h-5 mr-2" />
-                                        {t('saveReport', monthlyTranslations)}
-                                    </>
-                                )}
-                            </button>
+                            
+                            {!isLocked && (
+                                <button
+                                    type="submit"
+                                    disabled={isSaving || !basicInfo.pwmuName}
+                                    className="flex-1 sm:flex-none px-8 py-2.5 rounded-xl bg-[#005DAA] text-white font-bold hover:bg-[#00427A] shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-w-[160px]"
+                                >
+                                    {isSaving ? (
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                            <span>{t('saving', monthlyTranslations)}</span>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <CheckCircle2 className="w-5 h-5 mr-2" />
+                                            {t('saveReport', monthlyTranslations)}
+                                        </>
+                                    )}
+                                </button>
+                            )}
                         </div>
                     </div>
                 </form>
@@ -1023,46 +1228,79 @@ const PWMUMonthlyReport = () => {
                             </div>
                         ) : (
                             <div className="space-y-4">
+                                {/* Summary Headers */}
+                                <div className="grid grid-cols-2 gap-3 mb-2">
+                                    <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100 flex flex-col items-center justify-center text-center">
+                                        <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Total Waste</div>
+                                        <div className="text-lg font-black text-[#005DAA] font-mono">{totalCollectedWaste.toLocaleString()} <span className="text-[10px] text-gray-400">KG</span></div>
+                                    </div>
+                                    <div className="bg-green-50/50 p-3 rounded-xl border border-green-100 flex flex-col items-center justify-center text-center">
+                                        <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Total Sold</div>
+                                        <div className="text-lg font-black text-green-600 font-mono">{totalSoldWaste.toLocaleString()} <span className="text-[10px] text-gray-400">KG</span></div>
+                                    </div>
+                                </div>
+
                                 {sidebarMaterials.map(({ key, label }) => {
-                                    const currentStock = inventory[key] || 0;
+                                    const open = openingStock[key] || 0;
+                                    const intake = parseFloat(collection[key]) || 0;
+                                    const available = open + intake;
                                     const soldAmount = salesAggregate[key] || 0;
-                                    const remaining = currentStock - soldAmount;
-                                    const isOverSold = remaining < 0;
+                                    const remainingAfterSales = Math.max(0, available - soldAmount);
+                                    const maxAllowed = remainingAfterSales;
 
                                     return (
-                                        <div key={key} className="p-3 rounded-xl border border-gray-100 bg-gray-50/30 space-y-2">
+                                        <div key={key} className="p-4 rounded-xl border border-gray-100 bg-gray-50/50 space-y-3">
                                             <div className="flex items-center justify-between">
-                                                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">{label}</span>
-                                                <span className="text-[10px] font-bold px-2 py-0.5 bg-white border border-gray-100 rounded text-gray-400">AVAILABLE</span>
+                                                <span className="text-xs font-bold text-gray-700 uppercase tracking-wider">{label}</span>
+                                                <div className="flex flex-col items-end gap-0.5">
+                                                    <div className="text-[9px] text-gray-400 font-bold uppercase">Opening: {open.toLocaleString()} kg</div>
+                                                    <div className="text-[9px] text-gray-400 font-bold uppercase">Intake: {intake.toLocaleString()} kg</div>
+                                                    <div className="text-[10px] text-blue-600 font-black uppercase">Available: {available.toLocaleString()} kg</div>
+                                                </div>
                                             </div>
                                             
-                                            <div className="grid grid-cols-3 gap-2">
-                                                <div>
-                                                    <div className="text-[10px] text-gray-400 font-bold uppercase mb-0.5">Stock</div>
-                                                    <div className="text-sm font-mono font-bold text-gray-700">{currentStock.toLocaleString()} <small className="text-[10px]">KG</small></div>
+                                            <div className="flex items-center justify-between gap-4 pt-2 border-t border-gray-200/50">
+                                                <div className="flex flex-col">
+                                                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Remaining Waste</span>
+                                                    <span className="text-[9px] text-gray-400 font-bold italic">Max: {maxAllowed.toLocaleString()} kg</span>
                                                 </div>
-                                                <div className="flex flex-col items-center">
-                                                    <div className="text-[10px] text-gray-400 font-bold uppercase mb-0.5">Sold</div>
-                                                    <div className="text-sm font-mono font-bold text-[#005DAA]">{soldAmount > 0 ? `-${soldAmount.toLocaleString()}` : '0'}</div>
+                                                <div className="relative max-w-[120px]">
+                                                    <input
+                                                        type="number"
+                                                        value={closingStock[key] || ''}
+                                                        onChange={(e) => {
+                                                            let val = e.target.value;
+                                                            if (val !== '' && parseFloat(val) > maxAllowed + 0.1) val = maxAllowed.toString();
+                                                            setClosingStock(prev => ({ ...prev, [key]: val }));
+                                                        }}
+                                                        disabled={isLocked}
+                                                        placeholder="0"
+                                                        min="0"
+                                                        max={maxAllowed}
+                                                        className="w-full p-2.5 bg-white border border-gray-200 rounded-lg text-sm font-mono font-bold text-[#005DAA] text-right pr-9 shadow-sm focus:ring-2 focus:ring-[#005DAA]/20 focus:border-[#005DAA] transition-all disabled:opacity-60 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                                    />
+                                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-black">KG</span>
                                                 </div>
-                                                <div className="text-right">
-                                                    <div className="text-[10px] text-gray-400 font-bold uppercase mb-0.5">Remaining</div>
-                                                    <div className={`text-sm font-mono font-black ${isOverSold ? 'text-red-500' : 'text-green-600'}`}>
-                                                        {remaining.toLocaleString()}
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Visual Bar */}
-                                            <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
-                                                <div 
-                                                    className={`h-full transition-all duration-300 ${isOverSold ? 'bg-red-500' : 'bg-green-500'}`}
-                                                    style={{ width: `${Math.min(100, (currentStock > 0 ? (remaining > 0 ? (remaining / currentStock) * 100 : 0) : 0))}%` }}
-                                                ></div>
                                             </div>
                                         </div>
                                     );
                                 })}
+
+                                {/* Processing Loss / Residuals */}
+                                <div className="p-4 rounded-xl border border-orange-100 bg-orange-50/50 space-y-3 mt-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <AlertCircle className="w-4 h-4 text-orange-500" />
+                                            <span className="text-xs font-bold text-orange-700 uppercase tracking-wider">Lost in Processing</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center justify-between gap-4">
+                                        <span className="text-[10px] font-semibold text-orange-600 leading-tight flex-1">Auto-calculated unusable waste removed during recycling (e.g., dust, moisture)</span>
+                                        <div className="bg-white border border-orange-200 px-4 py-2.5 rounded-lg font-mono font-bold text-orange-600 shadow-sm text-right min-w-[120px]">
+                                            {calculatedProcessLoss.toLocaleString()} <span className="text-[10px] text-orange-400 font-black ml-1">KG</span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         )}
 
