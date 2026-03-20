@@ -443,44 +443,65 @@ const PWMUMonthlyReport = () => {
                     const defaultState = { WET: '', PLASTIC: '', METAL: '', GLASS: '', EWASTE: '', OTHER: '' };
                     setCollection(defaultState);
                     setClosingStock(defaultState);
+                    setSales([{ 
+                        id: Date.now(), 
+                        vendor: '', 
+                        materials: [{ id: `mat-${Date.now()}`, wasteType: '', quantity: '', revenue: '' }] 
+                    }]);
+                }
 
-                    // NEW: If no monthly report exists, aggregate from daily logs
-                    console.log("[Aggregator] No monthly report found. Fetching daily logs...");
-                    const yearMonth = `${basicInfo.year}-${basicInfo.month}`;
-                    const { data: logs, error: lErr } = await supabase
-                        .from('pwmu_operational_logs')
-                        .select('processed_stock_breakdown, total_intake_kg')
-                        .eq('pwmu_id', basicInfo.pwmuId)
-                        .like('log_date', `${yearMonth}-%`);
+                // ALWAYS: fetch daily logs and merge (Auto-sync)
+                console.log("[Aggregator] Fetching daily logs to sync...");
+                const yearMonth = `${basicInfo.year}-${basicInfo.month}`;
+                const startDate = `${yearMonth}-01`;
+                const endDate = `${yearMonth}-31`;
 
-                    if (!lErr && logs && logs.length > 0) {
-                        const aggregate = { WET: 0, PLASTIC: 0, METAL: 0, GLASS: 0, EWASTE: 0, OTHER: 0 };
-                        logs.forEach(log => {
-                            if (log.processed_stock_breakdown) {
-                                try {
-                                    const breakdown = typeof log.processed_stock_breakdown === 'string' 
-                                        ? JSON.parse(log.processed_stock_breakdown) 
-                                        : log.processed_stock_breakdown;
-                                    Object.entries(breakdown).forEach(([k, v]) => {
-                                        const uk = k.toUpperCase();
-                                        if (aggregate.hasOwnProperty(uk)) {
-                                            aggregate[uk] += (parseFloat(v) || 0);
-                                        }
-                                    });
-                                } catch (e) {
-                                    console.warn("Failed to parse log breakdown:", e);
-                                }
+                const { data: logs, error: lErr } = await supabase
+                    .from('pwmu_operational_logs')
+                    .select('processed_stock_breakdown, total_intake_kg')
+                    .eq('pwmu_id', basicInfo.pwmuId)
+                    .gte('log_date', startDate)
+                    .lte('log_date', endDate);
+
+                if (!lErr && logs && logs.length > 0) {
+                    const aggregate = { WET: 0, PLASTIC: 0, METAL: 0, GLASS: 0, EWASTE: 0, OTHER: 0 };
+                    logs.forEach(log => {
+                        if (log.processed_stock_breakdown) {
+                            try {
+                                const breakdown = typeof log.processed_stock_breakdown === 'string' 
+                                    ? JSON.parse(log.processed_stock_breakdown) 
+                                    : log.processed_stock_breakdown;
+                                Object.entries(breakdown).forEach(([k, v]) => {
+                                    const uk = k.toUpperCase();
+                                    if (aggregate.hasOwnProperty(uk)) {
+                                        aggregate[uk] += (parseFloat(v) || 0);
+                                    }
+                                });
+                            } catch (e) {
+                                console.warn("Failed to parse log breakdown:", e);
                             }
-                        });
+                        }
+                    });
+                    
+                    const stringified = {};
+                    let hasAggData = false;
+                    Object.entries(aggregate).forEach(([k, v]) => {
+                        if (v > 0) hasAggData = true;
+                        stringified[k] = v > 0 ? v.toString() : '';
+                    });
+
+                    // For an existing report, if true aggregate > saved collection, override to fix desync
+                    setCollection(prev => {
+                        if (!data) return stringified;
                         
-                        // Convert back to strings for the input fields
-                        const stringified = {};
-                        Object.entries(aggregate).forEach(([k, v]) => {
-                            stringified[k] = v > 0 ? v.toString() : '';
-                        });
-                        console.log("[Aggregator] Final Monthly Aggregate:", stringified);
-                        setCollection(stringified);
-                    }
+                        const savedTotal = Object.values(prev).reduce((sum, v) => sum + (parseFloat(v)||0), 0);
+                        const aggTotal = Object.values(stringified).reduce((sum, v) => sum + (parseFloat(v)||0), 0);
+                        if (aggTotal > savedTotal) {
+                            console.log("[Aggregator] Aggregate is higher than saved collection. Overriding to fix sync.");
+                            return stringified;
+                        }
+                        return prev;
+                    });
                 }
             } catch (err) {
                 console.error("Error fetching existing report:", err);
@@ -612,7 +633,16 @@ const PWMUMonthlyReport = () => {
     const netBalance = totalRevenue - totalExpenses;
 
     const totalCollectedWaste = Object.values(collection).reduce((sum, val) => sum + (Number(val) || 0), 0);
+    const totalOpeningStock = Object.values(openingStock).reduce((sum, val) => sum + (Number(val) || 0), 0);
+    const totalAvailableWaste = totalCollectedWaste + totalOpeningStock;
     const totalSoldWaste = Object.values(salesAggregate).reduce((sum, val) => sum + (Number(val) || 0), 0);
+    
+    // Auto-calculate Process Loss (Residuals)
+    useEffect(() => {
+        const totalClosing = Object.values(closingStock).reduce((s, v) => s + (parseFloat(v) || 0), 0);
+        const loss = totalAvailableWaste - totalSoldWaste - totalClosing;
+        setCalculatedProcessLoss(Math.max(0, parseFloat(loss.toFixed(2))));
+    }, [closingStock, totalAvailableWaste, totalSoldWaste]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -816,14 +846,13 @@ const PWMUMonthlyReport = () => {
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    <fieldset disabled={isLocked} className="space-y-6">
-
                     {/* Section 1: Basic Information */}
                     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                         <div className="bg-gray-50/50 px-6 py-4 border-b border-gray-100 flex items-center gap-2">
                             <Factory className="w-5 h-5 text-gray-500" />
                             <h2 className="font-semibold text-gray-800 tracking-wide uppercase text-sm">{t('facilityInfo', monthlyTranslations)}</h2>
                         </div>
+                        <fieldset disabled={isLocked}>
                         <div className="p-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
@@ -840,9 +869,10 @@ const PWMUMonthlyReport = () => {
                                 </div>
                             </div>
                         </div>
+                        </fieldset>
                     </div>
 
-                    {/* Section 3: Asset Status */}
+                    {/* Section 2: Asset Status */}
                     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                         <div className="bg-gray-50/50 px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                             <div className="flex items-center gap-2">
@@ -851,6 +881,7 @@ const PWMUMonthlyReport = () => {
                             </div>
                             <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded-md border border-gray-200 shadow-sm">{t('selectMachines', monthlyTranslations)}</span>
                         </div>
+                        <fieldset disabled={isLocked}>
                         <div className="p-6 space-y-6">
                             {/* Machine Selection Grid */}
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -859,9 +890,9 @@ const PWMUMonthlyReport = () => {
                                     return (
                                         <div
                                             key={key}
-                                            onClick={() => toggleMachineSelection(key)}
+                                            onClick={() => !isLocked && toggleMachineSelection(key)}
                                             className={`p-3 rounded-xl border-2 cursor-pointer flex items-center justify-between transition-all duration-200 ${isSelected ? 'border-[#005DAA] bg-blue-50/50' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                                                }`}
+                                                } ${isLocked ? 'cursor-not-allowed opacity-80' : ''}`}
                                         >
                                             <span className={`text-sm font-medium ${isSelected ? 'text-[#005DAA]' : 'text-gray-600'}`}>{label}</span>
                                             <div className={`w-5 h-5 rounded flex items-center justify-center border transition-colors ${isSelected ? 'bg-[#005DAA] border-[#005DAA] text-white' : 'border-gray-300 bg-white'
@@ -945,6 +976,7 @@ const PWMUMonthlyReport = () => {
                                 </div>
                             )}
                         </div>
+                        </fieldset>
                     </div>
 
                     {/* Section 3: Financials - Sales */}
@@ -956,12 +988,16 @@ const PWMUMonthlyReport = () => {
                             </div>
                             <button
                                 type="button"
-                                onClick={addSaleRow}
+                                onClick={() => {
+                                    setIsLocked(false);
+                                    addSaleRow();
+                                }}
                                 className="flex items-center gap-1 text-sm font-semibold text-[#005DAA] hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors border border-transparent hover:border-blue-100"
                             >
                                 <Plus className="w-4 h-4" /> {t('addRecord', monthlyTranslations)}
                             </button>
                         </div>
+                        <fieldset disabled={isLocked}>
                         <div className="p-6">
                             {sales.length === 0 ? (
                                 <div className="text-center py-10 text-gray-400 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
@@ -1103,6 +1139,7 @@ const PWMUMonthlyReport = () => {
                                 </div>
                             )}
                         </div>
+                        </fieldset>
                     </div>
 
                     {/* Section 4: Operating Expenses */}
@@ -1111,6 +1148,7 @@ const PWMUMonthlyReport = () => {
                             <IndianRupee className="w-5 h-5 text-gray-500" />
                             <h2 className="font-semibold text-gray-800 tracking-wide uppercase text-sm">{t('opExpenses', monthlyTranslations)}</h2>
                         </div>
+                        <fieldset disabled={isLocked}>
                         <div className="p-6">
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <div>
@@ -1150,8 +1188,9 @@ const PWMUMonthlyReport = () => {
                                 </div>
                             </div>
                         </div>
+                        </fieldset>
                     </div>
-                    </fieldset>
+
                     <div className="h-24"></div> {/* Extra spacer so the fixed bar doesn't hide the last card content */}
 
                     {/* Bottom Action Bar (Sticky) */}
@@ -1173,6 +1212,13 @@ const PWMUMonthlyReport = () => {
                                         e.preventDefault();
                                         e.stopPropagation();
                                         setIsLocked(false);
+                                        if (sales.length === 0) {
+                                            setSales([{ 
+                                                id: Date.now(), 
+                                                vendor: '', 
+                                                materials: [{ id: `mat-${Date.now()}`, wasteType: '', quantity: '', revenue: '' }] 
+                                            }]);
+                                        }
                                     }}
                                     className="flex-1 sm:flex-none px-8 py-2.5 rounded-xl bg-orange-500 text-white font-bold hover:bg-orange-600 shadow-md hover:shadow-lg transition-all flex items-center justify-center min-w-[160px]"
                                 >

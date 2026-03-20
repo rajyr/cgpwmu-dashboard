@@ -47,12 +47,37 @@ const ProfileSettings = () => {
 
         const fetchPwmus = async () => {
             try {
-                const { data, error } = await supabase
-                    .from('pwmu_centers')
-                    .select('id, name, district');
+                const [centersRes, managersRes] = await Promise.all([
+                    supabase.from('pwmu_centers').select('id, name, district'),
+                    supabase.from('users').select('id, registration_data').in('role', ['PWMUManager', 'PWMU'])
+                ]);
                 
-                if (error) throw error;
-                setPwmuCenters(data || []);
+                if (centersRes.error) throw centersRes.error;
+
+                const formattedCenters = (centersRes.data || []).map(c => {
+                    const manager = (managersRes.data || []).find(m => {
+                        let r = m.registration_data || {};
+                        if (typeof r === 'string') { try { r = JSON.parse(r); } catch(e){} }
+                        return String(r.pwmuId) === String(c.id) || String(m.id) === String(c.id);
+                    });
+                    
+                    let block = null;
+                    let gp = null;
+                    if (manager) {
+                        let r = manager.registration_data || {};
+                        if (typeof r === 'string') { try { r = JSON.parse(r); } catch(e){} }
+                        block = r.block;
+                        gp = r.gramPanchayat || r.gram_panchayat || r.villageName;
+                    }
+
+                    return {
+                        ...c,
+                        block,
+                        gramPanchayat: gp
+                    };
+                });
+
+                setPwmuCenters(formattedCenters);
             } catch (err) {
                 console.error("Failed to fetch PWMUs:", err);
             }
@@ -525,8 +550,11 @@ const ProfileSettings = () => {
                                                         className="mt-1 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                                     />
                                                     <div className="flex flex-col">
-                                                        <span className={`text-sm font-bold leading-tight ${isSelected ? 'text-blue-900' : 'text-gray-800'}`}>{pwmu.name}</span>
-                                                        <span className="text-[11px] font-medium text-gray-500 mt-0.5">{pwmu.district}</span>
+                                                        <span className={`text-sm font-bold leading-tight truncate ${isSelected ? 'text-blue-900' : 'text-gray-800'}`}>{pwmu.name}</span>
+                                                        <span className="text-[10px] font-medium text-gray-500 mt-1 flex items-center gap-1 truncate">
+                                                            <MapPin className="w-2.5 h-2.5 shrink-0" />
+                                                            {[pwmu.district, pwmu.block, pwmu.gramPanchayat].filter(Boolean).join(' → ')}
+                                                        </span>
                                                     </div>
                                                 </label>
                                             );

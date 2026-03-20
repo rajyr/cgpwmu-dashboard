@@ -147,12 +147,37 @@ const VendorReg = () => {
 
         const fetchPwmus = async () => {
             try {
-                const { data, error } = await supabase
-                    .from('pwmu_centers')
-                    .select('id, name, district');
+                const [centersRes, managersRes] = await Promise.all([
+                    supabase.from('pwmu_centers').select('id, name, district'),
+                    supabase.from('users').select('id, registration_data').in('role', ['PWMUManager', 'PWMU'])
+                ]);
                 
-                if (error) throw error;
-                setPwmuCenters(data || []);
+                if (centersRes.error) throw centersRes.error;
+
+                const formattedCenters = (centersRes.data || []).map(c => {
+                    const manager = (managersRes.data || []).find(m => {
+                        let reg = m.registration_data || {};
+                        if (typeof reg === 'string') { try { reg = JSON.parse(reg); } catch(e){} }
+                        return String(reg.pwmuId) === String(c.id) || String(m.id) === String(c.id);
+                    });
+                    
+                    let block = null;
+                    let gp = null;
+                    if (manager) {
+                        let reg = manager.registration_data || {};
+                        if (typeof reg === 'string') { try { reg = JSON.parse(reg); } catch(e){} }
+                        block = reg.block;
+                        gp = reg.gramPanchayat || reg.gram_panchayat || reg.villageName;
+                    }
+
+                    return {
+                        ...c,
+                        block,
+                        gramPanchayat: gp
+                    };
+                });
+
+                setPwmuCenters(formattedCenters);
             } catch (err) {
                 console.error("Failed to fetch PWMUs:", err);
             }
@@ -169,6 +194,29 @@ const VendorReg = () => {
             setBlocks([]);
         }
     }, [formData.district, locationData]);
+
+    // Auto-select PWMUs in the matching district
+    useEffect(() => {
+        if (formData.district && pwmuCenters.length > 0) {
+            setFormData(prev => {
+                const getBaseName = (str) => {
+                    if (!str) return '';
+                    const match = str.match(/^([^(]+)/);
+                    return match ? match[1].trim().toLowerCase() : str.toLowerCase();
+                };
+
+                const selectedDistrictBase = getBaseName(formData.district);
+
+                const autoPwmus = pwmuCenters
+                    .filter(p => getBaseName(p.district) === selectedDistrictBase)
+                    .map(p => p.id);
+                
+                // Merge with existing so they don't lose manually selected ones from other districts
+                const merged = [...new Set([...prev.partneredPwmus, ...autoPwmus])];
+                return { ...prev, partneredPwmus: merged };
+            });
+        }
+    }, [formData.district, pwmuCenters]);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -334,16 +382,19 @@ const VendorReg = () => {
                                         {pwmuCenters.length === 0 ? (
                                             <p className="text-xs text-gray-400 p-2 col-span-full">Loading PWMU Hubs...</p>
                                         ) : pwmuCenters.map(pwmu => (
-                                            <label key={pwmu.id} className={`flex items-start gap-2 p-2 rounded border cursor-pointer transition-colors ${formData.partneredPwmus.includes(pwmu.id) ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:border-blue-300'}`}>
+                                            <label key={pwmu.id} className={`flex items-start gap-2 p-2 rounded-lg border cursor-pointer transition-all ${formData.partneredPwmus.includes(pwmu.id) ? 'bg-blue-50/80 border-blue-300 shadow-sm' : 'bg-white border-gray-200 hover:border-blue-300'}`}>
                                                 <input 
                                                     type="checkbox" 
                                                     checked={formData.partneredPwmus.includes(pwmu.id)}
                                                     onChange={() => handlePwmuToggle(pwmu.id)}
-                                                    className="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                    className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
                                                 />
-                                                <div className="flex flex-col">
-                                                    <span className="text-xs font-bold text-gray-800 leading-tight">{pwmu.name}</span>
-                                                    <span className="text-[10px] text-gray-500">{pwmu.district}</span>
+                                                <div className="flex flex-col flex-1 overflow-hidden">
+                                                    <span className="text-sm font-bold text-gray-800 leading-tight truncate">{pwmu.name}</span>
+                                                    <span className="text-[10px] sm:text-[11px] font-medium text-gray-500 mt-0.5 truncate flex items-center gap-1">
+                                                        <MapPin className="w-2.5 h-2.5 shrink-0" />
+                                                        {[pwmu.district, pwmu.block, pwmu.gramPanchayat].filter(Boolean).join(' → ')}
+                                                    </span>
                                                 </div>
                                             </label>
                                         ))}
