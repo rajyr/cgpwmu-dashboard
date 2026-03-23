@@ -51,6 +51,7 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
             dailyLog: "Daily Log",
             monthlyReport: "Monthly Report",
             masterReports: "Master Reports",
+            villageReports: "Village Performance",
             profile: "Profile Setting"
         },
         hi: {
@@ -68,17 +69,36 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
             dailyLog: "दैनिक लॉग",
             monthlyReport: "मासिक रिपोर्ट",
             masterReports: "मास्टर रिपोर्ट्स",
+            villageReports: "गांव प्रदर्शन रिपोर्ट",
             profile: "प्रोफ़ाइल सेटिंग"
         }
     };
 
     const { language, t } = useLanguage();
 
+    const [dbUnlocked, setDbUnlocked] = useState(() => localStorage.getItem('db_unlocked') === 'true');
+    const [logoClicks, setLogoClicks] = useState(0);
+
+    const handleLogoClick = () => {
+        const newClicks = logoClicks + 1;
+        if (newClicks >= 5) {
+            const newState = !dbUnlocked;
+            setDbUnlocked(newState);
+            localStorage.setItem('db_unlocked', String(newState));
+            setLogoClicks(0);
+        } else {
+            setLogoClicks(newClicks);
+            // Reset clicks after 2 seconds of inactivity
+            setTimeout(() => setLogoClicks(0), 2000);
+        }
+    };
+
     const allNavItems = [
         // Main
         { name: t('overview', sidebarTranslations), icon: LayoutDashboard, path: '/dashboard', roles: ['Admin', 'Nodal', 'PWMU', 'Village'] },
         { name: t('pwmuHub', sidebarTranslations), icon: Factory, path: '/dashboard/pwmu', roles: ['Admin', 'Nodal', 'PWMU'] },
         { name: t('masterReports', sidebarTranslations), icon: FileBarChart, path: '/dashboard/reports', roles: ['Admin', 'Nodal', 'PWMU', 'Village'] },
+        { name: t('villageReports', sidebarTranslations), icon: FileBarChart, path: '/dashboard/village-reports', roles: ['Admin', 'Nodal', 'PWMU', 'Village'] },
 
         // Advanced Analytics
         { name: t('directory', sidebarTranslations), icon: Map, path: '/dashboard/district', roles: ['Admin', 'Nodal', 'PWMU'] },
@@ -97,7 +117,7 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
         // System
         { name: t('profile', sidebarTranslations), icon: Settings, path: '/dashboard/profile', roles: ['Admin', 'Nodal', 'PWMU', 'Village', 'Vendor'] },
         { name: t('settings', sidebarTranslations), icon: Settings, path: '/dashboard/settings', roles: ['Admin'] },
-        { name: 'Database Manager', icon: Database, path: '/dashboard/database', roles: ['Admin'] },
+        { name: 'Database Manager', icon: Database, path: '/dashboard/database', roles: dbUnlocked ? ['Admin'] : [] },
     ];
 
     const navItems = allNavItems.filter(item => item.roles.includes(effectiveRole));
@@ -142,7 +162,10 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
     const sidebarContent = (
         <div className="flex flex-col h-full bg-transparent relative">
             {/* Header/Logo Area */}
-            <div className={`flex items-center pt-6 pb-4 px-4 border-b border-gray-100 min-h-[80px] ${isActuallyCollapsed ? 'justify-center' : 'justify-between'}`}>
+            <div 
+                onClick={handleLogoClick}
+                className={`flex items-center pt-6 pb-4 px-4 border-b border-gray-100 min-h-[80px] cursor-pointer select-none ${isActuallyCollapsed ? 'justify-center' : 'justify-between'}`}
+            >
                 <div className={`flex items-center gap-2 ${isActuallyCollapsed ? 'hidden' : 'flex'}`}>
                     <img src="/cgpwmu/assets/Logo/CGPWMUlogosm.webp" alt="CG-PWMU Logo" className="h-10 w-auto object-contain" />
                     <div className="flex flex-col">

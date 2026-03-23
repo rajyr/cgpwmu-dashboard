@@ -109,6 +109,73 @@ const DatabaseManager = () => {
         setEditForm(formState);
     };
 
+    const convertToCSV = (objArray) => {
+        if (!objArray || objArray.length === 0) return '';
+        const array = typeof objArray !== 'object' ? JSON.parse(objArray) : objArray;
+        const keys = Object.keys(array[0]).filter(k => k !== '_rowid_');
+        let str = keys.join(',') + '\r\n';
+
+        for (let i = 0; i < array.length; i++) {
+            let line = '';
+            for (let index in keys) {
+                if (line !== '') line += ',';
+                let val = array[i][keys[index]];
+                // Handle commas/quotes for RFC4180
+                if (val !== null && val !== undefined) {
+                    let textVal = String(val);
+                    if (textVal.includes(',') || textVal.includes('"') || textVal.includes('\n')) {
+                        textVal = '"' + textVal.replace(/"/g, '""') + '"';
+                    }
+                    line += textVal;
+                }
+            }
+            str += line + '\r\n';
+        }
+        return str;
+    };
+
+    const downloadCSV = (tableName, tableData) => {
+        if (!tableData || tableData.length === 0) {
+            alert('No data to export.');
+            return;
+        }
+        const csv = convertToCSV(tableData);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute('download', `${tableName}_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const exportFullBackup = async () => {
+        if (!window.confirm('This will download a separate CSV for every table in the database. Continue?')) return;
+        setLoading(true);
+        setError('');
+        try {
+            for (const table of tables) {
+                setSuccess(`Exporting ${table}...`);
+                const res = await fetch('/cgpwmu/api/data/admin/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ query: `SELECT * FROM ${table}` })
+                });
+                const result = await res.json();
+                if (result.data && result.data.length > 0) {
+                    downloadCSV(table, result.data);
+                    // Small delay to prevent browser download grouping/blocking
+                    await new Promise(r => setTimeout(r, 500));
+                }
+            }
+            setSuccess('Full backup completed. Check your downloads.');
+        } catch (err) {
+            setError('Backup failed: ' + err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleSave = async (row) => {
         try {
             setError('');
@@ -140,10 +207,18 @@ const DatabaseManager = () => {
                         <div className="p-3 bg-red-100 text-red-600 rounded-xl">
                             <Database className="w-8 h-8" />
                         </div>
-                        <div>
+                        <div className="flex flex-col flex-grow">
                             <h1 className="text-2xl font-bold border-b-0 pb-0 mb-1 text-gray-900">Database Manager</h1>
                             <p className="text-sm text-gray-500">Direct SQLite Access. Use with extreme caution.</p>
                         </div>
+                        <button 
+                            onClick={exportFullBackup}
+                            disabled={loading || tables.length === 0}
+                            className="px-4 py-2 bg-[#005DAA] hover:bg-[#004a88] text-white font-bold rounded-xl flex items-center gap-2 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <Database className="w-4 h-4" />
+                            Download Full Backup (.csv)
+                        </button>
                     </div>
 
                     <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg mb-8 flex items-start gap-3">
@@ -173,13 +248,23 @@ const DatabaseManager = () => {
                         </div>
 
                         {selectedTable && (
-                            <button 
-                                onClick={() => fetchTableData(selectedTable)}
-                                className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-lg flex items-center gap-2 transition-colors border border-gray-200 shadow-sm"
-                            >
-                                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                                Refresh Data
-                            </button>
+                            <div className="flex gap-2">
+                                <button 
+                                    onClick={() => fetchTableData(selectedTable)}
+                                    className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-lg flex items-center gap-2 transition-colors border border-gray-200 shadow-sm"
+                                >
+                                    <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                                    Refresh Data
+                                </button>
+                                <button 
+                                    onClick={() => downloadCSV(selectedTable, data)}
+                                    disabled={loading || data.length === 0}
+                                    className="px-4 py-2.5 bg-green-50 hover:bg-green-100 text-green-700 font-semibold rounded-lg flex items-center gap-2 transition-colors border border-green-200 shadow-sm disabled:opacity-50"
+                                >
+                                    <Database className="w-4 h-4" />
+                                    Download CSV
+                                </button>
+                            </div>
                         )}
                     </div>
 

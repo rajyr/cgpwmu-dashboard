@@ -8,7 +8,9 @@
     "server": "nodemon server/index.js",
     "dev:full": "concurrently \"npm run server\" \"npm run dev\"",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "backup": "node scripts/google_backup.js",
+    "reset-db": "node server/init-db.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.98.0",
@@ -23,6 +25,7 @@
     "jspdf-autotable": "^5.0.7",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.363.0",
+    "node-cron": "^3.0.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-leaflet": "^4.2.1",

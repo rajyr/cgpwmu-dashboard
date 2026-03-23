@@ -28,6 +28,7 @@ import MasterReports from './pages/Dashboards/MasterReports';
 import SettingsDashboard from './pages/Dashboards/SettingsDashboard';
 import ProfileSettings from './pages/Dashboards/ProfileSettings';
 import DatabaseManager from './pages/Dashboards/DatabaseManager';
+import VillageReports from './pages/Dashboards/VillageReports';
 import { useAuth } from './context/AuthContext';
 
 // Protected Route Wrapper with optional Role filtering
@@ -86,6 +87,7 @@ function App() {
                     <Route path="village-hub" element={<VillageDashboard />} />
                     <Route path="vendor-hub" element={<VendorDashboard />} />
                     <Route path="reports" element={<MasterReports />} />
+                    <Route path="village-reports" element={<VillageReports />} />
                     <Route
                         path="settings"
                         element={

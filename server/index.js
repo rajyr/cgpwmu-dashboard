@@ -6,6 +6,8 @@ import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import cron from 'node-cron';
+import { exec } from 'child_process';
 import db from './db.js';
 
 dotenv.config();
@@ -85,7 +87,7 @@ authRouter.post('/signup', async (req, res) => {
       id = Math.random().toString(36).substring(2, 15);
     }
     const autoApprove = db.prepare('SELECT value FROM system_settings WHERE key = ?').get('auto_approve_users');
-    const status = autoApprove?.value === 'true' ? 'approved' : 'pending';
+    const status = (autoApprove?.value === 'true' || autoApprove?.value === 1 || autoApprove?.value === true) ? 'approved' : 'pending';
 
     db.prepare(`
       INSERT INTO users (id, email, password_hash, full_name, role, status, district, phone_number, registration_data)
@@ -493,6 +495,83 @@ app.use('/cgpwmu/api/auth', authRouter);
 app.use('/api/data', dataRouter);
 app.use('/cgpwmu/api/data', dataRouter);
 
+// --- Security: Change Password (Self) ---
+app.post(['/api/auth/change-password', '/cgpwmu/api/auth/change-password'], authenticateToken, async (req, res) => {
+    const { newPassword } = req.body;
+    if (!newPassword || newPassword.length < 8) {
+        return res.status(400).json({ error: 'Password must be at least 8 characters long' });
+    }
+
+    try {
+        const passwordHash = await bcrypt.hash(newPassword, 10);
+        db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(passwordHash, req.user.id);
+        console.log(`[PASSWORD CHANGE] User: ${req.user.id} (${req.user.email})`);
+        res.json({ message: 'Password updated successfully' });
+    } catch (error) {
+        console.error('[PASSWORD CHANGE ERROR]', error);
+        res.status(500).json({ error: 'Server error', details: error.message });
+    }
+});
+
+// --- Admin: Reset Password (Other Users) ---
+app.post(['/api/admin/reset-password', '/cgpwmu/api/admin/reset-password'], authenticateToken, async (req, res) => {
+    // Check if requester is Admin or StateAdmin
+    if (req.user.role !== 'Admin' && req.user.role !== 'StateAdmin') {
+        return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { userId, newPassword } = req.body;
+    if (!userId || !newPassword || newPassword.length < 8) {
+        return res.status(400).json({ error: 'User ID and a 8+ character password are required' });
+    }
+
+    try {
+        const passwordHash = await bcrypt.hash(newPassword, 10);
+        const result = db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(passwordHash, userId);
+        
+        if (result.changes === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+    console.log(`[ADMIN PASSWORD RESET] Admin: ${req.user.id} reset password for User: ${userId}`);
+        res.json({ message: 'User password reset successfully' });
+    } catch (error) {
+        console.error('[ADMIN PASSWORD RESET ERROR]', error);
+        res.status(500).json({ error: 'Server error', details: error.message });
+    }
+});
+
+// --- Admin: Trigger Backup ---
+app.post(['/api/admin/trigger-backup', '/cgpwmu/api/admin/trigger-backup'], authenticateToken, (req, res) => {
+    // Check if requester is Admin or StateAdmin
+    if (req.user.role !== 'Admin' && req.user.role !== 'StateAdmin') {
+        return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    console.log(`[ADMIN BACKUP] Triggered manually by Admin: ${req.user.id} (${req.user.email})`);
+    
+    // Execute the existing backup script
+    exec('npm run backup', (error, stdout, stderr) => {
+        if (error) {
+            console.error(`[Admin Backup] Script Error: ${error.message}`);
+            return res.status(500).json({ 
+                error: 'Backup script failed to start', 
+                details: error.message 
+            });
+        }
+        
+        if (stderr && stderr.includes('Error')) {
+            console.warn(`[Admin Backup] Script warning/error in stderr: ${stderr}`);
+        }
+
+        console.log(`[Admin Backup] Script Output: ${stdout}`);
+        res.json({ 
+            message: 'Backup process initiated successfully. Data is being pushed to Google Sheets.',
+            output: stdout.split('\n').slice(-3).join('\n') // Return last few lines of output
+        });
+    });
+});
+
 // Coverage Statistics for Map
 app.get(['/api/location-stats', '/cgpwmu/api/location-stats'], (req, res) => {
     try {
@@ -557,4 +636,18 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(PORT, () => { console.log(`Server running on port ${PORT}`); });
+app.listen(PORT, () => { 
+  console.log(`Server running on port ${PORT}`); 
+  
+  // Weekly backup (Every Sunday at 00:00)
+  cron.schedule('0 0 * * 0', () => {
+    console.log('[Cron] Starting weekly Google Sheets backup...');
+    exec('npm run backup', (error, stdout, stderr) => {
+      if (error) {
+        console.error(`[Cron] Backup error: ${error.message}`);
+        return;
+      }
+      console.log(`[Cron] Backup completed successfully.`);
+    });
+  });
+});

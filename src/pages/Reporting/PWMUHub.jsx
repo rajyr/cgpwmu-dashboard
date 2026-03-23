@@ -47,7 +47,7 @@ const PWMUHub = () => {
             pending: "Pending",
             sun: "Sun", mon: "Mon", tue: "Tue", wed: "Wed", thu: "Thu", fri: "Fri", sat: "Sat",
             weeklyPerf: "Weekly Performance",
-            totalIntake: "Total Intake (This Week)",
+            totalIntake: "Total Intake (This Month)",
             reportingRate: "Active Reporting Rate",
             secondaryTransport: "Total Secondary Transport",
             recoveryRate: "Resource Recovery Rate",
@@ -82,7 +82,7 @@ const PWMUHub = () => {
             pending: "लंबित",
             sun: "रवि", mon: "सोम", tue: "मंगल", wed: "बुध", thu: "गुरु", fri: "शुक्र", sat: "शनि",
             weeklyPerf: "साप्ताहिक प्रदर्शन",
-            totalIntake: "कुल अंतर्ग्रहण (इस सप्ताह)",
+            totalIntake: "कुल अंतर्ग्रहण (इस माह)",
             reportingRate: "सक्रिय रिपोर्टिंग दर",
             secondaryTransport: "कुल द्वितीयक परिवहन",
             recoveryRate: "संसाधन रिकवरी दर",
@@ -289,7 +289,7 @@ const PWMUHub = () => {
                         const last7 = new Date();
                         last7.setDate(realToday.getDate() - 7);
                         const last7Str = formatLocal(last7);
-                        const weeklyLogs = pwmuLogs.filter(l => l.log_date >= last7Str);
+                        const weeklyLogs = pwmuLogs.filter(l => l.log_date >= startStr && l.log_date <= endStr);
 
                         const totalIntake = weeklyLogs.reduce((sum, l) => sum + (Number(l.total_intake_kg) || 0), 0);
                         setWeeklyKpis({

@@ -14,16 +14,34 @@ db.pragma('foreign_keys = ON');
 
 console.log('Initializing database at:', dbPath);
 
+// Drop all tables in any order by disabling FK checks temporarily
+db.exec('PRAGMA foreign_keys = OFF');
+
+const tables = [
+  'waste_collections',
+  'pwmu_daily_logs',
+  'village_waste_reports',
+  'pwmu_village_intake',
+  'pwmu_operational_logs',
+  'monthly_reports',
+  'village_monthly_reports',
+  'pwmu_monthly_reports',
+  'market_availability',
+  'vendor_pickups',
+  'village_workers',
+  'system_settings',
+  'pwmu_centers',
+  'users'
+];
+
+tables.forEach(table => {
+  db.exec(`DROP TABLE IF EXISTS ${table}`);
+});
+
+db.exec('PRAGMA foreign_keys = ON');
+
 // Create Tables
 db.exec(`
-  DROP TABLE IF EXISTS waste_collections;
-  DROP TABLE IF EXISTS pwmu_daily_logs;
-  DROP TABLE IF EXISTS village_waste_reports;
-  DROP TABLE IF EXISTS pwmu_village_intake;
-  DROP TABLE IF EXISTS pwmu_operational_logs;
-  DROP TABLE IF EXISTS pwmu_monthly_reports;
-  DROP TABLE IF EXISTS market_availability;
-  DROP TABLE IF EXISTS vendor_pickups;
 
   CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
@@ -224,14 +242,6 @@ const migrations = [
   { table: 'pwmu_centers', column: 'nodal_officer_id', type: 'TEXT' },
   { table: 'pwmu_centers', column: 'village', type: 'TEXT' },
   { table: 'pwmu_centers', column: 'recovery_rate', type: 'REAL DEFAULT 75' },
-  { table: 'waste_collections', column: 'pwmu_id', type: 'TEXT' },
-  { table: 'waste_collections', column: 'village', type: 'TEXT' },
-  { table: 'waste_collections', column: 'shared_with_pwmu_kg', type: 'REAL DEFAULT 0' },
-  { table: 'waste_collections', column: 'metal_waste_kg', type: 'REAL DEFAULT 0' },
-  { table: 'waste_collections', column: 'glass_waste_kg', type: 'REAL DEFAULT 0' },
-  { table: 'waste_collections', column: 'ewaste_kg', type: 'REAL DEFAULT 0' },
-  { table: 'waste_collections', column: 'other_waste_kg', type: 'REAL DEFAULT 0' },
-  { table: 'waste_collections', column: 'updated_at', type: 'TEXT DEFAULT CURRENT_TIMESTAMP' },
   { table: 'users', column: 'latitude', type: 'REAL' },
   { table: 'users', column: 'longitude', type: 'REAL' },
   { table: 'pwmu_centers', column: 'latitude', type: 'REAL' },
@@ -258,7 +268,7 @@ migrations.forEach(m => {
 const uuid = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
 // Seed data
-const passwordHash = bcrypt.hashSync('admin123', 10);
+const passwordHash = bcrypt.hashSync('pwmuUNICEF123!', 10);
 
 // Admin user
 const adminId = 'admin_user_id';
@@ -277,22 +287,14 @@ const insertUser = db.prepare(`
 `);
 insertUser.run(adminId, 'superadmin@cgpwmu.com', passwordHash, 'State Administrator', 'StateAdmin', 'approved', adminRegData);
 
-// Seed PWMUs with stable IDs
-const pwmuData = [
-  [primaryPwmuId, 'Balod Central PWMU', 'Balod', 'Gunderdehi', 'Gunderdehi', 'Gunderdehi', 50, 42.5, 38.2, 425000, 180000, 'operational', adminId],
-  ['pwmu_durg', 'Durg Central PWMU', 'Durg', 'Durg', 'Durg', 'Durg', 80, 68.3, 55.1, 680000, 310000, 'operational', null],
-  ['pwmu_bemetara', 'Bemetara PWMU', 'Bemetara', 'Bemetara', 'Bemetara', 'Bemetara', 35, 28.7, 24.5, 287000, 125000, 'operational', null],
-  ['pwmu_raipur', 'Raipur East PWMU', 'Raipur', 'Arang', 'Arang', 'Arang', 100, 85.2, 72.8, 852000, 400000, 'operational', null],
-  ['pwmu_korba', 'Korba PWMU', 'Korba', 'Korba', 'Korba', 'Korba', 45, 32.1, 28.9, 321000, 155000, 'maintenance', null],
-  ['pwmu_bilaspur', 'Bilaspur PWMU', 'Bilaspur', 'Bilaspur', 'Bilaspur', 'Bilaspur', 60, 51.8, 45.3, 518000, 240000, 'operational', null]
-];
+// Seed system settings
+db.prepare("INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)").run('auto_approve_users', 'true');
+db.prepare("INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)").run('reporting_delay_days', '10');
+db.prepare("INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)").run('machine_downtime_hours', '48');
+db.prepare("INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)").run('min_expected_yield_pct', '85');
 
-const insertPWMU = db.prepare(`
-  INSERT OR REPLACE INTO pwmu_centers (id, name, district, block, gram_panchayat, village, capacity_mt, waste_processed_mt, waste_sold_mt, revenue, expenditure, status, nodal_officer_id)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-`);
-
-for (const row of pwmuData) insertPWMU.run(...row);
+// Initialized with Super Admin only. No demo PWMUs for production launch.
+console.log('Database initialized successfully with Super Admin.');
 
 // Market availability will be populated via PWMU Daily Logs
 db.exec('DELETE FROM market_availability');

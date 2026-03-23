@@ -3,7 +3,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { 
     User, Mail, Phone, MapPin, Factory, Home, Truck, 
-    Save, Loader2, CheckCircle2, AlertCircle, Building2
+    Save, Loader2, CheckCircle2, AlertCircle, Building2,
+    Lock, Eye, EyeOff, ShieldCheck
 } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 
@@ -20,6 +21,13 @@ const ProfileSettings = () => {
     const [serviceBlock, setServiceBlock] = useState('');
     const [serviceGP, setServiceGP] = useState('');
     const [serviceVillage, setServiceVillage] = useState('');
+    
+    // Password state
+    const [passwords, setPasswords] = useState({ new: '', confirm: '' });
+    const [showPassword, setShowPassword] = useState(false);
+    const [passwordLoading, setPasswordLoading] = useState(false);
+    const [passwordSuccess, setPasswordSuccess] = useState(false);
+    const [passwordError, setPasswordError] = useState('');
 
     const [formData, setFormData] = useState({
         full_name: '',
@@ -253,10 +261,51 @@ const ProfileSettings = () => {
                 const errData = await response.json();
                 throw new Error(errData.error || "Update failed");
             }
-        } catch (err) {
-            setError(err.message);
         } finally {
             setLoading(false);
+        }
+    };
+    
+    const handlePasswordUpdate = async (e) => {
+        e.preventDefault();
+        setPasswordError('');
+        setPasswordSuccess(false);
+        
+        if (passwords.new.length < 8) {
+            setPasswordError('Password must be at least 8 characters long');
+            return;
+        }
+        if (passwords.new !== passwords.confirm) {
+            setPasswordError('Passwords do not match');
+            return;
+        }
+        
+        setPasswordLoading(true);
+        try {
+            const session = JSON.parse(localStorage.getItem('cgpwmu_session') || '{}');
+            const token = session.access_token;
+            
+            const response = await fetch('/cgpwmu/api/auth/change-password', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ newPassword: passwords.new })
+            });
+            
+            if (response.ok) {
+                setPasswordSuccess(true);
+                setPasswords({ new: '', confirm: '' });
+                setTimeout(() => setPasswordSuccess(false), 5000);
+            } else {
+                const errData = await response.json();
+                throw new Error(errData.error || "Update failed");
+            }
+        } catch (err) {
+            setPasswordError(err.message);
+        } finally {
+            setPasswordLoading(false);
         }
     };
 
@@ -564,6 +613,68 @@ const ProfileSettings = () => {
                             </div>
                         </section>
                     )}
+
+                    {/* Security & Password Section */}
+                    <section className="space-y-4 pt-8 border-t border-gray-100">
+                        <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2 border-b pb-2">
+                            <Lock className="w-5 h-5 text-blue-600" /> Security & Password
+                        </h3>
+                        <p className="text-sm text-gray-500">Update your account password. Use a strong password with at least 8 characters.</p>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="relative">
+                                <label className="block text-sm font-medium text-gray-500 mb-1">New Password</label>
+                                <div className="relative">
+                                    <input 
+                                        type={showPassword ? "text" : "password"} 
+                                        value={passwords.new} 
+                                        onChange={(e) => setPasswords(prev => ({ ...prev, new: e.target.value }))}
+                                        placeholder="Minimum 8 characters"
+                                        className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 outline-none"
+                                    />
+                                    <button 
+                                        type="button" onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                    >
+                                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                    </button>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-500 mb-1">Confirm New Password</label>
+                                <input 
+                                    type={showPassword ? "text" : "password"} 
+                                    value={passwords.confirm} 
+                                    onChange={(e) => setPasswords(prev => ({ ...prev, confirm: e.target.value }))}
+                                    placeholder="Repeat new password"
+                                    className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 outline-none"
+                                />
+                            </div>
+                        </div>
+
+                        {passwordSuccess && (
+                            <div className="p-3 bg-green-50 border border-green-100 rounded-lg flex items-center gap-2 text-green-700 text-sm font-medium animate-fade-in">
+                                <ShieldCheck className="w-4 h-4" /> Password updated successfully!
+                            </div>
+                        )}
+                        
+                        {passwordError && (
+                            <div className="p-3 bg-red-50 border border-red-100 rounded-lg flex items-center gap-2 text-red-700 text-sm font-medium animate-fade-in">
+                                <AlertCircle className="w-4 h-4" /> {passwordError}
+                            </div>
+                        )}
+
+                        <div className="flex justify-start">
+                            <button
+                                type="button" 
+                                onClick={handlePasswordUpdate}
+                                disabled={passwordLoading || !passwords.new || !passwords.confirm}
+                                className="flex items-center gap-2 text-blue-600 font-bold text-sm bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-lg transition-all disabled:opacity-50"
+                            >
+                                {passwordLoading ? <Loader2 className="animate-spin w-4 h-4" /> : "Update Password"}
+                            </button>
+                        </div>
+                    </section>
 
                     {/* Messages */}
                     {success && (

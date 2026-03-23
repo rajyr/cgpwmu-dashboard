@@ -214,6 +214,7 @@ const Dashboard = () => {
         wasteSold: 0,
         villagesLinked: 0,
         swachhagrahis: 0,
+        avgEfficiency: 0,
         totalRevenue: 0,
         totalExpense: 0,
         activities: [],
@@ -384,6 +385,10 @@ const Dashboard = () => {
 
         const villagesLinked = filteredUsers.filter(u => u.role === 'Sarpanch').length;
         const swachhagrahis = filteredUsers.filter(u => u.role?.toLowerCase() === 'swachhagrahi').length || (villagesLinked * 4);
+        
+        const totalEfficiency = filteredPwmu.reduce((acc, curr) => acc + (parseFloat(curr.recovery_rate) || 0), 0);
+        const avgEfficiency = filteredPwmu.length > 0 ? Math.round(totalEfficiency / filteredPwmu.length) : 0;
+
         const totalRevenue = filteredPickups.reduce((acc, curr) => acc + (parseFloat(curr.amount_paid) || 0), 0);
         const totalExpense = (wasteProcessedKg / 1000) * 2500;
 
@@ -422,12 +427,12 @@ const Dashboard = () => {
             { name: t('ewaste', dashTranslations), value: Math.round((ewaste / totalVolComp) * 100), color: '#6366f1' },
             { name: t('other', dashTranslations), value: Math.round((Math.max(0, other) / totalVolComp) * 100), color: '#64748b' },
         ] : [
-            { name: t('organicWaste', dashTranslations), value: 30, color: '#22c55e' },
-            { name: t('plastic', dashTranslations), value: 25, color: '#3b82f6' },
-            { name: t('metal', dashTranslations), value: 15, color: '#a855f7' },
-            { name: t('glass', dashTranslations), value: 10, color: '#0ea5e9' },
-            { name: t('ewaste', dashTranslations), value: 10, color: '#6366f1' },
-            { name: t('other', dashTranslations), value: 10, color: '#64748b' },
+            { name: t('organicWaste', dashTranslations), value: 0, color: '#22c55e' },
+            { name: t('plastic', dashTranslations), value: 0, color: '#3b82f6' },
+            { name: t('metal', dashTranslations), value: 0, color: '#a855f7' },
+            { name: t('glass', dashTranslations), value: 0, color: '#0ea5e9' },
+            { name: t('ewaste', dashTranslations), value: 0, color: '#6366f1' },
+            { name: t('other', dashTranslations), value: 0, color: '#64748b' },
         ];
 
         // Recent Activities
@@ -460,6 +465,7 @@ const Dashboard = () => {
             wasteSold: wasteSoldKg / 1000,
             villagesLinked,
             swachhagrahis,
+            avgEfficiency,
             totalRevenue,
             totalExpense,
             activities,
@@ -486,8 +492,8 @@ const Dashboard = () => {
                     financial: `-` + formatFinance(totalExpense).replace(t('revenue', dashTranslations) + ': ', ''),
                     hoverText: "Processing and transport operations.",
                     details: [
-                        { label: 'Processing Loss', value: formatVolume(wasteProcessedKg * 0.08) },
-                        { label: 'Recovered', value: formatVolume(wasteProcessedKg * 0.92) }
+                        { label: 'Processing Loss', value: formatVolume(wasteProcessedKg * (1 - avgEfficiency / 100)) },
+                        { label: 'Recovered', value: formatVolume(wasteProcessedKg * (avgEfficiency / 100)) }
                     ]
                 },
                 sinks: [
@@ -514,7 +520,7 @@ const Dashboard = () => {
         { isFinance: true },
         { label: t('villagesLinked', dashTranslations), value: stats.villagesLinked.toLocaleString(), unit: t('villages', dashTranslations), sub: t('networkCoverage', dashTranslations), icon: Home, color: "text-blue-600", bg: "bg-blue-50" },
         { label: t('swachhagrahis', dashTranslations), value: stats.swachhagrahis.toLocaleString(), unit: t('workers', dashTranslations), sub: t('fieldForce', dashTranslations), icon: Users, color: "text-purple-600", bg: "bg-purple-50" },
-        { label: t('avgEfficiency', dashTranslations), value: "92%", unit: "", sub: t('statewideAvg', dashTranslations), icon: Settings, color: "text-orange-600", bg: "bg-orange-50" }
+        { label: t('avgEfficiency', dashTranslations), value: `${stats.avgEfficiency}%`, unit: "", sub: t('statewideAvg', dashTranslations), icon: Settings, color: "text-orange-600", bg: "bg-orange-50" }
     ];
 
     const actions = [

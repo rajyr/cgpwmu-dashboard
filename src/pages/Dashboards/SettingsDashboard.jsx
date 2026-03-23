@@ -38,9 +38,13 @@ const SettingsDashboard = () => {
     const [editingUser, setEditingUser] = useState(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [userToDelete, setUserToDelete] = useState(null);
+    const [showPasswordModal, setShowPasswordModal] = useState(false);
+    const [passwordUser, setPasswordUser] = useState(null);
     const [activeActionsMenu, setActiveActionsMenu] = useState(null);
-    const [autoApprove, setAutoApprove] = useState(true); // Default to true as requested
+    const [autoApprove, setAutoApprove] = useState(true); 
     const [settingsLoading, setSettingsLoading] = useState(false);
+    const [backupLoading, setBackupLoading] = useState(false);
+    const [backupStatus, setBackupStatus] = useState({ type: '', message: '' });
 
     const roleLabelMap = {
         'StateAdmin': 'State Admin', 'DistrictNodal': 'District Nodal',
@@ -133,6 +137,33 @@ const SettingsDashboard = () => {
             console.warn('Failed to save auto-approve setting:', err);
         } finally {
             setSettingsLoading(false);
+        }
+    };
+    
+    const handleTriggerBackup = async () => {
+        setBackupLoading(true);
+        setBackupStatus({ type: '', message: '' });
+        try {
+            const session = JSON.parse(localStorage.getItem('cgpwmu_session') || '{}');
+            const res = await fetch(`${API_BASE}/admin/trigger-backup`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${session.access_token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setBackupStatus({ type: 'success', message: data.message });
+            } else {
+                setBackupStatus({ type: 'error', message: data.error || 'Backup failed' });
+            }
+        } catch (err) {
+            setBackupStatus({ type: 'error', message: 'Network error triggering backup' });
+        } finally {
+            setBackupLoading(false);
+            // Clear message after 5 seconds
+            setTimeout(() => setBackupStatus({ type: '', message: '' }), 5000);
         }
     };
 
@@ -409,6 +440,84 @@ const SettingsDashboard = () => {
             </div>
         </div>
     );
+    
+    // Password Reset Modal
+    const PasswordResetModal = () => {
+        const [newPassword, setNewPassword] = useState('');
+        const [resetting, setResetting] = useState(false);
+        const [error, setError] = useState('');
+        const [success, setSuccess] = useState(false);
+
+        const handleReset = async () => {
+            if (newPassword.length < 8) {
+                setError('Password must be at least 8 characters');
+                return;
+            }
+            setResetting(true);
+            setError('');
+            try {
+                const session = JSON.parse(localStorage.getItem('cgpwmu_session') || '{}');
+                const res = await fetch(`${API_BASE}/admin/reset-password`, {
+                    method: 'POST',
+                    headers: {
+                        'apikey': ANON_KEY,
+                        'Authorization': `Bearer ${session.access_token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ userId: passwordUser.id, newPassword })
+                });
+                if (res.ok) {
+                    setSuccess(true);
+                    setTimeout(() => {
+                        setShowPasswordModal(false);
+                        setPasswordUser(null);
+                    }, 1500);
+                } else {
+                    const data = await res.json();
+                    setError(data.error || 'Failed to reset password');
+                }
+            } catch (err) {
+                setError('Network error');
+            } finally {
+                setResetting(false);
+            }
+        };
+
+        return (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={() => setShowPasswordModal(false)}>
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 relative animate-fade-in-up" onClick={e => e.stopPropagation()}>
+                    <button onClick={() => setShowPasswordModal(false)} className="absolute top-4 right-4 p-1 hover:bg-gray-100 rounded-full"><X className="w-5 h-5 text-gray-400" /></button>
+                    <h3 className="text-lg font-bold text-gray-800 mb-2 flex items-center gap-2"><Key className="w-5 h-5 text-orange-500" /> Reset Password</h3>
+                    <p className="text-xs text-gray-500 mb-4">Set a new password for <b>{passwordUser?.name}</b></p>
+                    
+                    {success ? (
+                        <div className="text-center py-4 bg-green-50 rounded-xl mb-4">
+                            <CheckCircle2 className="w-8 h-8 text-green-500 mx-auto mb-2" />
+                            <p className="text-sm font-bold text-green-700">Password Reset Successful!</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            <input
+                                type="password"
+                                value={newPassword}
+                                onChange={e => setNewPassword(e.target.value)}
+                                placeholder="Enter new password (min 8 chars)"
+                                className="w-full p-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                                autoFocus
+                            />
+                            {error && <p className="text-xs text-red-600 bg-red-50 p-2 rounded">{error}</p>}
+                            <div className="flex gap-3">
+                                <button onClick={() => setShowPasswordModal(false)} className="flex-1 py-2 text-sm font-bold text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
+                                <button onClick={handleReset} disabled={resetting} className="flex-1 py-2 bg-orange-600 text-white rounded-lg text-sm font-bold hover:bg-orange-700 disabled:bg-gray-400 flex items-center justify-center gap-2">
+                                    {resetting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Set Password'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    };
 
     const renderContent = () => {
         switch (activeTab) {
@@ -454,7 +563,7 @@ const SettingsDashboard = () => {
                                         <h3 className="text-sm font-bold text-amber-700 uppercase tracking-wider mb-3 flex items-center gap-2">
                                             <span className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></span> Pending Approval ({pendingUsers.length})
                                         </h3>
-                                        <div className="border-2 border-amber-200 rounded-xl overflow-hidden bg-amber-50/30">
+                                        <div className="border-2 border-amber-200 rounded-xl bg-amber-50/30">
                                             <table className="w-full text-left border-collapse">
                                                 <tbody className="divide-y divide-amber-100">
                                                     {pendingUsers.map(user => (
@@ -497,7 +606,7 @@ const SettingsDashboard = () => {
                                 )}
 
                                 {/* All Users */}
-                                <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
+                                <div className="border border-gray-200 rounded-xl bg-white">
                                     <table className="w-full text-left border-collapse">
                                         <thead className="bg-gray-50/80 border-b border-gray-200">
                                             <tr>
@@ -540,15 +649,16 @@ const SettingsDashboard = () => {
                                                                     e.stopPropagation();
                                                                     setActiveActionsMenu(activeActionsMenu === user.id ? null : user.id);
                                                                 }}
-                                                                className={`p-1 hover:bg-gray-100 rounded text-gray-400 transition-colors ${activeActionsMenu === user.id ? 'bg-gray-100 text-gray-700' : ''}`}
+                                                                className={`p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-all ${activeActionsMenu === user.id ? 'bg-blue-50 text-blue-600' : ''}`}
+                                                                title="Actions"
                                                             >
-                                                                <MoreVertical className="w-4 h-4" />
+                                                                <MoreVertical className="w-5 h-5" />
                                                             </button>
 
                                                             {activeActionsMenu === user.id && (
                                                                 <>
-                                                                    <div className="fixed inset-0 z-10" onClick={() => setActiveActionsMenu(null)}></div>
-                                                                    <div className="absolute right-0 mt-2 w-36 bg-white border border-gray-100 rounded-xl shadow-xl z-20 py-1 overflow-hidden animate-fade-in">
+                                                                    <div className="fixed inset-0 z-[80]" onClick={() => setActiveActionsMenu(null)}></div>
+                                                                    <div className="absolute right-0 mt-2 w-44 bg-white border border-gray-100 rounded-xl shadow-2xl z-[90] py-1.5 overflow-hidden animate-fade-in">
                                                                         <button
                                                                             onClick={() => {
                                                                                 setEditingUser(user);
@@ -557,8 +667,19 @@ const SettingsDashboard = () => {
                                                                             }}
                                                                             className="w-full text-left px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2"
                                                                         >
-                                                                            <Settings className="w-3 h-3" /> Edit Profile
+                                                                            <Settings className="w-3.5 h-3.5 text-blue-500" /> Edit User Profile
                                                                         </button>
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                setPasswordUser(user);
+                                                                                setShowPasswordModal(true);
+                                                                                setActiveActionsMenu(null);
+                                                                            }}
+                                                                            className="w-full text-left px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-orange-50 hover:text-orange-700 flex items-center gap-2"
+                                                                        >
+                                                                            <Key className="w-3.5 h-3.5 text-orange-500" /> Reset Password
+                                                                        </button>
+                                                                        <div className="h-px bg-gray-50 my-1"></div>
                                                                         <button
                                                                             onClick={() => {
                                                                                 setUserToDelete(user.id);
@@ -567,7 +688,7 @@ const SettingsDashboard = () => {
                                                                             }}
                                                                             className="w-full text-left px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 flex items-center gap-2"
                                                                         >
-                                                                            <XCircle className="w-3 h-3" /> Delete User
+                                                                            <XCircle className="w-3.5 h-3.5" /> Delete User
                                                                         </button>
                                                                     </div>
                                                                 </>
@@ -588,6 +709,7 @@ const SettingsDashboard = () => {
                         {showAddModal && <AddUserModal />}
                         {showEditModal && <EditUserModal />}
                         {showDeleteConfirm && <DeleteConfirmModal />}
+                        {showPasswordModal && <PasswordResetModal />}
                     </div>
                 );
 
@@ -807,9 +929,25 @@ const SettingsDashboard = () => {
                                         <p className="text-xs text-gray-500">Last backup: Yesterday at 11:45 PM</p>
                                     </div>
                                 </div>
-                                <button className="text-xs font-bold text-blue-600 px-3 py-1.5 border border-blue-200 rounded-lg hover:bg-blue-50">
-                                    Trigger Backup
-                                </button>
+                                <div className="flex flex-col items-end gap-2">
+                                    <button 
+                                        onClick={handleTriggerBackup}
+                                        disabled={backupLoading}
+                                        className={`flex items-center gap-2 text-xs font-bold px-4 py-2 border rounded-lg transition-all ${
+                                            backupLoading 
+                                                ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed'
+                                                : 'text-blue-600 border-blue-200 hover:bg-blue-50'
+                                        }`}
+                                    >
+                                        {backupLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                                        {backupLoading ? 'Backing Up...' : 'Trigger Backup'}
+                                    </button>
+                                    {backupStatus.message && (
+                                        <p className={`text-[10px] font-bold ${backupStatus.type === 'success' ? 'text-green-600' : 'text-red-500'}`}>
+                                            {backupStatus.message}
+                                        </p>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
