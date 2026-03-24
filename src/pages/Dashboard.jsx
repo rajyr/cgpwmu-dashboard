@@ -198,9 +198,9 @@ const Dashboard = () => {
     };
 
     // Helper: Scale units for small currency
-    const formatFinance = (val) => {
-        if (!val) return t('revenue', dashTranslations) + ': ₹0';
-        if (val < 10000) return `₹${Math.round(val).toLocaleString()}`;
+    const formatFinanceValue = (val) => {
+        if (!val) return '₹0';
+        if (Math.abs(val) < 10000) return `₹${Math.round(val).toLocaleString()}`;
         return `₹${(val / 100000).toFixed(1)}L`;
     };
 
@@ -340,6 +340,18 @@ const Dashboard = () => {
         fetchData();
     }, []);
 
+    // 1.5. Default Filter for PWMUManager
+    useEffect(() => {
+        if (userRole === 'PWMUManager' && !filters.pwmu) {
+            const session = JSON.parse(localStorage.getItem('cgpwmu_session') || '{}');
+            const myPwmuId = session.user?.id;
+            if (myPwmuId) {
+                console.log('[DASH] Auto-setting filter for PWMUManager:', myPwmuId);
+                setFilters(prev => ({ ...prev, pwmu: myPwmuId }));
+            }
+        }
+    }, [userRole, rawData.pwmu]);
+
     // 2. Computed Stats based on Filters
     useEffect(() => {
         if (!rawData.pwmu.length && !rawData.collections.length) return;
@@ -382,9 +394,10 @@ const Dashboard = () => {
         const wasteProcessedKg = filteredLogs.reduce((acc, curr) => acc + (parseFloat(curr.processed_kg || curr.total_intake_kg) || 0), 0);
         const wasteSoldKg = filteredPickups.reduce((acc, curr) => acc + (parseFloat(curr.quantity_kg) || 0), 0);
         const totalWetKg = filteredCollections.reduce((acc, curr) => acc + (parseFloat(curr.wet_waste_kg) || 0), 0);
+        const intakeVillages = new Set(filteredCollections.map(c => c.village_name)).size;
 
-        const villagesLinked = filteredUsers.filter(u => u.role === 'Sarpanch').length;
-        const swachhagrahis = filteredUsers.filter(u => u.role?.toLowerCase() === 'swachhagrahi').length || (villagesLinked * 4);
+        const villagesLinked = intakeVillages > 0 ? intakeVillages : filteredUsers.filter(u => u.role === 'Sarpanch').length;
+        const swachhagrahis = filteredUsers.filter(u => u.role?.toLowerCase() === 'swachhagrahi').length || (villagesLinked > 0 ? villagesLinked * 4 : 0);
         
         const totalEfficiency = filteredPwmu.reduce((acc, curr) => acc + (parseFloat(curr.recovery_rate) || 0), 0);
         const avgEfficiency = filteredPwmu.length > 0 ? Math.round(totalEfficiency / filteredPwmu.length) : 0;
@@ -480,7 +493,7 @@ const Dashboard = () => {
             valueChain: {
                 villages: {
                     volume: formatVolume(villageSentVolumeKg),
-                    financial: `-` + formatFinance(villageSentVolumeKg * 1.2).replace(t('revenue', dashTranslations) + ': ', ''),
+                    financial: `-` + formatFinanceValue(villageSentVolumeKg * 1.2),
                     hoverText: `Material reported by ${villagesLinked} active villages.`,
                     details: [
                         { label: 'Dry Waste', value: formatVolume(villageSentVolumeKg * 0.7) },
@@ -489,18 +502,18 @@ const Dashboard = () => {
                 },
                 pwmuCenter: {
                     volume: formatVolume(wasteProcessedKg),
-                    financial: `-` + formatFinance(totalExpense).replace(t('revenue', dashTranslations) + ': ', ''),
+                    financial: `-` + formatFinanceValue(totalExpense),
                     hoverText: "Processing and transport operations.",
                     details: [
                         { label: 'Processing Loss', value: formatVolume(wasteProcessedKg * (1 - avgEfficiency / 100)) },
                         { label: 'Recovered', value: formatVolume(wasteProcessedKg * (avgEfficiency / 100)) }
                     ]
                 },
-                sinks: [
-                    { id: 'recyclers', name: 'Recyclers', volume: formatVolume(wasteProcessedKg * 0.45), financial: `+` + formatFinance(totalRevenue > 0 ? totalRevenue * 0.65 : wasteProcessedKg * 2.5).replace(t('revenue', dashTranslations) + ': ', ''), color: 'green' },
-                    { id: 'cementKiln', name: 'Cement Kiln', volume: formatVolume(wasteProcessedKg * 0.25), financial: `+` + formatFinance(totalRevenue > 0 ? totalRevenue * 0.15 : wasteProcessedKg * 1.5).replace(t('revenue', dashTranslations) + ': ', ''), color: 'red' },
-                    { id: 'roadConst', name: 'Road Const.', volume: formatVolume(wasteProcessedKg * 0.20), financial: `+` + formatFinance(totalRevenue > 0 ? totalRevenue * 0.20 : wasteProcessedKg * 1.0).replace(t('revenue', dashTranslations) + ': ', ''), color: 'yellow' }
-                ]
+                    sinks: [
+                        { id: 'recyclers', name: 'Recyclers', volume: formatVolume(wasteProcessedKg * 0.45), financial: `+` + formatFinanceValue(totalRevenue > 0 ? totalRevenue * 0.65 : wasteProcessedKg * 2.5), color: 'green' },
+                        { id: 'cementKiln', name: 'Cement Kiln', volume: formatVolume(wasteProcessedKg * 0.25), financial: `+` + formatFinanceValue(totalRevenue > 0 ? totalRevenue * 0.15 : wasteProcessedKg * 1.5), color: 'red' },
+                        { id: 'roadConst', name: 'Road Const.', volume: formatVolume(wasteProcessedKg * 0.20), financial: `+` + formatFinanceValue(totalRevenue > 0 ? totalRevenue * 0.20 : wasteProcessedKg * 1.0), color: 'yellow' }
+                    ]
             }
         }));
     }, [filters, rawData]);
@@ -631,15 +644,15 @@ const Dashboard = () => {
                                     </div>
                                     <div className="flex flex-col justify-end flex-1">
                                         <div className="flex justify-between items-end mb-1">
-                                            <div className="text-[10px] text-gray-500 font-semibold flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-teal-500"></div> {t('revenue', dashTranslations)}: ₹{(stats.totalRevenue / 100000).toFixed(1)}L</div>
-                                            <div className="text-[10px] text-gray-500 font-semibold flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-red-400"></div> {t('expense', dashTranslations)}: ₹{(stats.totalExpense / 100000).toFixed(1)}L</div>
+                                            <div className="text-[10px] text-gray-500 font-semibold flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-teal-500"></div> {t('revenue', dashTranslations)}: {formatFinanceValue(stats.totalRevenue)}</div>
+                                            <div className="text-[10px] text-gray-500 font-semibold flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-red-400"></div> {t('expense', dashTranslations)}: {formatFinanceValue(stats.totalExpense)}</div>
                                         </div>
                                         <div className="w-full flex h-2 rounded-full overflow-hidden mb-1.5">
                                             <div className="bg-teal-500 transition-all duration-1000" style={{ width: `${(stats.totalRevenue / (stats.totalRevenue + stats.totalExpense || 1)) * 100}%` }} title="Revenue"></div>
                                             <div className="bg-red-400 transition-all duration-1000" style={{ width: `${(stats.totalExpense / (stats.totalRevenue + stats.totalExpense || 1)) * 100}%` }} title="Expenses"></div>
                                         </div>
                                         <div className="flex justify-between items-baseline box-border">
-                                            <span className="text-xl font-bold text-gray-800">₹{((stats.totalRevenue - stats.totalExpense) / 100000).toFixed(1)}L</span>
+                                            <span className="text-xl font-bold text-gray-800">{formatFinanceValue(stats.totalRevenue - stats.totalExpense)}</span>
                                             <span className="text-[10px] text-green-600 font-bold bg-green-50 px-1.5 rounded">{t('netFlow', dashTranslations)}</span>
                                         </div>
                                     </div>

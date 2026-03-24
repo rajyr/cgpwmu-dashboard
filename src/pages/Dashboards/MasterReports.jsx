@@ -28,7 +28,8 @@ function MasterReports() {
         pwmus: [],
         intake: [],
         sales: [],
-        monthly: []
+        monthly: [],
+        villageLinks: []
     });
 
     const [filters, setFilters] = useState({
@@ -65,12 +66,13 @@ function MasterReports() {
                     }
                 };
 
-                const [pwmus, users, intake, sales, monthly] = await Promise.all([
+                const [pwmus, users, intake, sales, monthly, vLinks] = await Promise.all([
                     safeFetch(supabase.from('pwmu_centers').select('*')),
                     safeFetch(supabase.from('users').select('*').eq('role', 'Sarpanch')),
                     safeFetch(supabase.from('pwmu_operational_logs').select('*')),
                     safeFetch(supabase.from('vendor_pickups').select('*')),
-                    safeFetch(supabase.from('monthly_reports').select('*'))
+                    safeFetch(supabase.from('monthly_reports').select('*')),
+                    safeFetch(supabase.from('pwmu_village_intake').select('pwmu_id, village_name'))
                 ]);
 
                 console.log('[MasterReports] Fetched raw data:', { 
@@ -96,7 +98,8 @@ function MasterReports() {
                     }),
                     intake: intake,
                     sales: sales,
-                    monthly: monthly
+                    monthly: monthly,
+                    villageLinks: vLinks
                 });
 
                 // Load location data
@@ -116,8 +119,10 @@ function MasterReports() {
     // --- Filtering Logic ---
     const filteredData = useMemo(() => {
         let results = data.pwmus.map(pwmu => {
-            // 1. Linked Villages
-            const linkedVillages = data.villages.filter(v => v.reg?.pwmuId === pwmu.id);
+            // 1. Linked Villages (Count unique village_names from intake for this PWMU)
+            const matchedLinks = data.villageLinks.filter(vl => vl.pwmu_id === pwmu.id);
+            const uniqueVillages = new Set(matchedLinks.map(vl => vl.village_name));
+            const linkedCount = uniqueVillages.size > 0 ? uniqueVillages.size : data.villages.filter(v => v.reg?.pwmuId === pwmu.id).length;
             
             // 2. Intake in date range
             const pwmuIntake = data.intake.filter(i => 
@@ -169,7 +174,7 @@ function MasterReports() {
 
             return {
                 ...pwmu,
-                linkedCount: linkedVillages.length,
+                linkedCount: linkedCount,
                 openingStock,
                 totalReceived: totalRec,
                 totalSold: totalSold,

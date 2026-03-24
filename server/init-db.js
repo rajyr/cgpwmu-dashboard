@@ -147,9 +147,11 @@ db.exec(`
     sales_records TEXT, -- JSON string
     collection_data TEXT, -- JSON string
     closing_stock TEXT, -- JSON string
+    opening_stock TEXT, -- JSON string
     process_loss_kg REAL DEFAULT 0,
     submitted_by TEXT REFERENCES users(id) ON DELETE SET NULL,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(pwmu_id, report_month, report_year)
   );
 
@@ -171,6 +173,7 @@ db.exec(`
     total_expenses REAL DEFAULT 0,
     net_balance REAL DEFAULT 0,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(village_id, report_month, report_year)
   );
 
@@ -249,7 +252,10 @@ const migrations = [
   { table: 'pwmu_operational_logs', column: 'processed_stock_breakdown', type: 'TEXT' },
   { table: 'monthly_reports', column: 'collection_data', type: 'TEXT' },
   { table: 'monthly_reports', column: 'closing_stock', type: 'TEXT' },
-  { table: 'monthly_reports', column: 'process_loss_kg', type: 'REAL DEFAULT 0' }
+  { table: 'monthly_reports', column: 'opening_stock', type: 'TEXT' },
+  { table: 'monthly_reports', column: 'updated_at', type: 'TEXT' },
+  { table: 'monthly_reports', column: 'process_loss_kg', type: 'REAL DEFAULT 0' },
+  { table: 'village_monthly_reports', column: 'updated_at', type: 'TEXT' }
 ];
 
 migrations.forEach(m => {

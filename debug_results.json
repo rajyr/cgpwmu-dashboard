@@ -1,0 +1,23 @@
+{
+  "centers": [
+    {
+      "id": "pwmu_raj_balod_pwmu_dncf",
+      "name": "Raj balod PWMU"
+    }
+  ],
+  "roles": [
+    {
+      "role": "PWMUManager",
+      "count": 1
+    },
+    {
+      "role": "StateAdmin",
+      "count": 1
+    },
+    {
+      "role": "Vendor",
+      "count": 1
+    }
+  ],
+  "villageUsers": []
+}

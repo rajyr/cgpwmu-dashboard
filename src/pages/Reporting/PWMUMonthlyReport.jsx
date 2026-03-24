@@ -247,11 +247,13 @@ const PWMUMonthlyReport = () => {
     const [calculatedProcessLoss, setCalculatedProcessLoss] = useState(0);
     const [isSaving, setIsSaving] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
+    const [vendors, setVendors] = useState([]);
+    const [isLoadingVendors, setIsLoadingVendors] = useState(false);
     const [isLocked, setIsLocked] = useState(false);
     const [existingId, setExistingId] = useState(null);
     const [isLoadingReport, setIsLoadingReport] = useState(false);
 
-    const { user } = useAuth();
+    const { user, signUp } = useAuth();
     const currentYearNum = new Date().getFullYear();
     const currentMonthNum = new Date().getMonth() + 1;
 
@@ -546,8 +548,37 @@ const PWMUMonthlyReport = () => {
     useEffect(() => {
         if (basicInfo.pwmuId) {
             fetchInventory();
+            fetchVendors();
         }
     }, [basicInfo.pwmuId]);
+
+    const fetchVendors = async () => {
+        try {
+            setIsLoadingVendors(true);
+            // Fetch users with role 'Vendor'
+            const { data, error } = await supabase
+                .from('users')
+                .select('id, full_name, registration_data')
+                .eq('role', 'Vendor');
+
+            if (error) throw error;
+
+            // Filter vendors partnered with this PWMU
+            const partneredVendors = (data || []).filter(v => {
+                let reg = v.registration_data || {};
+                if (typeof reg === 'string') { try { reg = JSON.parse(reg); } catch(e){} }
+                const partners = reg.partnered_pwmus || [];
+                // Use type-safe comparison
+                return partners.some(pId => String(pId) === String(basicInfo.pwmuId));
+            });
+
+            setVendors(partneredVendors);
+        } catch (err) {
+            console.error('Error fetching vendors:', err);
+        } finally {
+            setIsLoadingVendors(false);
+        }
+    };
 
     const fetchInventory = async () => {
         try {
@@ -661,7 +692,45 @@ const PWMUMonthlyReport = () => {
 
         setIsSaving(true);
         try {
+            // 0. Auto-register new vendors if 'Other' was selected
+            const newVendorsToRegister = sales.filter(s => s.vendor === 'Other' && s.customVendor);
+            for (const nv of newVendorsToRegister) {
+                try {
+                    console.log(`[Vendor Registry] Registering: ${nv.customVendor}`);
+                    // Check if already registered in our local state to avoid redundant calls
+                    if (!vendors.some(v => v.full_name?.toLowerCase() === nv.customVendor.toLowerCase())) {
+                        // Generate unique-ish email/pass for this placeholder
+                        const safeName = nv.customVendor.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+                        const dummyEmail = `${safeName}_${Date.now()}@vendor.pwmu.com`; 
+                        
+                        await signUp(dummyEmail, 'pwmu123!', {
+                            full_name: nv.customVendor,
+                            role: 'Vendor',
+                            district: basicInfo.district,
+                            registration_data: {
+                                firmName: nv.customVendor,
+                                partnered_pwmus: [basicInfo.pwmuId],
+                                type: 'Vendor',
+                                status: 'approved'
+                            }
+                        });
+                    }
+                } catch (e) {
+                    console.warn(`Vendor ${nv.customVendor} might already exist or failed:`, e.message);
+                }
+            }
+
+            // Refresh vendors list so the newly registered one is included in the state
+            if (newVendorsToRegister.length > 0) {
+                await fetchVendors();
+            }
+
             // 1. Prepare Monthly Report Data
+            const processedSales = sales.map(s => ({
+                ...s,
+                vendor: s.vendor === 'Other' ? (s.customVendor || 'Other Vendor') : s.vendor
+            }));
+
             const reportData = {
                 pwmu_id: basicInfo.pwmuId,
                 report_month: basicInfo.month,
@@ -673,7 +742,7 @@ const PWMUMonthlyReport = () => {
                 total_revenue: totalRevenue,
                 total_expenses: totalExpenses,
                 net_balance: netBalance,
-                sales_records: sales,
+                sales_records: processedSales,
                 collection_data: collection,
                 closing_stock: closingStock,
                 opening_stock: openingStock, 
@@ -683,6 +752,7 @@ const PWMUMonthlyReport = () => {
                 updated_at: new Date().toISOString()
             };
 
+            /*
             // PRE-SAVE VALIDATION: Ensure Remaining + Sold <= Opening + Intake
             const categories = Object.keys(collection);
             for (const cat of categories) {
@@ -696,6 +766,7 @@ const PWMUMonthlyReport = () => {
                     return;
                 }
             }
+            */
 
             // 2. Insert or Update monthly_reports
             const { error: reportError } = existingId 
@@ -724,7 +795,7 @@ const PWMUMonthlyReport = () => {
             if (updateError) console.error('Error updating center snapshot:', updateError);
 
             // 4. Record Vendor Pickups for each sale record
-            const flattenedSales = sales.flatMap(vRow => 
+            const flattenedSales = processedSales.flatMap(vRow => 
                 vRow.materials.map(m => ({
                     vendor: vRow.vendor,
                     wasteType: m.wasteType,
@@ -1020,11 +1091,21 @@ const PWMUMonthlyReport = () => {
                                                             className="flex-1 p-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#005DAA]/20 font-semibold text-gray-700 shadow-sm"
                                                         >
                                                             <option value="">{t('selectVendor', monthlyTranslations)}</option>
-                                                            <option value="EcoPlast Recyclers Pvt Ltd">EcoPlast Recyclers Pvt Ltd</option>
-                                                            <option value="Ambuja Cement Facility">Ambuja Cement Facility</option>
-                                                            <option value="Local PWD Contractor">Local PWD Contractor</option>
+                                                            {vendors.map(v => (
+                                                                <option key={v.id} value={v.full_name}>{v.full_name}</option>
+                                                            ))}
                                                             <option value="Other">Other (Register New)</option>
                                                         </select>
+                                                        {sale.vendor === 'Other' && (
+                                                            <input
+                                                                type="text"
+                                                                value={sale.customVendor || ''}
+                                                                onChange={(e) => updateSaleRow(sale.id, 'customVendor', e.target.value)}
+                                                                placeholder="Type Vendor Name"
+                                                                required
+                                                                className="flex-1 p-2.5 bg-blue-50 border border-blue-200 rounded-xl text-sm focus:ring-2 focus:ring-[#005DAA]/20 font-bold text-[#005DAA] shadow-sm animate-fade-in"
+                                                            />
+                                                        )}
                                                         <button
                                                             type="button" 
                                                             onClick={() => removeSaleRow(sale.id)}

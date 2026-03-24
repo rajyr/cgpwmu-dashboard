@@ -1,0 +1,191 @@
+{
+  "pickups": [
+    {
+      "id": "mb9qqepsky",
+      "vendor_id": null,
+      "vendor_name": "Other",
+      "pwmu_name": "Raj balod PWMU",
+      "material": "SHREDDING",
+      "quantity_kg": 2,
+      "amount_paid": 22,
+      "pickup_date": "2026-03-01",
+      "created_at": "2026-03-23 17:46:21"
+    },
+    {
+      "id": "4s69o8c9x5j",
+      "vendor_id": null,
+      "vendor_name": "Ambuja Cement Facility",
+      "pwmu_name": "Raj balod PWMU",
+      "material": "BAILING",
+      "quantity_kg": 22,
+      "amount_paid": 222,
+      "pickup_date": "2026-03-01",
+      "created_at": "2026-03-23 17:46:21"
+    },
+    {
+      "id": "65dgpfvjeus",
+      "vendor_id": null,
+      "vendor_name": "rrr",
+      "pwmu_name": "Raj balod PWMU",
+      "material": "SHREDDING",
+      "quantity_kg": 2,
+      "amount_paid": 22,
+      "pickup_date": "2026-03-01",
+      "created_at": "2026-03-23 17:54:55"
+    },
+    {
+      "id": "qe14fczgs8q",
+      "vendor_id": null,
+      "vendor_name": "eee",
+      "pwmu_name": "Raj balod PWMU",
+      "material": "BAILING",
+      "quantity_kg": 22,
+      "amount_paid": 222,
+      "pickup_date": "2026-03-01",
+      "created_at": "2026-03-23 17:54:55"
+    },
+    {
+      "id": "ftra7fx6i2o",
+      "vendor_id": null,
+      "vendor_name": "rrr",
+      "pwmu_name": "Raj balod PWMU",
+      "material": "SHREDDING",
+      "quantity_kg": 2,
+      "amount_paid": 22,
+      "pickup_date": "2026-03-01",
+      "created_at": "2026-03-23 17:55:26"
+    },
+    {
+      "id": "m0eurdm2rds",
+      "vendor_id": null,
+      "vendor_name": "eee",
+      "pwmu_name": "Raj balod PWMU",
+      "material": "BAILING",
+      "quantity_kg": 22,
+      "amount_paid": 222,
+      "pickup_date": "2026-03-01",
+      "created_at": "2026-03-23 17:55:26"
+    },
+    {
+      "id": "pi639q29irr",
+      "vendor_id": null,
+      "vendor_name": "rrr",
+      "pwmu_name": "Raj balod PWMU",
+      "material": "SHREDDING",
+      "quantity_kg": 2,
+      "amount_paid": 22,
+      "pickup_date": "2026-03-01",
+      "created_at": "2026-03-23 18:01:02"
+    },
+    {
+      "id": "grrj9cn38fm",
+      "vendor_id": null,
+      "vendor_name": "eee",
+      "pwmu_name": "Raj balod PWMU",
+      "material": "BAILING",
+      "quantity_kg": 22,
+      "amount_paid": 222,
+      "pickup_date": "2026-03-01",
+      "created_at": "2026-03-23 18:01:02"
+    },
+    {
+      "id": "kq3s1p21tf",
+      "vendor_id": null,
+      "vendor_name": "Rcoplant",
+      "pwmu_name": "Raj balod PWMU",
+      "material": "FATKA_CLEANING (फटका-क्लीनिंग)",
+      "quantity_kg": 22,
+      "amount_paid": 22,
+      "pickup_date": "2026-03-01",
+      "created_at": "2026-03-24 04:14:31"
+    },
+    {
+      "id": "0czrpsirvksc",
+      "vendor_id": null,
+      "vendor_name": "Cement",
+      "pwmu_name": "Raj balod PWMU",
+      "material": "FATKA_CLEANING (फटका-क्लीनिंग)",
+      "quantity_kg": 200,
+      "amount_paid": 222,
+      "pickup_date": "2026-03-01",
+      "created_at": "2026-03-24 04:14:31"
+    }
+  ],
+  "op_logs": [
+    {
+      "id": "log-pwmu_raj_balod_pwmu_dncf-2026-03-21",
+      "pwmu_id": "pwmu_raj_balod_pwmu_dncf",
+      "log_date": "2026-03-21",
+      "total_intake_kg": 40,
+      "processed_kg": 40,
+      "sold_kg": 0,
+      "revenue": 0,
+      "expenditure": 0,
+      "status": "operational",
+      "reporting_count": 4,
+      "processed_stock_breakdown": "{\"WET\":\"2\",\"PLASTIC\":\"32\",\"METAL\":\"2\",\"GLASS\":\"2\",\"EWASTE\":\"0\",\"OTHER\":\"2\"}",
+      "created_at": "2026-03-24 04:12:11",
+      "updated_at": "2026-03-24T04:12:11.601Z"
+    },
+    {
+      "id": "log-pwmu_raj_balod_pwmu_dncf-2026-03-22",
+      "pwmu_id": "pwmu_raj_balod_pwmu_dncf",
+      "log_date": "2026-03-22",
+      "total_intake_kg": 68,
+      "processed_kg": 68,
+      "sold_kg": 0,
+      "revenue": 0,
+      "expenditure": 0,
+      "status": "operational",
+      "reporting_count": 5,
+      "processed_stock_breakdown": "{\"WET\":\"6\",\"PLASTIC\":\"60\",\"METAL\":\"1\",\"GLASS\":\"\",\"EWASTE\":\"\",\"OTHER\":\"1\"}",
+      "created_at": "2026-03-24 04:13:07",
+      "updated_at": "2026-03-24T04:13:07.525Z"
+    },
+    {
+      "id": "log-pwmu_raj_balod_pwmu_dncf-2026-03-16",
+      "pwmu_id": "pwmu_raj_balod_pwmu_dncf",
+      "log_date": "2026-03-16",
+      "total_intake_kg": 222.5,
+      "processed_kg": 222.5,
+      "sold_kg": 0,
+      "revenue": 0,
+      "expenditure": 0,
+      "status": "operational",
+      "reporting_count": 89,
+      "processed_stock_breakdown": "{\"WET\":\"2\",\"PLASTIC\":\"200\",\"METAL\":\"2\",\"GLASS\":\"2\",\"EWASTE\":\"2\",\"OTHER\":\"14.5\"}",
+      "created_at": "2026-03-24 04:16:45",
+      "updated_at": "2026-03-24T04:16:45.605Z"
+    },
+    {
+      "id": "log-pwmu_raj_balod_pwmu_dncf-2026-03-23",
+      "pwmu_id": "pwmu_raj_balod_pwmu_dncf",
+      "log_date": "2026-03-23",
+      "total_intake_kg": 59,
+      "processed_kg": 59,
+      "sold_kg": 0,
+      "revenue": 0,
+      "expenditure": 0,
+      "status": "operational",
+      "reporting_count": 8,
+      "processed_stock_breakdown": "{\"WET\":\"2\",\"PLASTIC\":\"50\",\"METAL\":\"1\",\"GLASS\":\"1\",\"EWASTE\":\"1\",\"OTHER\":\"4\"}",
+      "created_at": "2026-03-24 05:42:21",
+      "updated_at": "2026-03-24T05:42:21.418Z"
+    },
+    {
+      "id": "log-pwmu_raj_balod_pwmu_dncf-2026-03-24",
+      "pwmu_id": "pwmu_raj_balod_pwmu_dncf",
+      "log_date": "2026-03-24",
+      "total_intake_kg": 96,
+      "processed_kg": 96,
+      "sold_kg": 0,
+      "revenue": 0,
+      "expenditure": 0,
+      "status": "operational",
+      "reporting_count": 5,
+      "processed_stock_breakdown": "{\"WET\":\"12\",\"PLASTIC\":\"66\",\"METAL\":\"4\",\"GLASS\":\"1\",\"EWASTE\":\"0\",\"OTHER\":\"13\"}",
+      "created_at": "2026-03-24 05:43:18",
+      "updated_at": "2026-03-24T05:43:18.593Z"
+    }
+  ]
+}

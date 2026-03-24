@@ -158,14 +158,11 @@ const VillageReg = () => {
 
         const fetchPWMUs = async () => {
             try {
-                const proxyUrl = '/cgpwmu/api';
-                const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-                const res = await fetch(`${proxyUrl}/data/pwmu_centers?select=id,name,district,block,gram_panchayat,village`, {
-                    headers: { 'apikey': ANON_KEY }
-                });
+                const { data, error } = await supabase
+                    .from('pwmu_centers')
+                    .select('id, name, district, block, gram_panchayat, village');
                 
-                if (res.ok) {
-                    const data = await res.json();
+                if (!error && data) {
                     const formatted = data.map(center => {
                         const locString = [
                             stripCode(center.district),
@@ -178,13 +175,12 @@ const VillageReg = () => {
                             id: center.id,
                             name: center.name || 'PWMU Center',
                             location: locString,
-                            serviceVillages: [] // Note: serviceVillages are currently stored in user manager profile, 
-                                              // but for linking we primarily need the center ID.
+                            serviceVillages: [] 
                         };
                     });
                     setPwmuCenters(formatted);
                 } else {
-                    console.error("Failed to fetch PWMUs from pwmu_centers table.");
+                    console.error("Failed to fetch PWMUs:", error);
                 }
             } catch (err) {
                 console.error("Error fetching PWMUs:", err);
