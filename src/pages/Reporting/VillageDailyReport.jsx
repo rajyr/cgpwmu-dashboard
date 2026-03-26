@@ -272,9 +272,11 @@ const VillageDailyReport = () => {
     const handleBasicInfoChange = (e) => setBasicInfo(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
     const handleWasteChange = (key, value) => {
+        // Prevent negative values
+        const normalizedValue = (value !== '' && parseFloat(value) < 0) ? '0' : value;
         setWasteData(prev => ({
             ...prev,
-            [key]: { ...prev[key], value: value }
+            [key]: { ...prev[key], value: normalizedValue }
         }));
     };
 
@@ -586,7 +588,7 @@ const VillageDailyReport = () => {
                                                     {key === 'metal' && <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" /><path d="M2 12h20" /></svg>}
                                                     {key === 'glass' && <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m15 5-5-5-5 5v3.5a1.5 1.5 0 0 0 .58 1.15l4.89 3.65v4.2A1.5 1.5 0 0 0 12 19h0a1.5 1.5 0 0 0 1.5-1.5v-4.2l4.89-3.65A1.5 1.5 0 0 0 19 8.5V5z" /><path d="M5 5h10" /></svg>}
                                                     {key === 'ewaste' && <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="14" height="8" x="5" y="2" rx="2" /><rect width="20" height="8" x="2" y="14" rx="2" /><path d="M6 18h2" /><path d="M12 18h6" /></svg>}
-                                                    {key === 'other' && <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v20" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>}
+                                                    {key === 'other' && <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 3h12" /><path d="M6 8h12" /><path d="m6 13 8.5 8" /><path d="M6 13h3" /><path d="M9 13c6.667 0 6.667-10 0-10" /></svg>}
                                                 </div>
                                                 <label className="block text-xs font-bold text-gray-700 truncate" title={wasteLabels[key]}>{wasteLabels[key]}</label>
                                             </div>
@@ -596,6 +598,7 @@ const VillageDailyReport = () => {
                                                     value={item.value}
                                                     onChange={(e) => handleWasteChange(key, e.target.value)}
                                                     min="0"
+                                                    step="0.1"
                                                     placeholder="0.0"
                                                     disabled={isLocked}
                                                     className="w-full bg-white/50 backdrop-blur-sm border border-transparent rounded-lg py-1.5 pl-2 pr-6 text-right font-mono text-gray-800 font-bold focus:outline-none focus:bg-white shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)] transition-all text-sm disabled:text-gray-400 disabled:cursor-not-allowed"

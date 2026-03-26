@@ -157,8 +157,16 @@ const VillageMonthlyReport = () => {
 
     // Handlers
     const handleBasicChange = (e) => setBasicInfo(prev => ({ ...prev, [e.target.name]: e.target.value }));
-    const handleSalesChange = (e) => setSalesInfo(prev => ({ ...prev, [e.target.name]: e.target.value }));
-    const handleExpensesChange = (e) => setExpensesInfo(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    const handleSalesChange = (e) => {
+        const { name, value } = e.target;
+        const normalizedValue = (value !== '' && parseFloat(value) < 0) ? '0' : value;
+        setSalesInfo(prev => ({ ...prev, [name]: normalizedValue }));
+    };
+    const handleExpensesChange = (e) => {
+        const { name, value } = e.target;
+        const normalizedValue = (value !== '' && parseFloat(value) < 0) ? '0' : value;
+        setExpensesInfo(prev => ({ ...prev, [name]: normalizedValue }));
+    };
     const selectRecycler = (type) => setSalesInfo(prev => ({ ...prev, recyclerType: type }));
 
     // Calculations

@@ -172,7 +172,7 @@ const Landing = () => {
             jul: "Jul"
         },
         hi: {
-            heroTitle: "कचरे से",
+            heroTitle: "अपशिष्ट से",
             value: "मूल्य-सृजन",
             wealth: "संपत्ति",
             opportunity: "अवसर",
@@ -501,9 +501,9 @@ const Landing = () => {
                 </div>
                 <div className="relative z-10 w-full pt-20 pb-12">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center animate-fade-in-up">
-                        <h1 className="text-5xl md:text-7xl font-extrabold text-slate-900 leading-tight mb-4 flex flex-wrap justify-center items-center gap-x-4">
+                        <h1 className="text-5xl md:text-7xl font-extrabold text-slate-900 leading-tight mb-4 flex flex-wrap justify-center items-center gap-x-1 tracking-tight">
                             <span>{t('heroTitle', translations)}</span>
-                            <span className="relative inline-block h-[1.1em] overflow-hidden align-top text-green-600 min-w-[210px] md:min-w-[480px]">
+                            <span className="relative inline-block h-[1.1em] overflow-hidden align-top text-green-600 min-w-[200px] md:min-w-[320px]">
                                 <span
                                     className="flex flex-col"
                                     style={{
@@ -512,7 +512,7 @@ const Landing = () => {
                                     }}
                                 >
                                     {animatedWords.map((word, i) => (
-                                        <span key={i} className="h-[1.1em] flex items-center justify-center whitespace-nowrap px-2 font-black italic tracking-tighter">
+                                        <span key={i} className="h-[1.1em] flex items-center justify-start whitespace-nowrap font-black italic tracking-tight">
                                             {word}
                                         </span>
                                     ))}

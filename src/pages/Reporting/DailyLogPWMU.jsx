@@ -605,8 +605,9 @@ const DailyLogPWMU = () => {
         autoFillData();
     }, [selectedDate, center, villages.length]);
 
+
     const handleBulkDistribute = (total) => {
-        if (!total || isNaN(total)) return;
+        if (!total || isNaN(total) || parseFloat(total) < 0) return;
         const targetVillages = villages; // Distribute across all by default
         const perVillage = (parseFloat(total) / targetVillages.length).toFixed(1);
         
@@ -642,8 +643,10 @@ const DailyLogPWMU = () => {
         }
     };
     const handleValueChange = (id, newValue) => {
+        // Prevent negative values
+        const normalizedValue = (newValue !== '' && parseFloat(newValue) < 0) ? '0' : newValue;
         setVillages(prev => prev.map(v =>
-            v.id === id ? { ...v, value: newValue, autoFilled: false, manualEntry: true } : v
+            v.id === id ? { ...v, value: normalizedValue, autoFilled: false, manualEntry: true } : v
         ));
     };
 
@@ -674,6 +677,28 @@ const DailyLogPWMU = () => {
     const totalIntake = villages.reduce((sum, v) => sum + (Number(v.value) || 0), 0);
     const totalCategorized = Object.values(processedStock).reduce((sum, v) => sum + (Number(v) || 0), 0);
     const isMatch = Math.abs(totalIntake - totalCategorized) < 0.01;
+
+    // Auto-calculate 'OTHER' waste based on total intake minus other categories
+    useEffect(() => {
+        if (!processedStock || isLocked) return;
+        
+        const otherCategories = ['WET', 'PLASTIC', 'METAL', 'GLASS', 'EWASTE'];
+        const totalCategorizedOthers = otherCategories.reduce((sum, key) => {
+            return sum + (parseFloat(processedStock[key]) || 0);
+        }, 0);
+
+        const calculatedOther = Math.max(0, totalIntake - totalCategorizedOthers);
+        
+        // Only update if the value has changed significantly (avoid float jitter)
+        const currentOther = parseFloat(processedStock.OTHER) || 0;
+        if (Math.abs(currentOther - calculatedOther) > 0.05) {
+            setProcessedStock(prev => ({
+                ...prev,
+                OTHER: calculatedOther > 0 ? calculatedOther.toFixed(1) : ''
+            }));
+        }
+    }, [totalIntake, processedStock.WET, processedStock.PLASTIC, processedStock.METAL, processedStock.GLASS, processedStock.EWASTE, isLocked]);
+
 
     const filteredVillages = villages.filter(v =>
         v.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -985,6 +1010,7 @@ const DailyLogPWMU = () => {
                                             placeholder="Distribute Total" 
                                             className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-blue-500"
                                             value={bulkValue}
+                                            min="0"
                                             onChange={(e) => setBulkValue(e.target.value)}
                                         />
                                         <button onClick={() => handleBulkDistribute(bulkValue)} className="p-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-md transition-all active:scale-95">
@@ -1081,7 +1107,7 @@ const DailyLogPWMU = () => {
                                                                     </div>
                                                                     <div className={`flex items-center ${isCompact ? 'gap-1.5' : 'gap-2'}`}>
                                                                         <div className="relative group/input">
-                                                                            <input type="number" value={v.value} onChange={(e) => handleValueChange(v.id, e.target.value)} onKeyDown={(e) => handleKeyDown(e, v.id)} className={`${isCompact ? 'w-20 px-1 py-1 text-xs' : 'w-24 p-2 text-sm'} bg-gray-50 border border-gray-200 rounded-lg text-center font-bold focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all`} />
+                                                                            <input type="number" value={v.value} min="0" onChange={(e) => handleValueChange(v.id, e.target.value)} onKeyDown={(e) => handleKeyDown(e, v.id)} className={`${isCompact ? 'w-20 px-1 py-1 text-xs' : 'w-24 p-2 text-sm'} bg-gray-50 border border-gray-200 rounded-lg text-center font-bold focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all`} />
                                                                             {v.value !== '' && (
                                                                                 <button 
                                                                                     onClick={() => handleClearVillage(v.id)}
@@ -1143,15 +1169,34 @@ const DailyLogPWMU = () => {
                         </div>
                     </div>
                     <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {Object.entries(processedStock).map(([materialKey, value]) => (
-                            <div key={materialKey} className="space-y-2">
-                                <label className="text-sm font-semibold text-gray-700">{materialLabels[materialKey]}</label>
-                                <div className="relative">
-                                    <input type="number" value={value} onChange={(e) => setProcessedStock(prev => ({ ...prev, [materialKey]: e.target.value }))} className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5 text-sm font-bold" />
-                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400 uppercase">kg</span>
+                        {Object.entries(processedStock).map(([materialKey, value]) => {
+                            const isOther = materialKey === 'OTHER';
+                            return (
+                                <div key={materialKey} className="space-y-2">
+                                    <label className="text-sm font-semibold text-gray-700">{materialLabels[materialKey]}</label>
+                                    <div className="relative">
+                                        <input 
+                                            type="number" 
+                                            value={value} 
+                                            min="0"
+                                            readOnly={isOther}
+                                            onChange={(e) => {
+                                                if (isOther) return;
+                                                const val = e.target.value;
+                                                const normalized = (val !== '' && parseFloat(val) < 0) ? '0' : val;
+                                                setProcessedStock(prev => ({ ...prev, [materialKey]: normalized }));
+                                            }} 
+                                            className={`w-full ${isOther ? 'bg-blue-50/50 border-blue-200 text-blue-600' : 'bg-gray-50 border border-gray-200'} rounded-lg p-2.5 text-sm font-bold transition-colors`}
+                                            placeholder={isOther ? "Auto-calculated" : "0"}
+                                        />
+                                        <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold ${isOther ? 'text-blue-400' : 'text-gray-400'} uppercase`}>kg</span>
+                                    </div>
+                                    {isOther && !isLocked && (
+                                        <p className="text-[10px] text-blue-500 font-medium italic pl-1">Recalculated from missing total</p>
+                                    )}
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
 
                     {/* Additional Save Button at Bottom */}

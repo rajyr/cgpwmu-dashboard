@@ -528,8 +528,16 @@ const PWMUMonthlyReport = () => {
 
     // Handlers
     const handleBasicInfoChange = (e) => setBasicInfo(prev => ({ ...prev, [e.target.name]: e.target.value }));
-    const handleCollectionChange = (e) => setCollection(prev => ({ ...prev, [e.target.name]: e.target.value }));
-    const handleExpenseChange = (e) => setExpenses(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    const handleCollectionChange = (e) => {
+        const { name, value } = e.target;
+        const normalizedValue = (value !== '' && parseFloat(value) < 0) ? '0' : value;
+        setCollection(prev => ({ ...prev, [name]: normalizedValue }));
+    };
+    const handleExpenseChange = (e) => {
+        const { name, value } = e.target;
+        const normalizedValue = (value !== '' && parseFloat(value) < 0) ? '0' : value;
+        setExpenses(prev => ({ ...prev, [name]: normalizedValue }));
+    };
 
     const toggleMachineSelection = (key) => {
         setMachineStatus(prev => ({
@@ -639,9 +647,13 @@ const PWMUMonthlyReport = () => {
     const updateMaterialRow = (vendorId, materialId, field, value) => {
         setSales(prev => prev.map(s => {
             if (s.id !== vendorId) return s;
+            let normalizedValue = value;
+            if ((field === 'quantity' || field === 'revenue') && value !== '' && parseFloat(value) < 0) {
+                normalizedValue = '0';
+            }
             return {
                 ...s,
-                materials: s.materials.map(m => m.id === materialId ? { ...m, [field]: value } : m)
+                materials: s.materials.map(m => m.id === materialId ? { ...m, [field]: normalizedValue } : m)
             };
         }));
     };
@@ -1237,7 +1249,7 @@ const PWMUMonthlyReport = () => {
                                     <input
                                         type="number" name="electricity" value={expenses.electricity} onChange={handleExpenseChange} min="0" placeholder="0"
                                         className="w-full p-2.5 pl-8 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#005DAA]/20 focus:border-[#005DAA] font-mono text-gray-800 relative"
-                                        style={{ backgroundImage: 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%239CA3AF\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><line x1=\'12\' y1=\'1\' x2=\'12\' y2=\'23\'></line><path d=\'M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6\'></path></svg>")', backgroundPosition: '10px center', backgroundRepeat: 'no-repeat' }}
+                                        style={{ backgroundImage: 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%239CA3AF\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><path d=\'M6 3h12M6 8h12M6 13l8.5 8M6 13h3M9 13c6.667 0 6.667-10 0-10\'></path></svg>")', backgroundPosition: '10px center', backgroundRepeat: 'no-repeat' }}
                                     />
                                     <p className="text-xs text-gray-500 mt-1">{t('reportingMonthDesc', monthlyTranslations)}</p>
                                 </div>
@@ -1246,7 +1258,7 @@ const PWMUMonthlyReport = () => {
                                     <input
                                         type="number" name="honorarium" value={expenses.honorarium} onChange={handleExpenseChange} min="0" placeholder="0"
                                         className="w-full p-2.5 pl-8 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#005DAA]/20 focus:border-[#005DAA] font-mono text-gray-800 relative"
-                                        style={{ backgroundImage: 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%239CA3AF\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><line x1=\'12\' y1=\'1\' x2=\'12\' y2=\'23\'></line><path d=\'M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6\'></path></svg>")', backgroundPosition: '10px center', backgroundRepeat: 'no-repeat' }}
+                                        style={{ backgroundImage: 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%239CA3AF\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><path d=\'M6 3h12M6 8h12M6 13l8.5 8M6 13h3M9 13c6.667 0 6.667-10 0-10\'></path></svg>")', backgroundPosition: '10px center', backgroundRepeat: 'no-repeat' }}
                                     />
                                     <p className="text-xs text-gray-500 mt-1">{t('distWorkersDesc', monthlyTranslations)}</p>
                                 </div>
@@ -1255,7 +1267,7 @@ const PWMUMonthlyReport = () => {
                                     <input
                                         type="number" name="other" value={expenses.other} onChange={handleExpenseChange} min="0" placeholder="0"
                                         className="w-full p-2.5 pl-8 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#005DAA]/20 focus:border-[#005DAA] font-mono text-gray-800 relative"
-                                        style={{ backgroundImage: 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%239CA3AF\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><line x1=\'12\' y1=\'1\' x2=\'12\' y2=\'23\'></line><path d=\'M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6\'></path></svg>")', backgroundPosition: '10px center', backgroundRepeat: 'no-repeat' }}
+                                        style={{ backgroundImage: 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%239CA3AF\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><path d=\'M6 3h12M6 8h12M6 13l8.5 8M6 13h3M9 13c6.667 0 6.667-10 0-10\'></path></svg>")', backgroundPosition: '10px center', backgroundRepeat: 'no-repeat' }}
                                     />
                                     <p className="text-xs text-gray-500 mt-1">{t('repairsDesc', monthlyTranslations)}</p>
                                 </div>
@@ -1397,6 +1409,7 @@ const PWMUMonthlyReport = () => {
                                                         value={closingStock[key] || ''}
                                                         onChange={(e) => {
                                                             let val = e.target.value;
+                                                            if (val !== '' && parseFloat(val) < 0) val = '0';
                                                             if (val !== '' && parseFloat(val) > maxAllowed + 0.1) val = maxAllowed.toString();
                                                             setClosingStock(prev => ({ ...prev, [key]: val }));
                                                         }}
