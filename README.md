@@ -92,7 +92,7 @@ A comprehensive, multi-stakeholder digital platform for monitoring and managing 
 
 ## 🤝 Acknowledgments
 
-Special thanks to the teams at **UNICEF India** and **All India Institute of Local Self-Government (AILSG)** for their vision and support in building this digital infrastructure for a cleaner, greener Chhattisgarh.
+Special thanks to the teams at **UNICEF India** and **Panchayat Raj Department ** for their vision and support in building this digital infrastructure for a cleaner, greener Chhattisgarh.
 
 ---
 © 2026 CG-PWMU Digital Platform. All rights reserved.
