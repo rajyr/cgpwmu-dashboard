@@ -30,17 +30,34 @@ const Navbar = () => {
         <nav className="bg-white/80 backdrop-blur-md border-b border-gray-100 sticky top-0 z-50 shadow-sm transition-all duration-300">
             <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-between h-16">
-                    <Link to="/" className="flex items-center gap-3 group">
+                    <div className="flex items-center">
+                        <Link to="/" className="flex items-center gap-3 group">
+                            <img
+                                src="/cgpwmu/assets/Logo/CGPWMUlogo.webp"
+                                alt="CG-PWMU Logo"
+                                className="h-10 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
+                            />
+                            <div className="flex flex-col">
+                                <span className="font-bold text-gray-800 text-lg leading-tight group-hover:text-blue-600 transition-colors">CG-PWMU</span>
+                                <span className="text-[10px] text-gray-500 font-medium uppercase tracking-wider">{t('platform', navTranslations)}</span>
+                            </div>
+                        </Link>
+                    </div>
+
+                    {/* Centered Logos - Larger, no frame */}
+                    <div className="hidden lg:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 items-center gap-6">
                         <img
-                            src="/cgpwmu/assets/Logo/CGPWMUlogo.webp"
-                            alt="CG-PWMU Logo"
-                            className="h-10 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
+                            src="/cgpwmu/assets/Logo/Chhattisgarh.webp"
+                            alt="Chhattisgarh Government"
+                            className="h-14 w-auto object-contain"
                         />
-                        <div className="flex flex-col">
-                            <span className="font-bold text-gray-800 text-lg leading-tight group-hover:text-blue-600 transition-colors">CG-PWMU</span>
-                            <span className="text-[10px] text-gray-500 font-medium uppercase tracking-wider">{t('platform', navTranslations)}</span>
-                        </div>
-                    </Link>
+                        <div className="h-8 border-l border-gray-300 mx-1 opacity-50"></div>
+                        <img
+                            src="/cgpwmu/assets/Logo/unicef.webp"
+                            alt="UNICEF"
+                            className="h-10 w-auto object-contain"
+                        />
+                    </div>
 
                     {/* Desktop Menu */}
                     <div className="hidden md:flex items-center space-x-8">

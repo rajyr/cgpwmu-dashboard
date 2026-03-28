@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Search, Bell, Home, Globe } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -40,6 +41,51 @@ const Header = ({ setIsMobileOpen }) => {
 
     const friendlyRole = t(roleKey, headerTranslations);
 
+    // Notification State
+    const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+
+    // Initialize mock notifications based on role
+    const [notifications, setNotifications] = useState(() => {
+        const mockNotifications = {
+            StateAdmin: [
+                { id: 1, title: 'New Center Registration', message: "PWMU center 'Balod North' registered and awaiting approval.", time: '2h ago', read: false },
+                { id: 2, title: 'Monthly State Report', message: "Monthly State report for March 2026 is now available.", time: '5h ago', read: false },
+                { id: 3, title: 'Alert: Reporting Delay', message: "3 Village Sheds in Raipur have not submitted logs for 48 hours.", time: '1d ago', read: true }
+            ],
+            DistrictNodal: [
+                { id: 1, title: 'New Center Registration', message: "PWMU center 'Balod North' registered and awaiting approval.", time: '2h ago', read: false },
+                { id: 2, title: 'Alert: Reporting Delay', message: "3 Village Sheds in Raipur have not submitted logs for 48 hours.", time: '1d ago', read: true }
+            ],
+            PWMUManager: [
+                { id: 1, title: 'New Collection Request', message: "New waste collection request from Amora Village.", time: '30m ago', read: false },
+                { id: 2, title: 'Machine Maintenance Alert', message: "Shredder #2 is due for service this week.", time: '3h ago', read: false },
+                { id: 3, title: 'Vendor Confirmation', message: "Vendor 'Sona Enterprises' confirmed pickup for 5 tons of Plastic.", time: '1d ago', read: true }
+            ],
+            Sarpanch: [
+                { id: 1, title: 'Schedule Updated', message: "Weekly collection schedule updated by PWMU Manager.", time: '1h ago', read: false },
+                { id: 2, title: 'Incentive Processed', message: "Incentive payment for February has been processed successfully.", time: '4h ago', read: false },
+                { id: 3, title: 'Daily Log Reminder', message: "Please update the daily processing log before 6 PM.", time: '6h ago', read: true }
+            ],
+            Vendor: [
+                { id: 1, title: 'New Purchase Order', message: "New purchase order #PO-1042 issued by state portal.", time: '2h ago', read: false },
+                { id: 2, title: 'Payment Initiated', message: "Payment for Invoice #INV-882 has been initiated.", time: '6h ago', read: false },
+                { id: 3, title: 'New Tender Notification', message: "New tender for 'Multi-layer plastic' published in Raipur.", time: '2d ago', read: true }
+            ]
+        };
+        return mockNotifications[userRole] || mockNotifications.StateAdmin;
+    });
+
+    const unreadCount = notifications.filter(n => !n.read).length;
+
+    const markAsRead = (id) => {
+        setNotifications(notifications.map(n => n.id === id ? { ...n, read: true } : n));
+    };
+
+    const clearAll = () => {
+        setNotifications([]);
+        setIsNotificationOpen(false);
+    };
+
     // Fallbacks if not fully loaded or no session
     const displayEmail = user?.email || 'admin@sbm.gov.in';
     const displayName = userName || friendlyRole;
@@ -73,10 +119,25 @@ const Header = ({ setIsMobileOpen }) => {
                         className="w-full pl-11 pr-4 py-2.5 border border-gray-200 rounded-full text-sm bg-[#fafafa] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#005DAA]/20 focus:border-[#005DAA] transition-all"
                     />
                 </div>
+
+                {/* Institutional Logos - Desktop Only (Relocated from Dashboard Header) */}
+                <div className="hidden lg:flex items-center gap-4 px-4 h-12 border-l border-gray-100 ml-2 animate-fade-in whitespace-nowrap">
+                    <img
+                        src="/cgpwmu/assets/Logo/Chhattisgarh.webp"
+                        alt="Chhattisgarh Government"
+                        className="h-10 w-auto object-contain brightness-110"
+                    />
+                    <div className="h-6 border-l border-gray-200"></div>
+                    <img
+                        src="/cgpwmu/assets/Logo/unicef.webp"
+                        alt="UNICEF"
+                        className="h-8 w-auto object-contain"
+                    />
+                </div>
             </div>
 
             {/* Right: Profile & Language & Notifications */}
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-6 relative">
                 {/* Language Toggle */}
                 <button
                     onClick={toggleLanguage}
@@ -86,10 +147,64 @@ const Header = ({ setIsMobileOpen }) => {
                     {language === 'en' ? 'हिन्दी' : 'English'}
                 </button>
 
-                <button className="relative p-2 text-gray-400 hover:text-gray-600 transition-colors" title={t('notifications', headerTranslations)}>
-                    <Bell className="w-[22px] h-[22px]" />
-                    <span className="absolute top-1 right-1.5 w-2 h-2 bg-[#DC3545] rounded-full border-2 border-white"></span>
-                </button>
+                <div className="relative">
+                    <button 
+                        onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+                        className={`relative p-2 rounded-full transition-all ${isNotificationOpen ? 'bg-blue-50 text-blue-600' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
+                        title={t('notifications', headerTranslations)}
+                    >
+                        <Bell className="w-[22px] h-[22px]" />
+                        {unreadCount > 0 && (
+                            <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-[#DC3545] text-white text-[10px] flex items-center justify-center rounded-full border-2 border-white font-bold animate-bounce-subtle">
+                                {unreadCount}
+                            </span>
+                        )}
+                    </button>
+
+                    {/* Notification Dropdown */}
+                    {isNotificationOpen && (
+                        <>
+                            <div className="fixed inset-0 z-10" onClick={() => setIsNotificationOpen(false)}></div>
+                            <div className="absolute right-0 mt-3 w-80 md:w-96 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-20 animate-scale-in">
+                                <div className="p-4 border-b border-gray-50 flex items-center justify-between bg-gray-50/50">
+                                    <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                                        {t('notifications', headerTranslations)}
+                                        {unreadCount > 0 && <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full">{unreadCount} New</span>}
+                                    </h3>
+                                    <button onClick={clearAll} className="text-[10px] font-bold text-blue-600 hover:text-blue-800 uppercase tracking-wider transition-colors">Clear All</button>
+                                </div>
+                                <div className="max-h-[70vh] overflow-y-auto no-scrollbar">
+                                    {notifications.length > 0 ? (
+                                        notifications.map((notification) => (
+                                            <div 
+                                                key={notification.id} 
+                                                onClick={() => markAsRead(notification.id)}
+                                                className={`p-4 border-b border-gray-50 cursor-pointer transition-all hover:bg-gray-50 flex gap-3 ${!notification.read ? 'bg-blue-50/30' : ''}`}
+                                            >
+                                                <div className={`w-2 h-2 rounded-full mt-2 shrink-0 ${!notification.read ? 'bg-blue-500' : 'bg-transparent'}`}></div>
+                                                <div className="flex-1">
+                                                    <div className="flex justify-between items-start">
+                                                        <h4 className={`text-sm font-bold ${!notification.read ? 'text-gray-900' : 'text-gray-600'}`}>{notification.title}</h4>
+                                                        <span className="text-[10px] text-gray-400 font-medium whitespace-nowrap ml-2">{notification.time}</span>
+                                                    </div>
+                                                    <p className="text-xs text-gray-500 mt-1 leading-relaxed line-clamp-2">{notification.message}</p>
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="py-12 flex flex-col items-center justify-center text-gray-400">
+                                            <Bell className="w-12 h-12 opacity-10 mb-3" />
+                                            <p className="text-sm font-medium">All caught up!</p>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="p-3 bg-gray-50/30 text-center border-t border-gray-50">
+                                    <button className="text-xs font-bold text-gray-500 hover:text-blue-600 transition-colors">View All Activities</button>
+                                </div>
+                            </div>
+                        </>
+                    )}
+                </div>
 
                 <div className="flex items-center gap-3">
                     <div className="text-right hidden lg:block">
@@ -104,4 +219,5 @@ const Header = ({ setIsMobileOpen }) => {
         </header>
     );
 };
+
 export default Header;

@@ -321,9 +321,9 @@ const Dashboard = () => {
                             lData = await locRes.json();
                             break;
                         }
-                    } catch (e) {}
+                    } catch (e) { }
                 }
-                
+
                 if (lData) {
                     setLocationData(lData);
                 } else {
@@ -398,7 +398,7 @@ const Dashboard = () => {
 
         const villagesLinked = intakeVillages > 0 ? intakeVillages : filteredUsers.filter(u => u.role === 'Sarpanch').length;
         const swachhagrahis = filteredUsers.filter(u => u.role?.toLowerCase() === 'swachhagrahi').length || (villagesLinked > 0 ? villagesLinked * 4 : 0);
-        
+
         const totalEfficiency = filteredPwmu.reduce((acc, curr) => acc + (parseFloat(curr.recovery_rate) || 0), 0);
         const avgEfficiency = filteredPwmu.length > 0 ? Math.round(totalEfficiency / filteredPwmu.length) : 0;
 
@@ -509,11 +509,11 @@ const Dashboard = () => {
                         { label: 'Recovered', value: formatVolume(wasteProcessedKg * (avgEfficiency / 100)) }
                     ]
                 },
-                    sinks: [
-                        { id: 'recyclers', name: 'Recyclers', volume: formatVolume(wasteProcessedKg * 0.45), financial: `+` + formatFinanceValue(totalRevenue > 0 ? totalRevenue * 0.65 : wasteProcessedKg * 2.5), color: 'green' },
-                        { id: 'cementKiln', name: 'Cement Kiln', volume: formatVolume(wasteProcessedKg * 0.25), financial: `+` + formatFinanceValue(totalRevenue > 0 ? totalRevenue * 0.15 : wasteProcessedKg * 1.5), color: 'red' },
-                        { id: 'roadConst', name: 'Road Const.', volume: formatVolume(wasteProcessedKg * 0.20), financial: `+` + formatFinanceValue(totalRevenue > 0 ? totalRevenue * 0.20 : wasteProcessedKg * 1.0), color: 'yellow' }
-                    ]
+                sinks: [
+                    { id: 'recyclers', name: 'Recyclers', volume: formatVolume(wasteProcessedKg * 0.45), financial: `+` + formatFinanceValue(totalRevenue > 0 ? totalRevenue * 0.65 : wasteProcessedKg * 2.5), color: 'green' },
+                    { id: 'cementKiln', name: 'Cement Kiln', volume: formatVolume(wasteProcessedKg * 0.25), financial: `+` + formatFinanceValue(totalRevenue > 0 ? totalRevenue * 0.15 : wasteProcessedKg * 1.5), color: 'red' },
+                    { id: 'roadConst', name: 'Road Const.', volume: formatVolume(wasteProcessedKg * 0.20), financial: `+` + formatFinanceValue(totalRevenue > 0 ? totalRevenue * 0.20 : wasteProcessedKg * 1.0), color: 'yellow' }
+                ]
             }
         }));
     }, [filters, rawData]);
@@ -554,32 +554,38 @@ const Dashboard = () => {
     return (
         <div className="w-full h-full flex flex-col gap-8 font-sans pb-10">
             {/* Header Section */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 animate-fade-in-up">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-800 tracking-tight">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 animate-fade-in-up">
+                {/* Relocated Institutional Logos - Mobile & Tablet Only (Desktop has them in Navbar) */}
+                <div className="lg:hidden flex items-center justify-center gap-3 bg-white/50 py-2.5 px-6 rounded-xl border border-gray-100 shadow-sm animate-fade-in w-full sm:w-auto">
+                    <img
+                        src="/cgpwmu/assets/Logo/Chhattisgarh.webp"
+                        alt="Chhattisgarh Government"
+                        className="h-10 w-auto object-contain brightness-110"
+                    />
+                    <div className="h-7 border-l border-gray-200"></div>
+                    <img
+                        src="/cgpwmu/assets/Logo/unicef.webp"
+                        alt="UNICEF"
+                        className="h-7 w-auto object-contain"
+                    />
+                </div>
+
+                <div className="flex flex-col min-w-0 max-w-full sm:max-w-[30%]">
+                    <h1 className="text-2xl md:text-3xl font-bold text-gray-800 tracking-tight whitespace-nowrap overflow-hidden text-ellipsis">
                         {t('welcome', dashTranslations)} {greeting}
                     </h1>
-                    <p className="text-sm text-gray-500 mt-2">
+                    <p className="text-[10px] md:text-xs text-gray-500 mt-1 line-clamp-1">
                         {t('happening', dashTranslations)} {displayRoleName === 'Admin' ? t('state', dashTranslations) : t('network', dashTranslations)} {t('pwmuNetwork', dashTranslations)}
                     </p>
                 </div>
 
-                <div className="flex flex-col md:flex-row items-end md:items-center gap-4">
-                    {/* Language Toggle */}
-                    <button
-                        onClick={toggleLanguage}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all text-xs font-bold text-gray-700 bg-white shadow-sm"
-                    >
-                        <Globe className="w-3.5 h-3.5 text-blue-500" />
-                        {language === 'en' ? 'हिन्दी' : 'English'}
-                    </button>
-
-                    {/* Hierarchical Location Filters */}
-                    <div className="flex bg-white border border-gray-200 rounded-lg shadow-sm p-1 overflow-x-auto max-w-[full] md:max-w-none hide-scrollbar">
+                <div className="flex-1 flex items-center gap-3 w-full max-w-full overflow-hidden">
+                    {/* Hierarchical Location Filters - Refined for equal width & adaptability */}
+                    <div className="flex-1 flex items-center bg-white border border-gray-200 rounded-lg shadow-sm p-1 overflow-x-auto hide-scrollbar gap-px min-w-0">
                         <select
                             value={filters.district}
                             onChange={(e) => setFilters({ ...filters, district: e.target.value, block: '', gp: '', village: '' })}
-                            className="bg-transparent text-xs font-semibold text-gray-700 px-3 py-1.5 outline-none border-r border-gray-200 cursor-pointer hover:bg-gray-50 rounded-l-md transition-colors min-w-[120px]">
+                            className="flex-1 bg-transparent text-[11px] md:text-xs font-semibold text-gray-700 px-2 py-1.5 outline-none border-r border-gray-100 cursor-pointer hover:bg-gray-50 rounded-l-md transition-colors min-w-0 truncate">
                             <option value="">{t('districtWise', dashTranslations)}</option>
                             {Object.keys(locationData).map(d => <option key={d} value={d}>{d}</option>)}
                         </select>
@@ -587,7 +593,7 @@ const Dashboard = () => {
                             value={filters.block}
                             disabled={!filters.district}
                             onChange={(e) => setFilters({ ...filters, block: e.target.value, gp: '', village: '' })}
-                            className="bg-transparent text-xs font-semibold text-gray-700 px-3 py-1.5 outline-none border-r border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors min-w-[120px]">
+                            className="flex-1 bg-transparent text-[11px] md:text-xs font-semibold text-gray-700 px-2 py-1.5 outline-none border-r border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors min-w-0 truncate">
                             <option value="">{t('blockWise', dashTranslations)}</option>
                             {filters.district && locationData[filters.district] && Object.keys(locationData[filters.district]).map(b => <option key={b} value={b}>{b}</option>)}
                         </select>
@@ -595,7 +601,7 @@ const Dashboard = () => {
                             value={filters.gp}
                             disabled={!filters.block}
                             onChange={(e) => setFilters({ ...filters, gp: e.target.value, village: '' })}
-                            className="bg-transparent text-xs font-semibold text-gray-700 px-3 py-1.5 outline-none border-r border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors hidden lg:block min-w-[150px]">
+                            className="flex-1 bg-transparent text-[11px] md:text-xs font-semibold text-gray-700 px-2 py-1.5 outline-none border-r border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors hidden sm:block min-w-0 truncate">
                             <option value="">{t('gramPanchayat', dashTranslations)}</option>
                             {filters.district && filters.block && locationData[filters.district][filters.block] && Object.keys(locationData[filters.district][filters.block]).map(g => <option key={g} value={g}>{g}</option>)}
                         </select>
@@ -603,26 +609,17 @@ const Dashboard = () => {
                             value={filters.village}
                             disabled={!filters.gp}
                             onChange={(e) => setFilters({ ...filters, village: e.target.value })}
-                            className="bg-transparent text-xs font-semibold text-gray-700 px-3 py-1.5 outline-none border-r border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors hidden lg:block min-w-[120px]">
+                            className="flex-1 bg-transparent text-[11px] md:text-xs font-semibold text-gray-700 px-2 py-1.5 outline-none border-r border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors hidden sm:block min-w-0 truncate">
                             <option value="">{t('village', dashTranslations)}</option>
                             {filters.district && filters.block && filters.gp && locationData[filters.district][filters.block][filters.gp] && locationData[filters.district][filters.block][filters.gp].map(v => <option key={v} value={v}>{v}</option>)}
                         </select>
                         <select
                             value={filters.pwmu}
                             onChange={(e) => setFilters({ ...filters, pwmu: e.target.value })}
-                            className="bg-transparent text-xs font-semibold text-gray-700 px-3 py-1.5 outline-none cursor-pointer hover:bg-gray-50 rounded-r-md transition-colors min-w-[120px]">
+                            className="flex-1 bg-transparent text-[11px] md:text-xs font-semibold text-gray-700 px-2 py-1.5 outline-none cursor-pointer hover:bg-gray-50 rounded-r-md transition-colors min-w-0 truncate">
                             <option value="">{t('pwmuWise', dashTranslations)}</option>
                             {rawData.pwmu.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                         </select>
-                    </div>
-
-                    {/* System Status Bubble */}
-                    <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-full px-4 py-1.5 shadow-sm shrink-0">
-                        <div className="flex flex-col text-right mr-2">
-                            <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider font-sans">{t('systemStatus', dashTranslations)}</span>
-                            <span className="text-sm font-bold text-green-600 font-sans">{t('operational', dashTranslations)}</span>
-                        </div>
-                        <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
                     </div>
                 </div>
             </div>
@@ -705,11 +702,22 @@ const Dashboard = () => {
 
             {/* Economic & Spatial Overview */}
             <div className="mt-2 pt-6 border-t border-gray-200 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-                <div className="mb-6">
-                    <h2 className="text-2xl font-bold text-gray-800">
-                        {displayRoleName === 'Admin' ? t('operationalEconomicState', dashTranslations) : t('operationalEconomic', dashTranslations)}
-                    </h2>
-                    <p className="text-sm text-gray-500 mt-1">{t('deepDive', dashTranslations)}</p>
+                <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-800">
+                            {displayRoleName === 'Admin' ? t('operationalEconomicState', dashTranslations) : t('operationalEconomic', dashTranslations)}
+                        </h2>
+                        <p className="text-sm text-gray-500 mt-1">{t('deepDive', dashTranslations)}</p>
+                    </div>
+
+                    {/* Relocated System Status Bubble */}
+                    <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-full px-4 py-1.5 shadow-sm shrink-0 h-fit">
+                        <div className="flex flex-col text-right mr-2">
+                            <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider font-sans">{t('systemStatus', dashTranslations)}</span>
+                            <span className="text-sm font-bold text-green-600 font-sans">{t('operational', dashTranslations)}</span>
+                        </div>
+                        <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -721,13 +729,13 @@ const Dashboard = () => {
                                 <p className="text-sm text-gray-500 mt-1">{t('districtCoverage', dashTranslations)}</p>
                             </div>
                             <div className="flex bg-gray-100 rounded-lg p-1 shadow-inner h-fit self-end">
-                                <button 
+                                <button
                                     onClick={() => setMapMetric('waste')}
                                     className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${mapMetric === 'waste' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                                 >
                                     {t('dryWaste', dashTranslations)}
                                 </button>
-                                <button 
+                                <button
                                     onClick={() => setMapMetric('revenue')}
                                     className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${mapMetric === 'revenue' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                                 >
@@ -736,8 +744,8 @@ const Dashboard = () => {
                             </div>
                         </div>
                         <div className="p-4 flex-1 min-h-[400px]">
-                            <ChhattisgarhMap 
-                                metricData={mapMetric === 'waste' ? stats.districtWasteMap : stats.districtRevenueMap} 
+                            <ChhattisgarhMap
+                                metricData={mapMetric === 'waste' ? stats.districtWasteMap : stats.districtRevenueMap}
                                 metricType={mapMetric}
                             />
                         </div>

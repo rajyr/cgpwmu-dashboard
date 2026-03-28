@@ -118,9 +118,29 @@ const AboutUs = () => {
                             <div className="absolute -bottom-2 left-0 w-full h-3 bg-orange-400/30 -rotate-1 skew-x-12"></div>
                         </span>
                     </h1>
-                    <p className="text-xl text-gray-600 leading-relaxed mb-10">
+                    <p className="text-xl text-gray-600 leading-relaxed mb-6">
                         {t('heroDesc', aboutTranslations)}
                     </p>
+
+                    {/* Branding Logos - Relocated below description and enlarged */}
+                    <div className="flex justify-center animate-fade-in mb-16">
+                        <div className="bg-white/40 backdrop-blur-xl px-8 py-4 rounded-full border border-white shadow-xl flex items-center gap-8 group hover:bg-white/60 transition-all duration-700 relative overflow-hidden">
+                            <div className="absolute inset-0 bg-gradient-to-tr from-white/20 to-transparent opacity-50"></div>
+                            <div className="relative flex items-center gap-6">
+                                <img
+                                    src="/cgpwmu/assets/Logo/Chhattisgarh.webp"
+                                    alt="Chhattisgarh Government"
+                                    className="h-16 md:h-20 w-auto object-contain transition-all duration-500 group-hover:scale-110"
+                                />
+                                <div className="h-12 border-l border-gray-300 mx-2 opacity-50"></div>
+                                <img
+                                    src="/cgpwmu/assets/Logo/unicef.webp"
+                                    alt="UNICEF"
+                                    className="h-12 md:h-16 w-auto object-contain transition-all duration-500 group-hover:scale-110"
+                                />
+                            </div>
+                        </div>
+                    </div>
 
                     <div className="grid md:grid-cols-2 gap-8 my-16">
                         <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 relative overflow-hidden group hover:shadow-md transition-shadow">

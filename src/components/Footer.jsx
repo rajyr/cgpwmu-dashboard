@@ -35,17 +35,34 @@ const Footer = () => {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 {/* Brand and Navigation */}
                 <div className="flex flex-col md:flex-row items-center justify-between gap-8 mb-8">
-                    <Link to="/" className="flex items-center gap-3 group">
-                        <img
-                            src="/cgpwmu/assets/Logo/CGPWMUlogo.webp"
-                            alt="CG-PWMU Logo"
-                            className="h-12 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
-                        />
-                        <div className="flex flex-col">
-                            <span className="font-bold text-gray-900 text-xl leading-tight group-hover:text-blue-600 transition-colors">CG-PWMU</span>
-                            <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">{t('dashboard_nav', footerTranslations)} {t('compliance', footerTranslations)}</span>
+                    <div className="flex items-center gap-6">
+                        <Link to="/" className="flex items-center gap-3 group">
+                            <img
+                                src="/cgpwmu/assets/Logo/CGPWMUlogo.webp"
+                                alt="CG-PWMU Logo"
+                                className="h-16 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
+                            />
+                            <div className="flex flex-col">
+                                <span className="font-bold text-gray-900 text-xl leading-tight group-hover:text-blue-600 transition-colors">CG-PWMU</span>
+                                <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">{t('dashboard_nav', footerTranslations)} {t('compliance', footerTranslations)}</span>
+                            </div>
+                        </Link>
+                        
+                        <div className="h-14 border-l border-gray-300 mx-2 opacity-50"></div>
+                        
+                        <div className="flex items-center gap-6">
+                            <img
+                                src="/cgpwmu/assets/Logo/Chhattisgarh.webp"
+                                alt="Chhattisgarh Government"
+                                className="h-16 w-auto object-contain"
+                            />
+                            <img
+                                src="/cgpwmu/assets/Logo/unicef.webp"
+                                alt="UNICEF"
+                                className="h-12 w-auto object-contain"
+                            />
                         </div>
-                    </Link>
+                    </div>
 
                     <div className="flex flex-wrap justify-center gap-6 text-xs font-bold">
                         {[

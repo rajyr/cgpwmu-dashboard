@@ -162,7 +162,7 @@ const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
     const sidebarContent = (
         <div className="flex flex-col h-full bg-transparent relative">
             {/* Header/Logo Area */}
-            <div 
+            <div
                 onClick={handleLogoClick}
                 className={`flex items-center pt-6 pb-4 px-4 border-b border-gray-100 min-h-[80px] cursor-pointer select-none ${isActuallyCollapsed ? 'justify-center' : 'justify-between'}`}
             >

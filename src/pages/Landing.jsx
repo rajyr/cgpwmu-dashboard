@@ -500,6 +500,25 @@ const Landing = () => {
                     </svg>
                 </div>
                 <div className="relative z-10 w-full pt-20 pb-12">
+                    {/* Mobile-Only Logos Banner - More compact and larger logos */}
+                    <div className="lg:hidden max-w-7xl mx-auto px-4 mb-10 flex justify-center animate-fade-in">
+                        <div className="bg-white/30 backdrop-blur-xl px-6 py-2 rounded-full border border-white/40 shadow-xl flex items-center gap-6 relative overflow-hidden">
+                            <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent opacity-50"></div>
+                            <div className="relative flex items-center gap-5">
+                                <img
+                                    src="/cgpwmu/assets/Logo/Chhattisgarh.webp"
+                                    alt="Chhattisgarh Government"
+                                    className="h-16 w-auto object-contain"
+                                />
+                                <div className="h-12 border-l border-white/60 mx-1"></div>
+                                <img
+                                    src="/cgpwmu/assets/Logo/unicef.webp"
+                                    alt="UNICEF"
+                                    className="h-12 w-auto object-contain"
+                                />
+                            </div>
+                        </div>
+                    </div>
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center animate-fade-in-up">
                         <h1 className="text-5xl md:text-7xl font-extrabold text-slate-900 leading-tight mb-4 flex flex-wrap justify-center items-center gap-x-1 tracking-tight">
                             <span>{t('heroTitle', translations)}</span>
